@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        /* Visit https://aka.ms/tsconfig to read more about this file */
+        "target": "es2022" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+        "lib": [
+            "es2022",
+            "esnext.asynciterable"
+        ], /* Specify a set of bundled library declaration files that describe the target runtime environment. */
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "module": "commonjs" /* Specify what module code is generated. */,
+        "esModuleInterop": true /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */,
+        "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */,
+        "strict": true /* Enable all strict type-checking options. */,
+        "strictNullChecks": true, /* When type checking, take into account 'null' and 'undefined'. */
+        "experimentalDecorators": true, /* Enable experimental support for TC39 stage 2 draft decorators. */
+        "emitDecoratorMetadata": true, /* Emit design-type metadata for decorated declarations in source files. */
+        "sourceMap": true, /* Create source map files for emitted JavaScript files. */
+        "declaration": true,
+        "declarationMap": true, /* Create sourcemaps for d.ts files. */
+        "skipLibCheck": true, /* Skip type checking all .d.ts files. */
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

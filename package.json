@@ -1,0 +1,70 @@
+{
+  "name": "nip05-backend",
+  "version": "1.0.0",
+  "private": false,
+  "license": "UNLICENSED",
+  "author": "christian.ellerbrock@inbayern.net",
+  "repository": {
+    "url": "https://github.com/ChristianEllerbrock/a001-backend",
+    "type": "github"
+  },
+  "description": "",
+  "keywords": [],
+  "main": "index.js",
+  "prisma": {
+    "schema": "src/prisma/schema.prisma",
+    "seed": "ts-node src/prisma/seed.ts"
+  },
+  "scripts": {
+    "clean": "rimraf -rf dist",
+    "prebuild": "npm run clean",
+    "build": "npx tsc",
+    "build:debug": "npm run clean && npx tsc",
+    "start": "node dist/index.js",
+    "dev": "npm run clean && concurrently \"npx tsc --watch\" \"nodemon --inspect src/index.ts\"",
+    "kill": "fuser 4000/tcp -k"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.2.0",
+    "@noble/secp256k1": "^1.7.1",
+    "@prisma/client": "^4.11.0",
+    "@scure/base": "^1.1.1",
+    "axios": "^1.2.2",
+    "class-validator": "^0.14.0",
+    "concurrently": "^7.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-graphql": "^0.12.0",
+    "graphql": "^15.8.0",
+    "graphql-scalars": "^1.20.1",
+    "graphql-ws": "^5.11.2",
+    "luxon": "^3.2.1",
+    "node-fetch": "^2.6.9",
+    "reflect-metadata": "^0.1.13",
+    "type-graphql": "^1.2.0-rc.1",
+    "uuid": "^9.0.0",
+    "websocket-polyfill": "^0.0.3",
+    "ws": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.12",
+    "@types/dotenv": "^8.2.0",
+    "@types/express": "^4.17.14",
+    "@types/luxon": "^3.2.0",
+    "@types/node": "^18.11.5",
+    "@types/node-fetch": "^2.6.2",
+    "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.5.4",
+    "nodemon": "^2.0.20",
+    "prisma": "^4.11.0",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4"
+  },
+  "nodemonConfig": {
+    "execMap": {
+      "ts": "node --require ts-node/register/transpile-only"
+    }
+  }
+}
