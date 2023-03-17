@@ -1,0 +1,149 @@
+datasource db {
+    provider          = "sqlserver"
+    url               = env("DATABASE_URL")
+    shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+model User {
+    id        String   @id @default(uuid())
+    pubkey    String   @unique
+    createdAt DateTime
+
+    registrations Registration[]
+    userToken     UserToken?
+    userLoginCode UserLoginCode?
+}
+
+model UserToken {
+    id         String   @id @default(uuid())
+    userId     String   @unique
+    token      String
+    validUntil DateTime
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Registration {
+    id         String    @id @default(uuid())
+    userId     String
+    identifier String    @unique
+    createdAt  DateTime
+    validUntil DateTime
+    verifiedAt DateTime?
+    nipped     Int       @default(0)
+
+    user               User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    registrationCode   RegistrationCode?
+    registrationRelays RegistrationRelay[]
+}
+
+model RegistrationCode {
+    id             String   @id @default(uuid())
+    registrationId String   @unique
+    code           String
+    createdAt      DateTime
+    validUntil     DateTime
+
+    registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model RegistrationRelay {
+    id             String @id @default(uuid())
+    registrationId String
+    address        String
+
+    registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model UserLoginCode {
+    id         String   @id @default(uuid())
+    userId     String   @unique
+    code       String
+    createdAt  DateTime
+    validUntil DateTime
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model SystemConfig {
+    id    Int    @id
+    name  String
+    value String
+}
+
+model SystemBlockedIdentifier {
+    id   Int    @id @default(autoincrement())
+    name String @unique
+}
+
+// model UserVerification {
+//     id        String   @id @default(uuid())
+//     userId    String
+//     createdAt DateTime
+//     expiresAt DateTime
+//     code      String
+
+//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+// }
+
+// model UserEvent {
+//     id              String   @id @default(uuid())
+//     userId          String
+//     userEventTypeId Int
+//     createdAt       DateTime @default(now())
+
+//     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+//     userEentType UserEventType @relation(fields: [userEventTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+// }
+
+// model UserEventType {
+//     id         Int         @id
+//     name       String
+//     userEvents UserEvent[]
+// }
+
+// model BlockedIdentifier {
+//     id   Int    @id @default(autoincrement())
+//     name String @unique
+// }
+
+// model AuthRegistration {
+//     id         String   @id @default(uuid())
+//     userId     String   @unique
+//     identifier String
+//     createdAt  DateTime
+//     validUntil DateTime
+
+//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+//     authRegistrationCode AuthRegistrationCode?
+// }
+
+// model AuthRegistrationCode {
+//     id                 String @id @default(uuid())
+//     authRegistrationId String @unique
+//     code               String
+
+//     authRegistration AuthRegistration   @relation(fields: [authRegistrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+//     UserRegistration UserRegistration[]
+// }
+
+// model FraudAuthRegistration {
+//     id         String   @id @default(uuid())
+//     userId     String   @unique
+//     reportedAt DateTime
+// }
+
+// model AuthLogin {
+//     id         String   @id @default(uuid())
+//     userId     String
+//     code       String
+//     createdAt  DateTime
+//     validUntil DateTime
+
+//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+// }

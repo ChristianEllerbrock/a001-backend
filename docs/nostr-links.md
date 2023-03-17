@@ -1,0 +1,1 @@
+https://nostrplebs.com/
