@@ -30,7 +30,12 @@ export class UserRelatedResolver {
         }
 
         const dbRegistrations = await context.db.registration.findMany({
-            where: { userId: context.user.userId },
+            where: {
+                userId: context.user.userId,
+                verifiedAt: {
+                    not: null,
+                },
+            },
         });
 
         return dbRegistrations.sortBy((x) => x.identifier);
