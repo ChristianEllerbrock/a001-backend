@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { buildNip05FromDatabaseAsync } from "../nostr/helpers";
 import { PrismaService } from "../services/prisma-service";
 import { Nip05CacheService } from "../services/nip05-cache-service";
+import { DateTime } from "luxon";
 
 interface Query {
     name?: string;
@@ -13,6 +14,8 @@ export async function wellKnownController(
     next: NextFunction
 ) {
     try {
+        const today = DateTime.now().startOf("day");
+
         const query = req.query as Query;
         if (typeof query.name === "undefined") {
             throw new Error(
@@ -35,13 +38,32 @@ export async function wellKnownController(
             );
         }
 
-        // update stats
+        // update specific (for this registration) stats
         await PrismaService.instance.db.registration.update({
             where: { id: cacheStore.registrationId },
             data: {
                 nipped: { increment: 1 },
             },
         });
+
+        // update global stats
+        const dbDailyLookup =
+            await PrismaService.instance.db.dailyLookup.findFirst({
+                where: { date: today.toJSDate() },
+            });
+        if (dbDailyLookup) {
+            await PrismaService.instance.db.dailyLookup.update({
+                where: { id: dbDailyLookup.id },
+                data: { nipped: dbDailyLookup.nipped + 1 },
+            });
+        } else {
+            await PrismaService.instance.db.dailyLookup.create({
+                data: {
+                    date: today.toJSDate(),
+                    nipped: 1,
+                },
+            });
+        }
 
         res.json(cacheStore.nip05);
     } catch (error) {
