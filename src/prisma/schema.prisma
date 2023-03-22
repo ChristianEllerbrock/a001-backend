@@ -42,6 +42,12 @@ model Registration {
     registrationRelays RegistrationRelay[]
 }
 
+model DailyLookup {
+    id     Int      @id @default(autoincrement())
+    date   DateTime
+    nipped Int
+}
+
 model RegistrationCode {
     id             String   @id @default(uuid())
     registrationId String   @unique
@@ -79,6 +85,14 @@ model SystemConfig {
 model SystemBlockedIdentifier {
     id   Int    @id @default(autoincrement())
     name String @unique
+}
+
+// StatUsers has to be filled/triggered by "something from outside the Api"
+// => Azure Function
+model StatUser {
+    id    Int      @id @default(autoincrement())
+    date  DateTime
+    users Int
 }
 
 // model UserVerification {
