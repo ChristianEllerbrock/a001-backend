@@ -9,9 +9,10 @@ generator client {
 }
 
 model User {
-    id        String   @id @default(uuid())
-    pubkey    String   @unique
-    createdAt DateTime
+    id           String   @id @default(uuid())
+    pubkey       String   @unique
+    createdAt    DateTime
+    isSystemUser Boolean? @default(false)
 
     registrations Registration[]
     userToken     UserToken?
