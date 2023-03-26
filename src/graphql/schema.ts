@@ -1,4 +1,5 @@
 import { BuildSchemaOptions } from "type-graphql";
+import { AdminResolver } from "./resolvers/admin-resolver";
 import { AuthResolver } from "./resolvers/auth-resolver";
 import { LoginResolver } from "./resolvers/login-resolver";
 import { RegistrationRelayResolver } from "./resolvers/registration-relay-resolver";
@@ -10,13 +11,14 @@ import { customAuthChecker } from "./type-defs";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
-        UserResolverRelations,
+        AdminResolver,
         AuthResolver,
+        LoginResolver,
+        UserResolverRelations,
         UserRelatedResolver,
         RegistrationResolver,
         RegistrationResolverRelations,
         RegistrationRelayResolver,
-        LoginResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false }
