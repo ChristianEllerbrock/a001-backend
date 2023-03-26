@@ -12,6 +12,9 @@ export class UserOutput {
     @Field((type) => Date)
     createdAt!: Date;
 
+    @Field(type => Boolean, { nullable: true })
+    isSystemUser?: boolean | null;
+
     // Model Relations
 
     @Field((type) => [RegistrationOutput], { nullable: true })

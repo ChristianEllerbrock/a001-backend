@@ -11,12 +11,13 @@ import { UserTokenOutput } from "./outputs/user-token-output";
 export interface GraphqlContext {
     db: PrismaClient;
     user:
-        | {
-              userId: string;
-              userToken: string;
-              hasValidTokenAsync: () => Promise<boolean>;
-          }
-        | undefined;
+    | {
+        userId: string;
+        userToken: string;
+        hasValidTokenAsync: () => Promise<boolean>;
+        isSystemUser: () => Promise<boolean>;
+    }
+    | undefined;
 }
 
 export const getGraphqlContext = function (
@@ -30,36 +31,54 @@ export const getGraphqlContext = function (
 
         const value2 = req.headers["nip05socialauthorization"];
         userToken = Array.isArray(value2) ? undefined : value2;
-    } catch (error) {}
+    } catch (error) { }
 
     const user =
         typeof userId !== "undefined" && typeof userToken !== "undefined"
             ? {
-                  userId,
-                  userToken,
-                  hasValidTokenAsync: async (): Promise<boolean> => {
-                      if (
-                          typeof userId === "undefined" ||
-                          typeof userToken === "undefined"
-                      ) {
-                          return false;
-                      }
+                userId,
+                userToken,
+                hasValidTokenAsync: async (): Promise<boolean> => {
+                    if (
+                        typeof userId === "undefined" ||
+                        typeof userToken === "undefined"
+                    ) {
+                        return false;
+                    }
 
-                      const dbUserToken =
-                          await PrismaService.instance.db.userToken.findFirst({
-                              where: { userId, token: userToken },
-                          });
+                    const dbUserToken =
+                        await PrismaService.instance.db.userToken.findFirst({
+                            where: { userId, token: userToken },
+                        });
 
-                      if (!dbUserToken) {
-                          return false;
-                      }
+                    if (!dbUserToken) {
+                        return false;
+                    }
 
-                      // Check validity
-                      return Date.now() < dbUserToken.validUntil.getTime()
-                          ? true
-                          : false;
-                  },
-              }
+                    // Check validity
+                    return Date.now() < dbUserToken.validUntil.getTime()
+                        ? true
+                        : false;
+                },
+                isSystemUser: async (): Promise<boolean> => {
+                    if (
+                        typeof userId === "undefined" ||
+                        typeof userToken === "undefined"
+                    ) {
+                        return false;
+                    }
+
+                    const dbUser = await PrismaService.instance.db.user.findUnique({
+                        where: { id: userId }
+                    });
+
+                    if (dbUser?.isSystemUser === true) {
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
             : undefined;
 
     return {
