@@ -56,8 +56,14 @@ export class LoginResolver {
         }
 
         // Create or update user token.
+
         const dbUserToken = await context.db.userToken.upsert({
-            where: { userId: dbUserLoginCode.userId },
+            where: {
+                userId_deviceId: {
+                    userId: dbUserLoginCode.userId,
+                    deviceId: args.deviceId,
+                },
+            },
             update: {
                 token: uuid.v4(),
                 validUntil: now
@@ -66,6 +72,7 @@ export class LoginResolver {
             },
             create: {
                 userId: dbUserLoginCode.userId,
+                deviceId: args.deviceId,
                 token: uuid.v4(),
                 validUntil: now
                     .plus({ minute: userTokenValidityInMinutes })
@@ -81,10 +88,10 @@ export class LoginResolver {
         return dbUserToken;
     }
 
-    @Mutation(returns => String)
+    @Mutation((returns) => String)
     async createLoginCode(
         @Ctx() context: GraphqlContext,
-        @Args() args: LoginCodeCreateInputArgs,
+        @Args() args: LoginCodeCreateInputArgs
     ): Promise<string> {
         await cleanupExpiredLoginsAsync();
 

@@ -9,6 +9,9 @@ export class RegistrationCodeRedeemInput {
     userId!: string;
 
     @Field((type) => String)
+    deviceId!: string;
+
+    @Field((type) => String)
     code!: string;
 }
 
