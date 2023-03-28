@@ -11,13 +11,14 @@ import { UserTokenOutput } from "./outputs/user-token-output";
 export interface GraphqlContext {
     db: PrismaClient;
     user:
-    | {
-        userId: string;
-        userToken: string;
-        hasValidTokenAsync: () => Promise<boolean>;
-        isSystemUser: () => Promise<boolean>;
-    }
-    | undefined;
+        | {
+              userId: string;
+              userToken: string;
+              deviceId: string;
+              hasValidTokenAsync: () => Promise<boolean>;
+              isSystemUser: () => Promise<boolean>;
+          }
+        | undefined;
 }
 
 export const getGraphqlContext = function (
@@ -25,60 +26,74 @@ export const getGraphqlContext = function (
 ): GraphqlContext {
     let userId: string | undefined;
     let userToken: string | undefined;
+    let deviceId: string | undefined;
     try {
         const value1 = req.headers["nip05socialuserid"];
         userId = Array.isArray(value1) ? undefined : value1;
 
         const value2 = req.headers["nip05socialauthorization"];
         userToken = Array.isArray(value2) ? undefined : value2;
-    } catch (error) { }
+
+        const value3 = req.headers["nip05socialdeviceid"];
+        deviceId = Array.isArray(value3) ? undefined : value3;
+    } catch (error) {}
 
     const user =
-        typeof userId !== "undefined" && typeof userToken !== "undefined"
+        typeof userId !== "undefined" &&
+        typeof userToken !== "undefined" &&
+        typeof deviceId !== "undefined"
             ? {
-                userId,
-                userToken,
-                hasValidTokenAsync: async (): Promise<boolean> => {
-                    if (
-                        typeof userId === "undefined" ||
-                        typeof userToken === "undefined"
-                    ) {
-                        return false;
-                    }
+                  userId,
+                  userToken,
+                  deviceId,
+                  hasValidTokenAsync: async (): Promise<boolean> => {
+                      if (
+                          typeof userId === "undefined" ||
+                          typeof userToken === "undefined" ||
+                          typeof deviceId === "undefined"
+                      ) {
+                          return false;
+                      }
 
-                    const dbUserToken =
-                        await PrismaService.instance.db.userToken.findFirst({
-                            where: { userId, token: userToken },
-                        });
+                      const dbUserToken =
+                          await PrismaService.instance.db.userToken.findFirst({
+                              where: {
+                                  userId,
+                                  deviceId,
+                                  token: userToken,
+                              },
+                          });
 
-                    if (!dbUserToken) {
-                        return false;
-                    }
+                      if (!dbUserToken) {
+                          return false;
+                      }
 
-                    // Check validity
-                    return Date.now() < dbUserToken.validUntil.getTime()
-                        ? true
-                        : false;
-                },
-                isSystemUser: async (): Promise<boolean> => {
-                    if (
-                        typeof userId === "undefined" ||
-                        typeof userToken === "undefined"
-                    ) {
-                        return false;
-                    }
+                      // Check validity
+                      return Date.now() < dbUserToken.validUntil.getTime()
+                          ? true
+                          : false;
+                  },
+                  isSystemUser: async (): Promise<boolean> => {
+                      if (
+                          typeof userId === "undefined" ||
+                          typeof userToken === "undefined" ||
+                          typeof deviceId === "undefined"
+                      ) {
+                          return false;
+                      }
 
-                    const dbUser = await PrismaService.instance.db.user.findUnique({
-                        where: { id: userId }
-                    });
+                      const dbUser =
+                          await PrismaService.instance.db.user.findUnique({
+                              where: { id: userId },
+                          });
 
-                    if (dbUser?.isSystemUser === true) {
-                        return true;
-                    }
+                      if (dbUser?.isSystemUser === true) {
+                          return true;
+                      }
 
-                    return false;
-                }
-            }
+                      return false;
+                  },
+              }
             : undefined;
 
     return {
@@ -121,7 +136,8 @@ export const getOrCreateUserInDatabaseAsync = async (
 };
 
 export const updateUserToken = async (
-    userId: string
+    userId: string,
+    deviceId: string
 ): Promise<UserTokenOutput> => {
     const now = DateTime.now();
     const userTokenValidityInMinutes =
@@ -139,13 +155,19 @@ export const updateUserToken = async (
     const token = uuid.v4();
 
     const dbUserToken = await PrismaService.instance.db.userToken.upsert({
-        where: { userId },
+        where: {
+            userId_deviceId: {
+                userId,
+                deviceId,
+            },
+        },
         update: {
             token,
             validUntil,
         },
         create: {
             userId,
+            deviceId: deviceId,
             token,
             validUntil,
         },

@@ -76,7 +76,12 @@ export class RegistrationResolver {
 
         // Create or update user token.
         const dbUserToken = await PrismaService.instance.db.userToken.upsert({
-            where: { userId: dbRegistration.userId },
+            where: {
+                userId_deviceId: {
+                    userId: dbRegistration.userId,
+                    deviceId: args.deviceId,
+                },
+            },
             update: {
                 token: uuid.v4(),
                 validUntil: now
@@ -85,6 +90,7 @@ export class RegistrationResolver {
             },
             create: {
                 userId: dbRegistration.userId,
+                deviceId: args.deviceId,
                 token: uuid.v4(),
                 validUntil: now
                     .plus({ minute: userTokenValidityInMinutes })
@@ -219,15 +225,27 @@ export class RegistrationResolver {
     }
 
     @Authorized()
-    @Mutation(returns => String)
-    async deleteRegistration(@Ctx() context: GraphqlContext, @Args() args: RegistrationDeleteInputArgs): Promise<string> {
-        const dbRegistration = await context.db.registration.findUnique({ where: { id: args.registrationId } });
+    @Mutation((returns) => String)
+    async deleteRegistration(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationDeleteInputArgs
+    ): Promise<string> {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: args.registrationId },
+        });
 
-        if (!dbRegistration || dbRegistration?.userId !== context.user?.userId) {
-            throw new Error(`Could not find your registration with id '${args.registrationId}'.`);
+        if (
+            !dbRegistration ||
+            dbRegistration?.userId !== context.user?.userId
+        ) {
+            throw new Error(
+                `Could not find your registration with id '${args.registrationId}'.`
+            );
         }
 
-        await context.db.registration.delete({ where: { id: dbRegistration.id } });
+        await context.db.registration.delete({
+            where: { id: dbRegistration.id },
+        });
         return dbRegistration.id;
     }
 }

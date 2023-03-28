@@ -5,7 +5,9 @@ import { GraphqlContext, updateUserToken } from "../type-defs";
 @Resolver()
 export class AuthResolver {
     @Query((returns) => UserTokenOutput, { nullable: true })
-    async isAuthenticated(@Ctx() context: GraphqlContext): Promise<UserTokenOutput | null> {
+    async isAuthenticated(
+        @Ctx() context: GraphqlContext
+    ): Promise<UserTokenOutput | null> {
         if (!context.user) {
             return null;
         }
@@ -15,6 +17,10 @@ export class AuthResolver {
             return null;
         }
 
-        return await updateUserToken(context.user.userId);
+        return await updateUserToken(
+            context.user.userId,
+            context.user.deviceId
+        );
     }
 }
+
