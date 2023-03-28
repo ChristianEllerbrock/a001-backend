@@ -10,6 +10,9 @@ export class UserTokenOutput {
     userId!: string;
 
     @Field((type) => String)
+    deviceId!: string;
+
+    @Field((type) => String)
     token!: string;
 
     @Field((type) => Date)

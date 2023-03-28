@@ -15,17 +15,20 @@ model User {
     isSystemUser Boolean? @default(false)
 
     registrations Registration[]
-    userToken     UserToken?
+    userTokens    UserToken[]
     userLoginCode UserLoginCode?
 }
 
 model UserToken {
     id         String   @id @default(uuid())
-    userId     String   @unique
+    userId     String
+    deviceId   String
     token      String
     validUntil DateTime
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@unique([userId, deviceId])
 }
 
 model Registration {

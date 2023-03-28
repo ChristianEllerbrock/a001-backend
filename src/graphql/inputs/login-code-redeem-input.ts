@@ -6,5 +6,9 @@ export class LoginCodeRedeemInput {
     userId!: string;
 
     @Field((type) => String)
+    deviceId!: string;
+
+    @Field((type) => String)
     code!: string;
 }
+
