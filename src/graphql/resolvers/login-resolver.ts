@@ -4,12 +4,14 @@ import { HelperAuth } from "../../helpers/helper-auth";
 import { Nostr } from "../../nostr/nostr";
 import { SystemConfigId } from "../../prisma/assortments";
 import { PrismaService } from "../../services/prisma-service";
-import { RelayService, SendCodeReason } from "../../services/relay-service";
 import { LoginCodeCreateInputArgs } from "../inputs/login-code-create-input";
 import { LoginCodeRedeemInput } from "../inputs/login-code-redeem-input";
 import { UserTokenOutput } from "../outputs/user-token-output";
 import { getOrCreateUserInDatabaseAsync, GraphqlContext } from "../type-defs";
 import * as uuid from "uuid";
+import { AzureServiceBus } from "../../services/azure-service-bus";
+import { ServiceBusMessage } from "@azure/service-bus";
+import { EnvService } from "../../services/env-service";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -131,12 +133,28 @@ export class LoginResolver {
         });
 
         const pubkey = Nostr.npubToHexObject(args.npub).hex;
-        await RelayService.instance.sendCodeAsync(
-            args.relay,
-            pubkey,
-            code,
-            SendCodeReason.Login,
-            dbUserLoginCode.id
+
+        const content = `Your LOGIN code is:
+
+${Array.from(code).join(" ")}
+
+If you did not initiate this login you can either ignore this message or click on the following link to report a fraud attempt:
+
+https://nip05.social/login-fraud/${dbUserLoginCode.id}
+
+Your nip05.social Team`;
+
+        const sbMessage: ServiceBusMessage = {
+            body: {
+                pubkey,
+                content,
+                relay: args.relay,
+            },
+        };
+
+        await AzureServiceBus.instance.sendAsync(
+            sbMessage,
+            EnvService.instance.env.SERVICE_BUS_DM_QUEUE
         );
 
         return dbUser.id;
