@@ -11,11 +11,13 @@ import { RegistrationCreateInput } from "../inputs/registration-create-input";
 import { RegistrationOutput } from "../outputs/registration-output";
 import { UserTokenOutput } from "../outputs/user-token-output";
 import * as uuid from "uuid";
-import { RelayService, SendCodeReason } from "../../services/relay-service";
 import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
 import { GraphqlContext } from "../type-defs";
 import { RegistrationDeleteInputArgs } from "../inputs/registration-delete-input";
 import { Void } from "graphql-scalars/typings/typeDefs";
+import { AzureServiceBus } from "../../services/azure-service-bus";
+import { ServiceBusMessage } from "@azure/service-bus";
+import { EnvService } from "../../services/env-service";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -152,15 +154,29 @@ export class RegistrationResolver {
                 },
             });
 
-        // TODO: Send code via NOSTR relay
+        const content = `Your REGISTRATION code is:
+            
+${Array.from(dbRegistrationCode.code).join(" ")}
 
-        const result = await RelayService.instance.sendCodeAsync(
-            args.relay,
-            dbRegistration.user.pubkey,
-            dbRegistrationCode.code,
-            SendCodeReason.Registration,
-            dbRegistration.id
+If you did not initiate this registration you can either ignore this message or click on the following link to report a fraud attempt:
+
+https://nip05.social/registration-fraud/${dbRegistration.id}
+
+Your nip05.social Team`;
+
+        const message: ServiceBusMessage = {
+            body: {
+                pubkey: dbRegistration.user.pubkey,
+                content,
+                relay: args.relay,
+            },
+        };
+
+        await AzureServiceBus.instance.sendAsync(
+            message,
+            EnvService.instance.env.SERVICE_BUS_DM_QUEUE
         );
+
         return true;
     }
 

@@ -19,6 +19,8 @@ export class EnvServiceEnv {
     BOT_PRIVKEY!: string;
     APP_URL!: string;
     DOMAIN!: string;
+    SERVICE_BUS_CONNECTION_STRING!: string;
+    SERVICE_BUS_DM_QUEUE!: string;
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
