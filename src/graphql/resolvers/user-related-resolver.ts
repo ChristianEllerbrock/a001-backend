@@ -6,16 +6,21 @@ import { GraphqlContext } from "../type-defs";
 
 @Resolver()
 export class UserRelatedResolver {
-    @Authorized()
-    @Query((returns) => UserOutput)
-    async myUser(@Ctx() context: GraphqlContext): Promise<UserOutput> {
-        const dbUser = await context.db.user.findUnique({
-            where: { id: context.user?.userId },
-        });
-
-        if (!dbUser) {
-            throw new Error("Could not find user in database.");
+    @Query((returns) => UserOutput, { nullable: true })
+    async myUser(@Ctx() context: GraphqlContext): Promise<UserOutput | null> {
+        if (!context.user) {
+            return null;
         }
+
+        const isAuthenticated = await context.user.hasValidTokenAsync();
+
+        if (!isAuthenticated) {
+            return null;
+        }
+
+        const dbUser = await context.db.user.findUnique({
+            where: { id: context.user.userId },
+        });
 
         return dbUser;
     }
