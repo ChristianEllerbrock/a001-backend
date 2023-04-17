@@ -63,42 +63,6 @@ export class PrismaService {
             : configValueAsNumber;
     }
 
-    // async logUserEventAsync(userId: string, userEventTypeId: UserEventTypeId) {
-    //     await this._db.userEvent.create({
-    //         data: {
-    //             userId,
-    //             userEventTypeId,
-    //         },
-    //     });
-
-    //     await this._enforceRetentionPolicyAsync(userEventTypeId);
-    // }
-
-    // #endregion Public Methods
-
-    // #region Private Methods
-
-    // private async _enforceRetentionPolicyAsync(
-    //     userEventTypeId: UserEventTypeId
-    // ) {
-    //     switch (userEventTypeId) {
-    //         case UserEventTypeId.userNipped:
-    //             const upperAllowedDate = DateTime.now()
-    //                 .minus({ minute: 5 })
-    //                 .toJSDate();
-
-    //             await this._db.userEvent.deleteMany({
-    //                 where: {
-    //                     createdAt: { lt: upperAllowedDate },
-    //                 },
-    //             });
-    //             break;
-
-    //         default:
-    //             break;
-    //     }
-    // }
-
     // #endregion Private Methods
 }
 

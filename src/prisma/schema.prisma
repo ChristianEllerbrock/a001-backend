@@ -9,14 +9,16 @@ generator client {
 }
 
 model User {
-    id           String   @id @default(uuid())
-    pubkey       String   @unique
-    createdAt    DateTime
-    isSystemUser Boolean? @default(false)
+    id              String    @id @default(uuid())
+    pubkey          String    @unique
+    createdAt       DateTime
+    isSystemUser    Boolean?  @default(false)
+    fraudReportedAt DateTime?
 
-    registrations Registration[]
-    userTokens    UserToken[]
-    userLoginCode UserLoginCode?
+    registrations    Registration[]
+    userTokens       UserToken[]
+    userLoginCode    UserLoginCode?
+    userFraudOptions UserFraudOption[]
 }
 
 model UserToken {
@@ -29,6 +31,14 @@ model UserToken {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
     @@unique([userId, deviceId])
+}
+
+model UserFraudOption {
+    id       String   @id @default(uuid())
+    userId   String
+    createAt DateTime
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model Registration {
@@ -97,71 +107,3 @@ model StatUser {
     date  DateTime
     users Int
 }
-
-// model UserVerification {
-//     id        String   @id @default(uuid())
-//     userId    String
-//     createdAt DateTime
-//     expiresAt DateTime
-//     code      String
-
-//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-// }
-
-// model UserEvent {
-//     id              String   @id @default(uuid())
-//     userId          String
-//     userEventTypeId Int
-//     createdAt       DateTime @default(now())
-
-//     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-//     userEentType UserEventType @relation(fields: [userEventTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-// }
-
-// model UserEventType {
-//     id         Int         @id
-//     name       String
-//     userEvents UserEvent[]
-// }
-
-// model BlockedIdentifier {
-//     id   Int    @id @default(autoincrement())
-//     name String @unique
-// }
-
-// model AuthRegistration {
-//     id         String   @id @default(uuid())
-//     userId     String   @unique
-//     identifier String
-//     createdAt  DateTime
-//     validUntil DateTime
-
-//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-//     authRegistrationCode AuthRegistrationCode?
-// }
-
-// model AuthRegistrationCode {
-//     id                 String @id @default(uuid())
-//     authRegistrationId String @unique
-//     code               String
-
-//     authRegistration AuthRegistration   @relation(fields: [authRegistrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-//     UserRegistration UserRegistration[]
-// }
-
-// model FraudAuthRegistration {
-//     id         String   @id @default(uuid())
-//     userId     String   @unique
-//     reportedAt DateTime
-// }
-
-// model AuthLogin {
-//     id         String   @id @default(uuid())
-//     userId     String
-//     code       String
-//     createdAt  DateTime
-//     validUntil DateTime
-
-//     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-// }
