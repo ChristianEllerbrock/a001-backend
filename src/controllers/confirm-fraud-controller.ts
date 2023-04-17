@@ -37,7 +37,7 @@ export async function confirmFraudController(
 
         if (dbUserFraudOption) {
             if (dbUserFraudOption.user.fraudReportedAt != null) {
-                res.render(__dirname + "/pages/confirm-fraud-notok.html", {
+                res.render("confirm-fraud-notok.html", {
                     message: "Pubkey is already blocked.",
                 });
             } else {
@@ -58,12 +58,12 @@ export async function confirmFraudController(
 
                 const npub = Nostr.Pubkey2nPub(dbUserFraudOption?.user.pubkey);
 
-                res.render(__dirname + "/pages/confirm-fraud-ok.html", {
+                res.render("confirm-fraud-ok.html", {
                     npub,
                 });
             }
         } else {
-            res.render(__dirname + "/pages/confirm-fraud-notok.html", {
+            res.render("confirm-fraud-notok.html", {
                 message: `Link invalid.`,
             });
         }

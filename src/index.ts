@@ -14,6 +14,7 @@ import { wellKnownController } from "./controllers/well-known-controller";
 import { hexController } from "./controllers/hex-controller";
 import { reportFraudController } from "./controllers/report-fraud-controller";
 import { confirmFraudController } from "./controllers/confirm-fraud-controller";
+var path = require("path");
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -26,6 +27,7 @@ const port = EnvService.instance.env.PORT;
 app.use(express.json());
 app.use(cors());
 
+app.set("views", path.join(__dirname, "views"));
 app.engine("html", require("ejs").renderFile);
 
 // API Controller routes

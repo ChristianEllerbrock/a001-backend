@@ -31,17 +31,17 @@ export async function reportFraudController(
 
         if (dbUserFraudOption) {
             if (dbUserFraudOption.user.fraudReportedAt != null) {
-                res.render(__dirname + "/pages/report-fraud-notok.html", {
+                res.render("report-fraud-notok.html", {
                     message: "Pubkey is already blocked.",
                 });
             } else {
-                res.render(__dirname + "/pages/report-fraud-ok.html", {
+                res.render("report-fraud-ok.html", {
                     url: req.baseUrl + `/confirm-fraud/${userId}/${fraudId}`,
                     npub: Nostr.Pubkey2nPub(dbUserFraudOption?.user.pubkey),
                 });
             }
         } else {
-            res.render(__dirname + "/pages/report-fraud-notok.html", {
+            res.render("report-fraud-notok.html", {
                 message: `Link invalid. Please note that all fraud links are only valid for ${userFraudOptionValidityInDays} days.`,
             });
         }
