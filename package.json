@@ -16,12 +16,14 @@
     "seed": "ts-node src/prisma/seed.ts"
   },
   "scripts": {
+    "cp-views": "copyfiles --flat src/views/* dist/views",
     "clean": "rimraf -rf dist",
     "prebuild": "npm run clean",
     "build": "npx tsc",
+    "postbuild": "npm run cp-views",
     "build:debug": "npm run clean && npx tsc",
     "start": "node dist/index.js",
-    "dev": "npm run clean && concurrently \"npx tsc --watch\" \"nodemon --inspect src/index.ts\"",
+    "dev": "npm run clean && npm run cp-views && concurrently \"npx tsc --watch\" \"nodemon --inspect src/index.ts\"",
     "kill": "fuser 4000/tcp -k"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "@types/node-fetch": "^2.6.2",
     "@types/uuid": "^9.0.0",
     "@types/ws": "^8.5.4",
+    "copyfiles": "^2.4.1",
     "nodemon": "^2.0.20",
     "prisma": "^4.12.0",
     "rimraf": "^3.0.2",
