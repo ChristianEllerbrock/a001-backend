@@ -1,0 +1,67 @@
+<html>
+  <head>
+    <title>My Title</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <script></script>
+
+    <style type="text/css">
+      body {
+        font-family: "Roboto", sans-serif;
+
+        background-color: #e7e7e7;
+        margin: 0;
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .flex-row {
+        display: flex;
+        flex-direction: row;
+      }
+
+      .flex-column {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .align-items-center {
+        align-items: center;
+      }
+
+      .font-size-40 {
+        font-size: 40px;
+      }
+
+      .font-size-20 {
+        font-size: 20px;
+      }
+
+      .font-weight-500 {
+        font-weight: 500;
+      }
+
+      .mb-normal {
+        margin-bottom: 24px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="flex-column align-items-center" style="align-items: center">
+      <div class="font-size-40 font-weight-500 mb-normal">
+        Report FRAUD ERROR
+      </div>
+      <div class="mb-normal font-size-20"><%= message %></div>
+    </div>
+  </body>
+</html>
