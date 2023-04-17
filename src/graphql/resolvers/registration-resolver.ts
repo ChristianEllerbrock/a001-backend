@@ -12,12 +12,17 @@ import { RegistrationOutput } from "../outputs/registration-output";
 import { UserTokenOutput } from "../outputs/user-token-output";
 import * as uuid from "uuid";
 import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
-import { GraphqlContext } from "../type-defs";
+import {
+    GraphqlContext,
+    cleanAndAddUserFraudOption,
+    getOrCreateUserInDatabaseAsync,
+} from "../type-defs";
 import { RegistrationDeleteInputArgs } from "../inputs/registration-delete-input";
 import { Void } from "graphql-scalars/typings/typeDefs";
 import { AzureServiceBus } from "../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
+import { ErrorMessage } from "./error-messages";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -154,13 +159,15 @@ export class RegistrationResolver {
                 },
             });
 
+        const fraudId = await cleanAndAddUserFraudOption(dbRegistration.userId);
+
         const content = `Your REGISTRATION code is:
             
 ${Array.from(dbRegistrationCode.code).join(" ")}
 
 If you did not initiate this registration you can either ignore this message or click on the following link to report a fraud attempt:
 
-https://nip05.social/registration-fraud/${dbRegistration.id}
+https://nip05.social/report-fraud/${dbRegistration.userId}/${fraudId}
 
 Your nip05.social Team`;
 
@@ -188,28 +195,19 @@ Your nip05.social Team`;
 
         const now = DateTime.now();
 
+        const dbUser = await getOrCreateUserInDatabaseAsync(args.npub);
+
+        // Only continue, if the user was NOT reported as fraud.
+        if (dbUser.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
+        }
+
         const check = await HelperIdentifier.canIdentifierBeRegisteredAsync(
             args.identifier
         );
 
         if (!check.canBeRegistered) {
             throw new Error(check.reason);
-        }
-
-        let pubkey = Nostr.npubToHexObject(args.npub).hex;
-
-        // Check if the user is already registered
-        let dbUser = await PrismaService.instance.db.user.findFirst({
-            where: { pubkey },
-        });
-        if (!dbUser) {
-            // Create database user
-            dbUser = await PrismaService.instance.db.user.create({
-                data: {
-                    pubkey,
-                    createdAt: new Date(),
-                },
-            });
         }
 
         const registrationValidityInMinutes =

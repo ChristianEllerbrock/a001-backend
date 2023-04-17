@@ -7,11 +7,16 @@ import { PrismaService } from "../../services/prisma-service";
 import { LoginCodeCreateInputArgs } from "../inputs/login-code-create-input";
 import { LoginCodeRedeemInput } from "../inputs/login-code-redeem-input";
 import { UserTokenOutput } from "../outputs/user-token-output";
-import { getOrCreateUserInDatabaseAsync, GraphqlContext } from "../type-defs";
+import {
+    cleanAndAddUserFraudOption,
+    getOrCreateUserInDatabaseAsync,
+    GraphqlContext,
+} from "../type-defs";
 import * as uuid from "uuid";
 import { AzureServiceBus } from "../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
+import { ErrorMessage } from "./error-messages";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -34,10 +39,15 @@ export class LoginResolver {
 
         const dbUserLoginCode = await context.db.userLoginCode.findFirst({
             where: { userId: args.userId },
+            include: { user: true },
         });
 
         if (!dbUserLoginCode) {
             throw new Error("No login request found for this user.");
+        }
+
+        if (dbUserLoginCode.user.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
         }
 
         if (dbUserLoginCode.code !== args.code) {
@@ -101,6 +111,11 @@ export class LoginResolver {
 
         const dbUser = await getOrCreateUserInDatabaseAsync(args.npub);
 
+        // CHeck, if the user was reported as "fraud"
+        if (dbUser.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
+        }
+
         const loginValidityInMinutes =
             await PrismaService.instance.getSystemConfigAsNumberAsync(
                 SystemConfigId.LoginCodeValidityInMinutes
@@ -132,6 +147,8 @@ export class LoginResolver {
             },
         });
 
+        const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
+
         const pubkey = Nostr.npubToHexObject(args.npub).hex;
 
         const content = `Your LOGIN code is:
@@ -140,7 +157,7 @@ ${Array.from(code).join(" ")}
 
 If you did not initiate this login you can either ignore this message or click on the following link to report a fraud attempt:
 
-https://nip05.social/login-fraud/${dbUserLoginCode.id}
+https://nip05.social/report-fraud/${dbUser.id}/${fraudId}
 
 Your nip05.social Team`;
 
