@@ -176,3 +176,35 @@ export const updateUserToken = async (
     return dbUserToken;
 };
 
+export const cleanAndAddUserFraudOption = async (
+    userId: string
+): Promise<string> => {
+    const now = DateTime.now();
+    const userFraudOptionValidityInDays =
+        await PrismaService.instance.getSystemConfigAsNumberAsync(
+            SystemConfigId.UserFraudOptionValidityInDays
+        );
+
+    // Delete all entries in dbo.UserFraudOption that are "older" than allowed.
+    await PrismaService.instance.db.userFraudOption.deleteMany({
+        where: {
+            createAt: {
+                lt: now
+                    .minus({ day: userFraudOptionValidityInDays })
+                    .toJSDate(),
+            },
+        },
+    });
+
+    // Create new entry in dbo.UserFraudOption
+    const dbUserFraudOption =
+        await PrismaService.instance.db.userFraudOption.create({
+            data: {
+                userId,
+                createAt: now.toJSON(),
+            },
+        });
+
+    return dbUserFraudOption.id;
+};
+

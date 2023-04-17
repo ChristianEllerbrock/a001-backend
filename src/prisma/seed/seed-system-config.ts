@@ -52,6 +52,18 @@ const seed = async function (prisma: PrismaClient) {
             value: "10",
         },
     });
+
+    i = 5;
+
+    await prisma.systemConfig.upsert({
+        where: { id: i },
+        update: {},
+        create: {
+            id: i,
+            name: "USER_FRAUD_OPTION_VALIDITY_IN_DAYS",
+            value: "30",
+        },
+    });
 };
 
 export { seed as seedSystemConfig };
