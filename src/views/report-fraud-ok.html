@@ -22,6 +22,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
+
+        overflow-y: hidden;
+        overflow-x: hidden;
       }
 
       .flex-row {
@@ -80,12 +83,21 @@
   </head>
 
   <body>
-    <div class="flex-column align-items-center" style="align-items: center">
+    <div
+      class="flex-column align-items-center"
+      style="margin: 24px; text-align: center; overflow: hidden"
+    >
       <div class="font-size-40 font-weight-500 mb-normal">Report FRAUD</div>
-      <div class="mb-normal font-size-20"><%= npub %></div>
+      <!-- <div class="mb-normal font-size-20"><%= npub %></div> -->
+      <div
+        class="mb-normal font-size-20"
+        style="overflow: hidden; text-overflow: ellipsis; width: 100%"
+      >
+        <%= npub %><
+      </div>
       <div class="font-size-203 mb-normal" style="color: red">
         ATTENTION: The pubkey will be blocked
-        <b class="font-weight-500">permanently</b> on nip05.social
+        <b class="font-weight-500">permanently</b>
       </div>
 
       <a class="button" href="<%= url %>">BLOCK</a>
