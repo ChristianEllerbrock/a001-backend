@@ -42,17 +42,19 @@ model UserFraudOption {
 }
 
 model Registration {
-    id         String    @id @default(uuid())
-    userId     String
-    identifier String    @unique
-    createdAt  DateTime
-    validUntil DateTime
-    verifiedAt DateTime?
-    nipped     Int       @default(0)
+    id             String    @id @default(uuid())
+    userId         String
+    identifier     String    @unique
+    createdAt      DateTime
+    validUntil     DateTime
+    verifiedAt     DateTime?
+    nipped         Int       @default(0)
+    systemDomainId Int       @default(1)
 
     user               User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
     registrationCode   RegistrationCode?
     registrationRelays RegistrationRelay[]
+    systemDomain       SystemDomain        @relation(fields: [systemDomainId], references: [id])
 }
 
 model DailyLookup {
@@ -101,9 +103,10 @@ model SystemBlockedIdentifier {
 }
 
 model SystemDomain {
-    id    Int    @id
-    name  String
-    order Int
+    id            Int            @id
+    name          String
+    order         Int
+    registrations Registration[]
 }
 
 // StatUsers has to be filled/triggered by "something from outside the Api"
