@@ -100,6 +100,12 @@ model SystemBlockedIdentifier {
     name String @unique
 }
 
+model SystemDomain {
+    id    Int    @id
+    name  String
+    order Int
+}
+
 // StatUsers has to be filled/triggered by "something from outside the Api"
 // => Azure Function
 model StatUser {
