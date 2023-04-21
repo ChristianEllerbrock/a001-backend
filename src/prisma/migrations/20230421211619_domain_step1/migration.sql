@@ -1,0 +1,24 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[SystemDomain] (
+    [id] INT NOT NULL,
+    [name] NVARCHAR(1000) NOT NULL,
+    [order] INT NOT NULL,
+    CONSTRAINT [SystemDomain_pkey] PRIMARY KEY CLUSTERED ([id])
+);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH
