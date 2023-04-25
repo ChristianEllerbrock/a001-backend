@@ -14,6 +14,7 @@ model User {
     createdAt       DateTime
     isSystemUser    Boolean?  @default(false)
     fraudReportedAt DateTime?
+    isSystemAgent   Boolean   @default(false)
 
     registrations    Registration[]
     userTokens       UserToken[]

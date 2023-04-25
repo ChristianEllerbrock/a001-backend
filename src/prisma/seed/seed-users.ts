@@ -2,49 +2,108 @@ import { PrismaClient } from "@prisma/client";
 import { Nostr } from "../../nostr/nostr";
 import { EnvService } from "../../services/env-service";
 
-const seed = async function (prisma: PrismaClient) {
-    const seedDate = new Date();
-
-    // #region bot User
-
-    const pubkey = Nostr.getPubKeyHexObjectFromPrivKey(
-        EnvService.instance.env.BOT_PRIVKEY
-    ).hex;
-
+async function seedBot(
+    prisma: PrismaClient,
+    seedDate: Date,
+    pubkey: string,
+    identifier: string
+) {
     const botDbUser = await prisma.user.upsert({
         where: { pubkey: pubkey },
-        update: {},
+        update: {
+            isSystemAgent: true,
+        },
         create: {
             pubkey: pubkey,
+            isSystemUser: true,
+            isSystemAgent: true,
             createdAt: seedDate,
         },
     });
 
-    const botDbRegistration = await prisma.registration.upsert({
-        where: { identifier: "bot" },
+    await prisma.registration.upsert({
+        where: { identifier },
         update: {},
         create: {
             userId: botDbUser.id,
-            identifier: "bot",
+            identifier,
+            systemDomainId: 1,
             createdAt: seedDate,
             validUntil: seedDate,
             verifiedAt: seedDate,
         },
     });
+}
 
-    await prisma.registrationRelay.deleteMany({
-        where: { registrationId: botDbRegistration.id },
-    });
-    await prisma.registrationRelay.create({
-        data: {
-            registrationId: botDbRegistration.id,
-            address: "wss://nostr-pub.wellorder.net",
-        },
-    });
+const seed = async function (prisma: PrismaClient) {
+    const seedDate = new Date();
 
-    // #endregion bot User
+    // #region bot users
+
+    const pubkey = Nostr.getPubKeyHexObjectFromPrivKey(
+        EnvService.instance.env.BOT_PRIVKEY
+    ).hex;
+
+    seedBot(prisma, seedDate, pubkey, "bot");
+    seedBot(
+        prisma,
+        seedDate,
+        "c6d5eb25e5b352ba8e0e5bf5e70f79d6f18492d1fc294554a53996d4755221ef",
+        "bot2"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "4b1ef958fe009df0c696b7443034c9d4f4e15b9948553e86693b43e689449961",
+        "bot3"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "b96fc93681c73f2477a67bf462025d6b6f843db2aaea2b410f8e593316bfa92a",
+        "bot4"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "50b61ee8f15860252a3835fd949a11b1ce5b01bb352d53b7e5437f130c178984",
+        "bot5"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "f975acbafed19f190ec608c800dcd2acf4d2b376cdc144582cf51ca728a219c5",
+        "bot6"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "d1f76005694e26ba955370ca74d86defe2862564c3eea79a7414d9a5fa30a9f4",
+        "bot7"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "2b95e398f5c20509605639300c7a52252f77380e9d3268230bf0b49a277a0a87",
+        "bot8"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "1e4ab9bf9395959dca9a52dfdfa83e38f74aa0153ece44163e3e4c71e9c81fcc",
+        "bot9"
+    );
+    seedBot(
+        prisma,
+        seedDate,
+        "8377ae5e4c818aa4e429a08f009d64295d43057bd90a5325137051602a432ef7",
+        "bot10"
+    );
+
+    // #endregion bot users
 
     // #region chris User
+
     const pubkeyChris =
         "090e4e48e07e331b7a9eb527532794969ab1086ddfa4d805fff88c6358e9d15d";
 
@@ -53,6 +112,8 @@ const seed = async function (prisma: PrismaClient) {
         update: {},
         create: {
             pubkey: pubkeyChris,
+            isSystemUser: true,
+            isSystemAgent: false,
             createdAt: seedDate,
         },
     });
@@ -62,6 +123,7 @@ const seed = async function (prisma: PrismaClient) {
         create: {
             userId: chrisDbUser.id,
             identifier: "chris",
+            systemDomainId: 1,
             createdAt: seedDate,
             validUntil: seedDate,
             verifiedAt: seedDate,
