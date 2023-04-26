@@ -37,7 +37,7 @@ export class AzureServiceBus {
 
         if (sessionId) {
             await sender.sendMessages({
-                body: message,
+                body: message.body,
                 sessionId,
             });
         } else {

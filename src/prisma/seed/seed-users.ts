@@ -40,11 +40,12 @@ const seed = async function (prisma: PrismaClient) {
 
     // #region bot users
 
-    const pubkey = Nostr.getPubKeyHexObjectFromPrivKey(
-        EnvService.instance.env.BOT_PRIVKEY
-    ).hex;
-
-    seedBot(prisma, seedDate, pubkey, "bot");
+    seedBot(
+        prisma,
+        seedDate,
+        "decfe634a6a6a6025fb59d4e139026381242b9ddad6b8d612d370c343942c005",
+        "bot"
+    );
     seedBot(
         prisma,
         seedDate,

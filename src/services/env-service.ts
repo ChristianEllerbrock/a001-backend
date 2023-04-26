@@ -16,9 +16,9 @@ export class EnvServiceEnv {
     DATABASE_URL!: string;
     SHADOW_DATABASE_URL?: string;
 
-    BOT_PRIVKEY!: string;
-    APP_URL!: string;
-    DOMAIN!: string;
+    //BOT_PRIVKEY!: string;
+    //APP_URL!: string;
+    //DOMAIN!: string;
     SERVICE_BUS_CONNECTION_STRING!: string;
     SERVICE_BUS_DM_QUEUE!: string;
 
