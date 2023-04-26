@@ -28,10 +28,21 @@ export class AzureServiceBus {
         );
     }
 
-    async sendAsync(message: ServiceBusMessage, queueName: string) {
-        const sender = this._client.createSender(queueName);
+    async sendAsync(
+        message: ServiceBusMessage,
+        queueName: string,
+        sessionId: string | undefined = undefined
+    ) {
+        const sender = this._client.createSender(queueName, {});
 
-        await sender.sendMessages(message);
+        if (sessionId) {
+            await sender.sendMessages({
+                body: message.body,
+                sessionId,
+            });
+        } else {
+            await sender.sendMessages(message);
+        }
     }
 }
 
