@@ -45,21 +45,17 @@ app.get("/", (req, res, next) => {
     // localhost
     // ...
     if (req.hostname.includes("wwww.")) {
-        appUrl = `${req.protocol}://${req.hostname.replace("wwww.", "app.")}:${
-            EnvService.instance.env.PORT
-        }`;
+        appUrl = `${req.protocol}://${req.hostname.replace("wwww.", "app.")}`;
     } else if (req.hostname.includes("dev.")) {
         appUrl = `${req.protocol}://${req.hostname.replace(
             "dev.",
             "dev.app."
-        )}:${EnvService.instance.env.PORT}`;
+        )}`;
     } else if (req.hostname.includes("localhost")) {
         res.send("You are on localhost. No forwarding to any app location.");
         return;
     } else {
-        appUrl = `${req.protocol}://${"app." + req.hostname}:${
-            EnvService.instance.env.PORT
-        }`;
+        appUrl = `${req.protocol}://${"app." + req.hostname}`;
     }
     console.log(appUrl);
 
