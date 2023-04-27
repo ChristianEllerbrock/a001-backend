@@ -35,7 +35,9 @@ export async function buildNip05FromDatabaseAsync(
         });
 
     if (!dbRegistration) {
-        throw new Error(`No record found with the name '${identifier}'.`);
+        throw new Error(
+            `No record found with the name '${identifier}' on '${domain}'.`
+        );
     }
 
     const data: Nip05 = {
