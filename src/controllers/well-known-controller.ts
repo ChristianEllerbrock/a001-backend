@@ -32,12 +32,14 @@ export async function wellKnownController(
         } else {
             const hostnameParts = req.hostname.toLowerCase().split(".");
             const lastIndex = hostnameParts.length - 1;
-            const domain = (
+            domain = (
                 hostnameParts[lastIndex - 1] +
                 "." +
                 hostnameParts[lastIndex]
             ).toLowerCase();
         }
+
+        console.log(`CHECK '${identifier}@${domain}'`);
 
         // 1st check the cache
         let cacheStore = Nip05CacheService.instance.get(
