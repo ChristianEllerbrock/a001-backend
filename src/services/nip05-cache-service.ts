@@ -38,25 +38,29 @@ export class Nip05CacheService {
 
     // #region Public Methods
 
-    set(identifier: string, registrationId: string, nip05: Nip05): CacheStore {
+    set(
+        identifierPlusDomain: string,
+        registrationId: string,
+        nip05: Nip05
+    ): CacheStore {
         const cacheStore: CacheStore = {
             registrationId: registrationId,
             nip05,
         };
-        this._cacheStore.set(identifier, cacheStore);
+        this._cacheStore.set(identifierPlusDomain, cacheStore);
         return cacheStore;
     }
 
-    get(identifier: string): CacheStore | undefined {
-        return this._cacheStore.get(identifier);
+    get(identifierPlusDomain: string): CacheStore | undefined {
+        return this._cacheStore.get(identifierPlusDomain);
     }
 
-    has(identifier: string): boolean {
-        return this._cacheStore.has(identifier);
+    has(identifierPlusDomain: string): boolean {
+        return this._cacheStore.has(identifierPlusDomain);
     }
 
-    invalidate(identifier: string): boolean {
-        return this._cacheStore.delete(identifier);
+    invalidate(identifierPlusDomain: string): boolean {
+        return this._cacheStore.delete(identifierPlusDomain);
     }
 
     invalidateCache() {
