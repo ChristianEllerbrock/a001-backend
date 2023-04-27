@@ -17,6 +17,7 @@ import { AzureServiceBus } from "../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
 import { ErrorMessage } from "./error-messages";
+import { AgentService } from "../../services/agent-service";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -161,17 +162,23 @@ https://nip05.social/report-fraud/${dbUser.id}/${fraudId}
 
 Your nip05.social Team`;
 
+        const agentInfo =
+            await AgentService.instance.determineAgentInfoForNextJobAsync(
+                args.relay
+            );
+
         const sbMessage: ServiceBusMessage = {
             body: {
                 pubkey,
                 content,
                 relay: args.relay,
+                agentPubkey: agentInfo[0],
             },
         };
-
         await AzureServiceBus.instance.sendAsync(
             sbMessage,
-            EnvService.instance.env.SERVICE_BUS_DM_QUEUE
+            EnvService.instance.env.SERVICE_BUS_DM_QUEUE,
+            agentInfo[1]
         );
 
         return dbUser.id;

@@ -23,16 +23,34 @@ export async function wellKnownController(
             );
         }
 
-        const identifier = query.name.trim();
+        const identifier = query.name.trim().toLowerCase();
+
+        // Determine the domain from the request.
+        let domain = "";
+        if (req.hostname.includes("localhost")) {
+            domain = "nip05.social";
+        } else {
+            const hostnameParts = req.hostname.toLowerCase().split(".");
+            const lastIndex = hostnameParts.length - 1;
+            domain = (
+                hostnameParts[lastIndex - 1] +
+                "." +
+                hostnameParts[lastIndex]
+            ).toLowerCase();
+        }
+
+        console.log(`CHECK '${identifier}@${domain}'`);
 
         // 1st check the cache
-        let cacheStore = Nip05CacheService.instance.get(identifier);
+        let cacheStore = Nip05CacheService.instance.get(
+            `${identifier}@${domain}`
+        );
         if (!cacheStore) {
-            const data = await buildNip05FromDatabaseAsync(identifier);
+            const data = await buildNip05FromDatabaseAsync(identifier, domain);
 
             // cache element
             cacheStore = Nip05CacheService.instance.set(
-                identifier,
+                `${identifier}@${domain}`,
                 data[0], // registration.id
                 data[1]
             );
