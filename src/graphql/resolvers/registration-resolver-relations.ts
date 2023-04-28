@@ -4,6 +4,7 @@ import { RegistrationOutput } from "../outputs/registration-output";
 import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
 import { UserOutput } from "../outputs/user-output";
 import { GraphqlContext } from "../type-defs";
+import { SystemDomainOutput } from "../outputs/system-domain";
 
 @Resolver((of) => RegistrationOutput)
 export class RegistrationResolverRelations {
@@ -37,7 +38,26 @@ export class RegistrationResolverRelations {
             return [];
         }
 
-        return dbRegistrations.sortBy(x => x.address);
+        return dbRegistrations.sortBy((x) => x.address);
+    }
+
+    @Authorized()
+    @FieldResolver((returns) => SystemDomainOutput)
+    async systemDomain(
+        @Root() registration: RegistrationOutput,
+        @Ctx() context: GraphqlContext
+    ): Promise<SystemDomainOutput> {
+        const dbSystemDomain = await context.db.registration
+            .findUnique({
+                where: { id: registration.id },
+            })
+            .systemDomain({});
+
+        if (!dbSystemDomain) {
+            throw new Error("Could not find domain info for registration.");
+        }
+
+        return dbSystemDomain;
     }
 }
 

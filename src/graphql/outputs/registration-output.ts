@@ -2,6 +2,7 @@ import { Field, Int, ObjectType } from "type-graphql";
 import { RegistrationCodeOutput } from "./registration-code-output";
 import { RegistrationRelayOutput } from "./registration-relay-output";
 import { UserOutput } from "./user-output";
+import { SystemDomainOutput } from "./system-domain";
 
 @ObjectType("RegistrationOutput", {
     isAbstract: true,
@@ -29,10 +30,16 @@ export class RegistrationOutput {
     @Field((type) => Int)
     nipped!: number;
 
+    @Field((type) => Int)
+    systemDomainId!: number;
+
     // Model Relations
 
     @Field((type) => UserOutput)
     user?: UserOutput;
+
+    @Field((type) => SystemDomainOutput)
+    systemDomain?: SystemDomainOutput;
 
     // Prevent the model relation RegistrationCode to be exposed.
 
