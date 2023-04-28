@@ -8,6 +8,7 @@ import { RegistrationResolverRelations } from "./resolvers/registration-resolver
 import { UserRelatedResolver } from "./resolvers/user-related-resolver";
 import { UserResolverRelations } from "./resolvers/user-resolver-relations";
 import { customAuthChecker } from "./type-defs";
+import { SystemResolver } from "./resolvers/system-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -19,8 +20,9 @@ export const schemaOptions: BuildSchemaOptions = {
         RegistrationResolver,
         RegistrationResolverRelations,
         RegistrationRelayResolver,
+        SystemResolver,
     ],
     authChecker: customAuthChecker,
-    validate: { forbidUnknownValues: false }
+    validate: { forbidUnknownValues: false },
 };
 
