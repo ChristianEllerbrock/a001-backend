@@ -23,6 +23,7 @@ import { AzureServiceBus } from "../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
 import { ErrorMessage } from "./error-messages";
+import { AgentService } from "../../services/agent-service";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -171,17 +172,24 @@ https://nip05.social/report-fraud/${dbRegistration.userId}/${fraudId}
 
 Your nip05.social Team`;
 
-        const message: ServiceBusMessage = {
+        const agentInfo =
+            await AgentService.instance.determineAgentInfoForNextJobAsync(
+                args.relay
+            );
+
+        const sbMessage: ServiceBusMessage = {
             body: {
                 pubkey: dbRegistration.user.pubkey,
                 content,
                 relay: args.relay,
+                agentPubkey: agentInfo[0],
             },
         };
 
         await AzureServiceBus.instance.sendAsync(
-            message,
-            EnvService.instance.env.SERVICE_BUS_DM_QUEUE
+            sbMessage,
+            EnvService.instance.env.SERVICE_BUS_DM_QUEUE,
+            agentInfo[1]
         );
 
         return true;
