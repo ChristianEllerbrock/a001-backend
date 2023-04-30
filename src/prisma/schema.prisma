@@ -45,7 +45,7 @@ model UserFraudOption {
 model Registration {
     id             String    @id @default(uuid())
     userId         String
-    identifier     String    @unique
+    identifier     String
     createdAt      DateTime
     validUntil     DateTime
     verifiedAt     DateTime?
@@ -56,6 +56,8 @@ model Registration {
     registrationCode   RegistrationCode?
     registrationRelays RegistrationRelay[]
     systemDomain       SystemDomain        @relation(fields: [systemDomainId], references: [id])
+
+    @@unique([identifier, systemDomainId])
 }
 
 model DailyLookup {
