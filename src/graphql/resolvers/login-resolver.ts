@@ -18,6 +18,7 @@ import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
 import { ErrorMessage } from "./error-messages";
 import { AgentService } from "../../services/agent-service";
+import { NostrHelperV2, NostrPubkeyObject } from "../../nostr/nostr-helper-2";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -31,6 +32,9 @@ const cleanupExpiredLoginsAsync = async () => {
 
 @Resolver()
 export class LoginResolver {
+    //
+    // redeemLoginCode
+    //
     @Mutation((returns) => UserTokenOutput)
     async redeemLoginCode(
         @Args() args: LoginCodeRedeemInput,
@@ -101,6 +105,9 @@ export class LoginResolver {
         return dbUserToken;
     }
 
+    //
+    // createLoginCode
+    //
     @Mutation((returns) => String)
     async createLoginCode(
         @Ctx() context: GraphqlContext,
@@ -110,7 +117,16 @@ export class LoginResolver {
 
         const now = DateTime.now();
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(args.npub);
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         // CHeck, if the user was reported as "fraud"
         if (dbUser.fraudReportedAt != null) {
@@ -150,8 +166,6 @@ export class LoginResolver {
 
         const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
 
-        const pubkey = Nostr.npubToHexObject(args.npub).hex;
-
         const content = `Your LOGIN code is:
 
 ${Array.from(code).join(" ")}
@@ -169,7 +183,7 @@ Your nip05.social Team`;
 
         const sbMessage: ServiceBusMessage = {
             body: {
-                pubkey,
+                pubkey: pubkeyObject.hex,
                 content,
                 relay: args.relay,
                 agentPubkey: agentInfo[0],

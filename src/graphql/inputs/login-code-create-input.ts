@@ -3,7 +3,7 @@ import { ArgsType, Field } from "type-graphql";
 @ArgsType()
 export class LoginCodeCreateInputArgs {
     @Field((type) => String)
-    npub!: string;
+    pubkey!: string;
 
     @Field((type) => String)
     relay!: string;
