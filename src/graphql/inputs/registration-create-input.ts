@@ -9,6 +9,6 @@ export class RegistrationCreateInput {
     systemDomainId!: number;
 
     @Field((type) => String)
-    npub!: string;
+    pubkey!: string;
 }
 
