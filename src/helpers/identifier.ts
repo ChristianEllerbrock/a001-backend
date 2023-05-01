@@ -3,7 +3,8 @@ import { PrismaService } from "../services/prisma-service";
 
 export class HelperIdentifier {
     static async canIdentifierBeRegisteredAsync(
-        identifier: string
+        identifier: string,
+        systemDomainId: number
     ): Promise<IdentifierRegisterCheckOutput> {
         const cleanIdentifier = identifier.trim().toLowerCase();
 
@@ -27,6 +28,18 @@ export class HelperIdentifier {
             };
         }
 
+        const dbSystemDomain =
+            await PrismaService.instance.db.systemDomain.findUnique({
+                where: { id: systemDomainId },
+            });
+        if (!dbSystemDomain) {
+            return {
+                name: cleanIdentifier,
+                canBeRegistered: false,
+                reason: "The provided domain does not exist.",
+            };
+        }
+
         // 3nd check:
         // On blocked list
         const dbBlockedIdentifier =
@@ -47,6 +60,7 @@ export class HelperIdentifier {
             await PrismaService.instance.db.registration.findFirst({
                 where: {
                     identifier: cleanIdentifier,
+                    systemDomainId,
                     verifiedAt: { not: null },
                 },
             });
@@ -62,7 +76,11 @@ export class HelperIdentifier {
         // pending registration
         const dbPendingRegistration =
             await PrismaService.instance.db.registration.findFirst({
-                where: { identifier: cleanIdentifier, verifiedAt: null },
+                where: {
+                    identifier: cleanIdentifier,
+                    systemDomainId,
+                    verifiedAt: null,
+                },
             });
         if (dbPendingRegistration) {
             return {

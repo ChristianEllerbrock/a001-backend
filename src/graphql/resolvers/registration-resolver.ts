@@ -211,7 +211,8 @@ Your nip05.social Team`;
         }
 
         const check = await HelperIdentifier.canIdentifierBeRegisteredAsync(
-            args.identifier
+            args.identifier,
+            args.systemDomainId
         );
 
         if (!check.canBeRegistered) {
@@ -234,6 +235,7 @@ Your nip05.social Team`;
                 data: {
                     userId: dbUser.id,
                     identifier: check.name,
+                    systemDomainId: args.systemDomainId,
                     createdAt: new Date(),
                     validUntil: now
                         .plus({ minute: registrationValidityInMinutes })
@@ -243,7 +245,6 @@ Your nip05.social Team`;
             });
 
         return dbRegistration;
-        // return dbAuthRegistration;
     }
 
     @Authorized()

@@ -46,9 +46,14 @@ export class UserRelatedResolver {
                     not: null,
                 },
             },
+            include: {
+                systemDomain: true,
+            },
         });
 
-        return dbRegistrations.sortBy((x) => x.identifier);
+        return dbRegistrations.sortBy(
+            (x) => x.systemDomain.name + x.identifier
+        );
     }
 
     @Authorized()
