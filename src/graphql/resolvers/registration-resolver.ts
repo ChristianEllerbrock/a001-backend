@@ -24,6 +24,7 @@ import { ServiceBusMessage } from "@azure/service-bus";
 import { EnvService } from "../../services/env-service";
 import { ErrorMessage } from "./error-messages";
 import { AgentService } from "../../services/agent-service";
+import { NostrHelperV2, NostrPubkeyObject } from "../../nostr/nostr-helper-2";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -203,7 +204,16 @@ Your nip05.social Team`;
 
         const now = DateTime.now();
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(args.npub);
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         // Only continue, if the user was NOT reported as fraud.
         if (dbUser.fraudReportedAt != null) {
