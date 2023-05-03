@@ -115,17 +115,15 @@ export const customAuthChecker: AuthChecker<GraphqlContext> = async (
 };
 
 export const getOrCreateUserInDatabaseAsync = async (
-    npub: string
+    hex: string
 ): Promise<User> => {
-    const pubkey = Nostr.npubToHexObject(npub).hex;
-
     let dbUser = await PrismaService.instance.db.user.findFirst({
-        where: { pubkey },
+        where: { pubkey: hex },
     });
     if (!dbUser) {
         dbUser = await PrismaService.instance.db.user.create({
             data: {
-                pubkey,
+                pubkey: hex,
                 createdAt: new Date(),
                 isSystemUser: false,
             },
