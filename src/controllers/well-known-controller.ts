@@ -15,6 +15,7 @@ export async function wellKnownController(
 ) {
     try {
         const today = DateTime.now().startOf("day");
+        const now = DateTime.now();
 
         const query = req.query as Query;
         if (typeof query.name === "undefined") {
@@ -62,6 +63,7 @@ export async function wellKnownController(
                 where: { id: cacheStore.registrationId },
                 data: {
                     nipped: { increment: 1 },
+                    lastLookupDate: now.toJSDate(),
                 },
             });
 
