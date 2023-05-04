@@ -50,14 +50,25 @@ model Registration {
     validUntil     DateTime
     verifiedAt     DateTime?
     nipped         Int       @default(0)
+    lastLookupDate DateTime?
     systemDomainId Int       @default(1)
 
-    user               User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    registrationCode   RegistrationCode?
-    registrationRelays RegistrationRelay[]
-    systemDomain       SystemDomain        @relation(fields: [systemDomainId], references: [id])
+    user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    registrationCode    RegistrationCode?
+    registrationRelays  RegistrationRelay[]
+    systemDomain        SystemDomain         @relation(fields: [systemDomainId], references: [id])
+    registrationLookups RegistrationLookup[]
 
     @@unique([identifier, systemDomainId])
+}
+
+model RegistrationLookup {
+    id             Int      @id @default(autoincrement())
+    registrationId String
+    date           DateTime
+    total          Int
+
+    registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model DailyLookup {
