@@ -57,12 +57,36 @@ export async function wellKnownController(
         }
 
         // update specific (for this registration) stats
-        await PrismaService.instance.db.registration.update({
-            where: { id: cacheStore.registrationId },
-            data: {
-                nipped: { increment: 1 },
-            },
-        });
+        const dbRegistration =
+            await PrismaService.instance.db.registration.update({
+                where: { id: cacheStore.registrationId },
+                data: {
+                    nipped: { increment: 1 },
+                },
+            });
+
+        // update registration stats
+        const dbRegistrationLookup =
+            await PrismaService.instance.db.registrationLookup.findFirst({
+                where: {
+                    registrationId: dbRegistration.id,
+                    date: today.toJSDate(),
+                },
+            });
+        if (dbRegistrationLookup) {
+            await PrismaService.instance.db.registrationLookup.update({
+                where: { id: dbRegistrationLookup.id },
+                data: { total: dbRegistrationLookup.total + 1 },
+            });
+        } else {
+            await PrismaService.instance.db.registrationLookup.create({
+                data: {
+                    registrationId: dbRegistration.id,
+                    date: today.toJSDate(),
+                    total: 1,
+                },
+            });
+        }
 
         // update global stats
         const dbDailyLookup =
