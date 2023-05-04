@@ -50,6 +50,7 @@ model Registration {
     validUntil     DateTime
     verifiedAt     DateTime?
     nipped         Int       @default(0)
+    lastLookupDate DateTime?
     systemDomainId Int       @default(1)
 
     user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
