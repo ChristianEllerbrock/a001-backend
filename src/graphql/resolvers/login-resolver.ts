@@ -115,6 +115,11 @@ export class LoginResolver {
     ): Promise<string> {
         await cleanupExpiredLoginsAsync();
 
+        let cleanedRelay = args.relay;
+        if (args.relay.startsWith("wss://wss://")) {
+            cleanedRelay = args.relay.slice(6);
+        }
+
         const now = DateTime.now();
 
         let pubkeyObject: NostrPubkeyObject | undefined;
@@ -178,14 +183,14 @@ Your nip05.social Team`;
 
         const agentInfo =
             await AgentService.instance.determineAgentInfoForNextJobAsync(
-                args.relay
+                cleanedRelay
             );
 
         const sbMessage: ServiceBusMessage = {
             body: {
                 pubkey: pubkeyObject.hex,
                 content,
-                relay: args.relay,
+                relay: cleanedRelay,
                 agentPubkey: agentInfo[0],
             },
         };
