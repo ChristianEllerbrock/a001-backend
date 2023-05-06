@@ -5,6 +5,9 @@ import {
 } from "../outputs/usage-statistics-output";
 import { GraphqlContext } from "../type-defs";
 import { DateTime } from "luxon";
+import { CacheService } from "../../services/cache-service";
+
+const USAGE_STATISTICS = "usageStatistics";
 
 @Resolver()
 export class StatisticsResolver {
@@ -12,9 +15,17 @@ export class StatisticsResolver {
     async usageStatistics(
         @Ctx() context: GraphqlContext
     ): Promise<UsageStatisticsOutput> {
-        const today = DateTime.now();
-        const todayString = today.toJSDate().toISOString().slice(0, 10);
-        const yesterday = today.plus({ days: -1 });
+        // 1st: query the cache for previously stored (and still cached) value
+        const cachedValue =
+            CacheService.instance.get<UsageStatisticsOutput>(USAGE_STATISTICS);
+        if (cachedValue) {
+            return cachedValue;
+        }
+
+        // 2nd: There was NO cache hit. Get the data from the database and cache the value.
+        const now = DateTime.now();
+        const nowString = now.toJSDate().toISOString().slice(0, 10);
+        const yesterday = now.plus({ days: -1 });
         const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
 
         const queryNoOfUsers = `SELECT 
@@ -42,7 +53,7 @@ export class StatisticsResolver {
                 registrationLookup.total,
                 0
             ))
-            , noOfLookupsToday = SUM(IIF(registrationLookup.[date] = '${todayString}',
+            , noOfLookupsToday = SUM(IIF(registrationLookup.[date] = '${nowString}',
                 registrationLookup.total,
                 0
             ))
@@ -65,7 +76,7 @@ export class StatisticsResolver {
             identifier = registration.identifier
             , domain = domain.name
             --, [date] = registrationLookup.[date] 
-            , lookups = registrationLookup.total
+            , total = registrationLookup.total
             FROM
             dbo.RegistrationLookup registrationLookup
             JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
@@ -83,10 +94,11 @@ export class StatisticsResolver {
             noOfRegistrations,
             noOfLookupsYesterday,
             noOfLookupsToday,
-            date: today.toJSDate(),
+            date: now.toJSDate(),
             lookups,
         };
-        console.log(stats);
+
+        CacheService.instance.set(USAGE_STATISTICS, stats);
 
         return stats;
     }

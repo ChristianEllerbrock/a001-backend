@@ -1,6 +1,6 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
-@ObjectType("RegistrationLookupDailyOutput")
+@ObjectType("RegistrationLookupStatisticsOutput")
 export class RegistrationLookupStatisticsOutput {
     @Field((type) => String)
     identifier!: string;
