@@ -49,14 +49,14 @@ export class StatisticsResolver {
         const noOfRegistrations = (result2 as any[])[0].noOfRegistrations;
 
         const queryNoOfLookups = `SELECT
-            noOfLookupsYesterday = SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
+            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
                 registrationLookup.total,
                 0
-            ))
-            , noOfLookupsToday = SUM(IIF(registrationLookup.[date] = '${nowString}',
+            )), 0)
+            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
                 registrationLookup.total,
                 0
-            ))
+            )), 0)
             FROM
             dbo.RegistrationLookup registrationLookup
             JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
