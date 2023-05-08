@@ -1,7 +1,7 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
-@ObjectType("RegistrationLookupStatisticsOutput")
-export class RegistrationLookupStatisticsOutput {
+@ObjectType("LookupStatisticsOutput")
+export class LookupStatisticsOutput {
     @Field((type) => String)
     identifier!: string;
 
@@ -10,6 +10,27 @@ export class RegistrationLookupStatisticsOutput {
 
     @Field((type) => Int)
     total!: number;
+}
+
+@ObjectType("RegistrationStatisticsOutput")
+export class RegistrationStatisticsOutput {
+    @Field((type) => Date)
+    date!: Date;
+
+    @Field((type) => String)
+    identifier!: string;
+
+    @Field((type) => String)
+    domain!: string;
+}
+
+@ObjectType("RegistrationsPerDomainStatisticsOutput")
+export class RegistrationsPerDomainStatisticsOutput {
+    @Field((type) => String)
+    domain!: string;
+
+    @Field((type) => Int)
+    registrations!: number;
 }
 
 @ObjectType("UsageStatisticsOutput")
@@ -29,7 +50,13 @@ export class UsageStatisticsOutput {
     @Field((type) => Int)
     noOfLookupsToday!: number;
 
-    @Field((type) => [RegistrationLookupStatisticsOutput])
-    lookups!: RegistrationLookupStatisticsOutput[];
+    @Field((type) => [LookupStatisticsOutput])
+    topLookupsToday!: LookupStatisticsOutput[];
+
+    @Field((type) => [RegistrationStatisticsOutput])
+    lastRegistrations!: RegistrationStatisticsOutput[];
+
+    @Field((type) => [RegistrationsPerDomainStatisticsOutput])
+    registrationsPerDomain!: RegistrationsPerDomainStatisticsOutput[];
 }
 
