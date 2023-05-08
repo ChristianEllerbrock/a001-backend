@@ -24,6 +24,15 @@ export class RegistrationStatisticsOutput {
     domain!: string;
 }
 
+@ObjectType("RegistrationsPerDomainStatisticsOutput")
+export class RegistrationsPerDomainStatisticsOutput {
+    @Field((type) => String)
+    domain!: string;
+
+    @Field((type) => Int)
+    registrations!: number;
+}
+
 @ObjectType("UsageStatisticsOutput")
 export class UsageStatisticsOutput {
     @Field((type) => Date)
@@ -46,5 +55,8 @@ export class UsageStatisticsOutput {
 
     @Field((type) => [RegistrationStatisticsOutput])
     lastRegistrations!: RegistrationStatisticsOutput[];
+
+    @Field((type) => [RegistrationsPerDomainStatisticsOutput])
+    registrationsPerDomain!: RegistrationsPerDomainStatisticsOutput[];
 }
 

@@ -2,6 +2,7 @@ import { Ctx, Query, Resolver } from "type-graphql";
 import {
     LookupStatisticsOutput,
     RegistrationStatisticsOutput,
+    RegistrationsPerDomainStatisticsOutput,
     UsageStatisticsOutput,
 } from "../outputs/usage-statistics-output";
 import { GraphqlContext } from "../type-defs";
@@ -43,7 +44,9 @@ export class StatisticsResolver {
             FROM 
             dbo.Registration registration
             JOIN dbo.[User] [user] ON registration.userId  = [user].id
-            WHERE [user].[isSystemAgent] = 0`;
+            WHERE 
+            registration.verifiedAt IS NOT NULL
+            AND [user].[isSystemAgent] = 0`;
         const result2 = await context.db.$queryRawUnsafe(
             queryNoOfRegistrations
         );
@@ -99,12 +102,40 @@ export class StatisticsResolver {
             dbo.Registration registration 
             JOIN dbo.[User] [user] ON [user].id = registration.userId 
             JOIN dbo.SystemDomain domain ON registration.systemDOmainId = domain.id
-            WHERE [user].isSystemAgent = 0
+            WHERE 
+            registration.verifiedAt IS NOT NULL
+            AND [user].isSystemAgent = 0
             ORDER BY registration.verifiedAt DESC`;
         const result5 = await context.db.$queryRawUnsafe(
             queryLast10Registrations
         );
         const lastRegistrations = result5 as RegistrationStatisticsOutput[];
+
+        const queryRegistrationsPerDomain = `SELECT
+                domain = domain.name
+                , registrations = ISNULL(bookedDomain.registrations, 0)
+                FROM
+                dbo.SystemDomain domain 
+                LEFT JOIN
+                (
+                SELECT
+                domain = domain.name
+                , registrations = count(registration.id)
+                FROM
+                dbo.Registration registration 
+                JOIN dbo.[User] [user] ON [user].id = registration.userId 
+                JOIN dbo.SystemDomain domain ON registration.systemDOmainId = domain.id
+                WHERE 
+                registration.verifiedAt IS NOT NULL
+                AND [user].isSystemAgent = 0
+                GROUP BY domain.name
+                ) bookedDomain on domain.name = bookedDomain.domain
+                ORDER BY registrations DESC, domain`;
+        const result6 = await context.db.$queryRawUnsafe(
+            queryRegistrationsPerDomain
+        );
+        const registrationsPerDomain =
+            result6 as RegistrationsPerDomainStatisticsOutput[];
 
         const stats: UsageStatisticsOutput = {
             noOfUsers,
@@ -114,6 +145,7 @@ export class StatisticsResolver {
             date: now.toJSDate(),
             topLookupsToday: top10Lookups,
             lastRegistrations,
+            registrationsPerDomain,
         };
 
         CacheService.instance.set(USAGE_STATISTICS, stats);
