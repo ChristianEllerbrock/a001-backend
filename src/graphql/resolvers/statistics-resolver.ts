@@ -1,6 +1,7 @@
 import { Ctx, Query, Resolver } from "type-graphql";
 import {
-    RegistrationLookupStatisticsOutput,
+    LookupStatisticsOutput,
+    RegistrationStatisticsOutput,
     UsageStatisticsOutput,
 } from "../outputs/usage-statistics-output";
 import { GraphqlContext } from "../type-defs";
@@ -71,7 +72,7 @@ export class StatisticsResolver {
         const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
         const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
 
-        const queryLookups = `SELECT
+        const queryTop10Lookups = `SELECT
             Top 10
             identifier = registration.identifier
             , domain = domain.name
@@ -86,8 +87,24 @@ export class StatisticsResolver {
             registrationLookup.[date] = (SELECT CONVERT (Date, GETDATE()))
             AND [user].isSystemAgent = 0
             order by registrationLookup.total DESC`;
-        const result4 = await context.db.$queryRawUnsafe(queryLookups);
-        const lookups = result4 as RegistrationLookupStatisticsOutput[];
+        const result4 = await context.db.$queryRawUnsafe(queryTop10Lookups);
+        const top10Lookups = result4 as LookupStatisticsOutput[];
+
+        const queryLast10Registrations = `SELECT
+            TOP 10
+            [date] = registration.verifiedAt
+            , registration.identifier
+            , domain = domain.name
+            FROM
+            dbo.Registration registration 
+            JOIN dbo.[User] [user] ON [user].id = registration.userId 
+            JOIN dbo.SystemDomain domain ON registration.systemDOmainId = domain.id
+            WHERE [user].isSystemAgent = 0
+            ORDER BY registration.verifiedAt DESC`;
+        const result5 = await context.db.$queryRawUnsafe(
+            queryLast10Registrations
+        );
+        const lastRegistrations = result5 as RegistrationStatisticsOutput[];
 
         const stats: UsageStatisticsOutput = {
             noOfUsers,
@@ -95,7 +112,8 @@ export class StatisticsResolver {
             noOfLookupsYesterday,
             noOfLookupsToday,
             date: now.toJSDate(),
-            lookups,
+            topLookupsToday: top10Lookups,
+            lastRegistrations,
         };
 
         CacheService.instance.set(USAGE_STATISTICS, stats);
