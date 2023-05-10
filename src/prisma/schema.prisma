@@ -43,26 +43,37 @@ model UserFraudOption {
 }
 
 model Registration {
-    id             String    @id @default(uuid())
-    userId         String
-    identifier     String
-    createdAt      DateTime
-    validUntil     DateTime
-    verifiedAt     DateTime?
-    nipped         Int       @default(0)
-    lastLookupDate DateTime?
-    systemDomainId Int       @default(1)
+    id               String    @id @default(uuid())
+    userId           String
+    identifier       String
+    createdAt        DateTime
+    validUntil       DateTime
+    verifiedAt       DateTime?
+    nipped           Int       @default(0)
+    lastLookupDate   DateTime?
+    systemDomainId   Int       @default(1)
+    lightningAddress String?
 
-    user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    registrationCode    RegistrationCode?
-    registrationRelays  RegistrationRelay[]
-    systemDomain        SystemDomain         @relation(fields: [systemDomainId], references: [id])
-    registrationLookups RegistrationLookup[]
+    user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    registrationCode        RegistrationCode?
+    registrationRelays      RegistrationRelay[]
+    systemDomain            SystemDomain             @relation(fields: [systemDomainId], references: [id])
+    registrationLookups     RegistrationLookup[]
+    lightningAddressLookups LightningAddressLookup[]
 
     @@unique([identifier, systemDomainId])
 }
 
 model RegistrationLookup {
+    id             Int      @id @default(autoincrement())
+    registrationId String
+    date           DateTime
+    total          Int
+
+    registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model LightningAddressLookup {
     id             Int      @id @default(autoincrement())
     registrationId String
     date           DateTime
