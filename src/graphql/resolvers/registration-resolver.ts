@@ -256,6 +256,7 @@ Your nip05.social Team`;
                         .plus({ minute: registrationValidityInMinutes })
                         .toJSDate(),
                     verifiedAt: null,
+                    lightningAddress: null,
                 },
             });
 

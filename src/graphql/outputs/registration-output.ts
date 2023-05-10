@@ -33,6 +33,12 @@ export class RegistrationOutput {
     @Field((type) => Int)
     systemDomainId!: number;
 
+    @Field((type) => Date, { nullable: true })
+    lastLookupDate!: Date | null;
+
+    @Field((type) => String, { nullable: true })
+    lightningAddress!: string | null;
+
     // Model Relations
 
     @Field((type) => UserOutput)
@@ -41,10 +47,6 @@ export class RegistrationOutput {
     @Field((type) => SystemDomainOutput)
     systemDomain?: SystemDomainOutput;
 
-    // Prevent the model relation RegistrationCode to be exposed.
-
-    //@Field((type) => RegistrationCodeOutput, { nullable: true })
-    //registrationCode?: RegistrationCodeOutput | null;
     @Field((type) => [RegistrationCodeOutput])
     registrationsRelays?: RegistrationRelayOutput[];
 }
