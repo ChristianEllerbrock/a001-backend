@@ -4,5 +4,10 @@ export class HelperRegex {
 
         return regExp.test(address);
     }
+
+    static isValidLightningAddress(address: string): boolean {
+        const regExp = /^[\w-\.]+@([\w-]+\.)+[A-Z]{2,}$/i;
+        return regExp.test(address);
+    }
 }
 

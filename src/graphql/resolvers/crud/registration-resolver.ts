@@ -1,30 +1,32 @@
 import { DateTime } from "luxon";
 import { Args, Authorized, Ctx, Mutation, Resolver } from "type-graphql";
-import { HelperAuth } from "../../helpers/helper-auth";
-import { HelperIdentifier } from "../../helpers/identifier";
-import { Nostr } from "../../nostr/nostr";
-import { SystemConfigId } from "../../prisma/assortments";
-import { PrismaService } from "../../services/prisma-service";
-import { RegistrationCodeCreateInput } from "../inputs/registration-code-create-input";
-import { RegistrationCodeRedeemInput } from "../inputs/registration-code-redeem-input";
-import { RegistrationCreateInput } from "../inputs/registration-create-input";
-import { RegistrationOutput } from "../outputs/registration-output";
-import { UserTokenOutput } from "../outputs/user-token-output";
+import { HelperAuth } from "../../../helpers/helper-auth";
+import { HelperIdentifier } from "../../../helpers/identifier";
+import { SystemConfigId } from "../../../prisma/assortments";
+import { PrismaService } from "../../../services/prisma-service";
+import { RegistrationCodeCreateInput } from "../../inputs/registration-code-create-input";
+import { RegistrationCodeRedeemInput } from "../../inputs/registration-code-redeem-input";
+import { RegistrationCreateInput } from "../../inputs/registration-create-input";
+import { RegistrationOutput } from "../../outputs/registration-output";
+import { UserTokenOutput } from "../../outputs/user-token-output";
 import * as uuid from "uuid";
-import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
 import {
     GraphqlContext,
     cleanAndAddUserFraudOption,
     getOrCreateUserInDatabaseAsync,
-} from "../type-defs";
-import { RegistrationDeleteInputArgs } from "../inputs/registration-delete-input";
-import { Void } from "graphql-scalars/typings/typeDefs";
-import { AzureServiceBus } from "../../services/azure-service-bus";
+} from "../../type-defs";
+import { RegistrationDeleteInputArgs } from "../../inputs/registration-delete-input";
+import { AzureServiceBus } from "../../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
-import { EnvService } from "../../services/env-service";
-import { ErrorMessage } from "./error-messages";
-import { AgentService } from "../../services/agent-service";
-import { NostrHelperV2, NostrPubkeyObject } from "../../nostr/nostr-helper-2";
+import { EnvService } from "../../../services/env-service";
+import { ErrorMessage } from "../error-messages";
+import { AgentService } from "../../../services/agent-service";
+import {
+    NostrHelperV2,
+    NostrPubkeyObject,
+} from "../../../nostr/nostr-helper-2";
+import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
+import { HelperRegex } from "../../../helpers/helper-regex";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -286,6 +288,40 @@ Your nip05.social Team`;
             where: { id: dbRegistration.id },
         });
         return dbRegistration.id;
+    }
+
+    @Authorized()
+    @Mutation((returns) => RegistrationOutput)
+    async updateRegistration(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationInputUpdateArgs
+    ): Promise<RegistrationOutput> {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: args.registrationId },
+        });
+
+        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
+            throw new Error("Could not find registration or unauthorized.");
+        }
+
+        const cleanedLightningAddress =
+            args.data.lightningAddress?.trim().toLowerCase() ?? null;
+
+        if (
+            cleanedLightningAddress &&
+            !HelperRegex.isValidLightningAddress(cleanedLightningAddress)
+        ) {
+            throw new Error("Invlid lightning address.");
+        }
+
+        const updatedDbRegistration = await context.db.registration.update({
+            where: { id: args.registrationId },
+            data: {
+                lightningAddress: cleanedLightningAddress,
+            },
+        });
+
+        return updatedDbRegistration;
     }
 }
 
