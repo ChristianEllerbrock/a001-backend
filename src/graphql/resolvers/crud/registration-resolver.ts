@@ -1,5 +1,13 @@
 import { DateTime } from "luxon";
-import { Args, Authorized, Ctx, Mutation, Resolver } from "type-graphql";
+import {
+    Arg,
+    Args,
+    Authorized,
+    Ctx,
+    Mutation,
+    Query,
+    Resolver,
+} from "type-graphql";
 import { HelperAuth } from "../../../helpers/helper-auth";
 import { HelperIdentifier } from "../../../helpers/identifier";
 import { SystemConfigId } from "../../../prisma/assortments";
@@ -27,6 +35,9 @@ import {
 } from "../../../nostr/nostr-helper-2";
 import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
 import { HelperRegex } from "../../../helpers/helper-regex";
+import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
+
+const NOSTR_STATISTICS = "nostrStatistics";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -322,6 +333,60 @@ Your nip05.social Team`;
         });
 
         return updatedDbRegistration;
+    }
+
+    @Authorized()
+    @Query((returns) => String)
+    async nostrAddressStatistics(
+        @Ctx() context: GraphqlContext,
+        @Arg("registrationId") registrationId: string
+    ) {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: registrationId },
+        });
+
+        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
+            throw new Error("Could not find registration or unauthorized.");
+        }
+
+        const now = DateTime.now();
+        const nowString = now.toJSDate().toISOString().slice(0, 10);
+        const yesterday = now.plus({ days: -1 });
+        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
+
+        const noOfLookups = dbRegistration.nipped;
+
+        const query = `SELECT
+            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            FROM
+            dbo.RegistrationLookup registrationLookup
+            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
+            JOIN dbo.[User] [user] ON [user].id = registration.userId 
+            WHERE 
+            Registration.id = 'asd'
+            AND registrationLookup.[date] in (
+                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
+                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
+            )
+            AND [user].isSystemAgent = 0`;
+        const result3 = await context.db.$queryRawUnsafe(query);
+        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
+        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
+
+        const stats: NostrAddressStatisticsOutput = {
+            noOfLookups,
+            noOfLookupsToday,
+            noOfLookupsYesterday,
+        };
+
+        return stats;
     }
 }
 

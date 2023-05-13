@@ -1,10 +1,9 @@
 import { Arg, Args, Authorized, Ctx, Mutation, Resolver } from "type-graphql";
-import { UpdateRegistrationRelayInputArgs } from "../inputs/update-registration-relay-input";
-import { RegistrationOutput } from "../outputs/registration-output";
-import { GraphqlContext } from "../type-defs";
-import { HelperRegex } from "../../helpers/helper-regex";
-import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
-import { Nip05CacheService } from "../../services/nip05-cache-service";
+import { UpdateRegistrationRelayInputArgs } from "../../inputs/update-registration-relay-input";
+import { GraphqlContext } from "../../type-defs";
+import { HelperRegex } from "../../../helpers/helper-regex";
+import { RegistrationRelayOutput } from "../../outputs/registration-relay-output";
+import { Nip05CacheService } from "../../../services/nip05-cache-service";
 
 @Resolver()
 export class RegistrationRelayResolver {

@@ -2,7 +2,7 @@ import { BuildSchemaOptions } from "type-graphql";
 import { AdminResolver } from "./resolvers/admin-resolver";
 import { AuthResolver } from "./resolvers/auth-resolver";
 import { LoginResolver } from "./resolvers/login-resolver";
-import { RegistrationRelayResolver } from "./resolvers/registration-relay-resolver";
+import { RegistrationRelayResolver } from "./resolvers/crud/registration-relay-resolver";
 import { RegistrationResolver } from "./resolvers/crud/registration-resolver";
 import { RegistrationResolverRelations } from "./resolvers/registration-resolver-relations";
 import { UserRelatedResolver } from "./resolvers/user-related-resolver";
