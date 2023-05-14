@@ -2,6 +2,9 @@ import { Field, Int, ObjectType } from "type-graphql";
 
 @ObjectType()
 export class NostrAddressStatisticsOutput {
+    @Field((type) => String)
+    id!: string;
+
     @Field((type) => Int)
     noOfLookups!: number;
 

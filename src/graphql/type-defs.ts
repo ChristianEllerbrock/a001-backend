@@ -36,7 +36,9 @@ export const getGraphqlContext = function (
 
         const value3 = req.headers["nip05socialdeviceid"];
         deviceId = Array.isArray(value3) ? undefined : value3;
-    } catch (error) {}
+    } catch (error) {
+        console.log(error);
+    }
 
     const user =
         typeof userId !== "undefined" &&

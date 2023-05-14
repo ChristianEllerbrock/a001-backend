@@ -336,11 +336,11 @@ Your nip05.social Team`;
     }
 
     @Authorized()
-    @Query((returns) => String)
+    @Query((returns) => NostrAddressStatisticsOutput)
     async nostrAddressStatistics(
         @Ctx() context: GraphqlContext,
         @Arg("registrationId") registrationId: string
-    ) {
+    ): Promise<NostrAddressStatisticsOutput> {
         const dbRegistration = await context.db.registration.findUnique({
             where: { id: registrationId },
         });
@@ -381,6 +381,7 @@ Your nip05.social Team`;
         const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
 
         const stats: NostrAddressStatisticsOutput = {
+            id: registrationId,
             noOfLookups,
             noOfLookupsToday,
             noOfLookupsYesterday,
