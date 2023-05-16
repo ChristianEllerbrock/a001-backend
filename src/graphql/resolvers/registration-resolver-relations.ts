@@ -22,7 +22,7 @@ export class RegistrationResolverRelations {
         return dbUser;
     }
 
-    @Authorized()
+    //@Authorized()
     @FieldResolver((returns) => [RegistrationRelayOutput], { nullable: true })
     async registrationRelays(
         @Root() registration: RegistrationOutput,
@@ -41,7 +41,7 @@ export class RegistrationResolverRelations {
         return dbRegistrations.sortBy((x) => x.address);
     }
 
-    @Authorized()
+    //@Authorized()
     @FieldResolver((returns) => SystemDomainOutput)
     async systemDomain(
         @Root() registration: RegistrationOutput,

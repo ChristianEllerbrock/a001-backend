@@ -1,30 +1,43 @@
 import { DateTime } from "luxon";
-import { Args, Authorized, Ctx, Mutation, Resolver } from "type-graphql";
-import { HelperAuth } from "../../helpers/helper-auth";
-import { HelperIdentifier } from "../../helpers/identifier";
-import { Nostr } from "../../nostr/nostr";
-import { SystemConfigId } from "../../prisma/assortments";
-import { PrismaService } from "../../services/prisma-service";
-import { RegistrationCodeCreateInput } from "../inputs/registration-code-create-input";
-import { RegistrationCodeRedeemInput } from "../inputs/registration-code-redeem-input";
-import { RegistrationCreateInput } from "../inputs/registration-create-input";
-import { RegistrationOutput } from "../outputs/registration-output";
-import { UserTokenOutput } from "../outputs/user-token-output";
+import {
+    Arg,
+    Args,
+    Authorized,
+    Ctx,
+    Mutation,
+    Query,
+    Resolver,
+} from "type-graphql";
+import { HelperAuth } from "../../../helpers/helper-auth";
+import { HelperIdentifier } from "../../../helpers/identifier";
+import { SystemConfigId } from "../../../prisma/assortments";
+import { PrismaService } from "../../../services/prisma-service";
+import { RegistrationCodeCreateInput } from "../../inputs/registration-code-create-input";
+import { RegistrationCodeRedeemInput } from "../../inputs/registration-code-redeem-input";
+import { RegistrationCreateInput } from "../../inputs/registration-create-input";
+import { RegistrationOutput } from "../../outputs/registration-output";
+import { UserTokenOutput } from "../../outputs/user-token-output";
 import * as uuid from "uuid";
-import { RegistrationRelayOutput } from "../outputs/registration-relay-output";
 import {
     GraphqlContext,
     cleanAndAddUserFraudOption,
     getOrCreateUserInDatabaseAsync,
-} from "../type-defs";
-import { RegistrationDeleteInputArgs } from "../inputs/registration-delete-input";
-import { Void } from "graphql-scalars/typings/typeDefs";
-import { AzureServiceBus } from "../../services/azure-service-bus";
+} from "../../type-defs";
+import { RegistrationDeleteInputArgs } from "../../inputs/registration-delete-input";
+import { AzureServiceBus } from "../../../services/azure-service-bus";
 import { ServiceBusMessage } from "@azure/service-bus";
-import { EnvService } from "../../services/env-service";
-import { ErrorMessage } from "./error-messages";
-import { AgentService } from "../../services/agent-service";
-import { NostrHelperV2, NostrPubkeyObject } from "../../nostr/nostr-helper-2";
+import { EnvService } from "../../../services/env-service";
+import { ErrorMessage } from "../error-messages";
+import { AgentService } from "../../../services/agent-service";
+import {
+    NostrHelperV2,
+    NostrPubkeyObject,
+} from "../../../nostr/nostr-helper-2";
+import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
+import { HelperRegex } from "../../../helpers/helper-regex";
+import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
+
+const NOSTR_STATISTICS = "nostrStatistics";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -256,6 +269,7 @@ Your nip05.social Team`;
                         .plus({ minute: registrationValidityInMinutes })
                         .toJSDate(),
                     verifiedAt: null,
+                    lightningAddress: null,
                 },
             });
 
@@ -285,6 +299,95 @@ Your nip05.social Team`;
             where: { id: dbRegistration.id },
         });
         return dbRegistration.id;
+    }
+
+    @Authorized()
+    @Mutation((returns) => RegistrationOutput)
+    async updateRegistration(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationInputUpdateArgs
+    ): Promise<RegistrationOutput> {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: args.registrationId },
+        });
+
+        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
+            throw new Error("Could not find registration or unauthorized.");
+        }
+
+        const cleanedLightningAddress =
+            args.data.lightningAddress?.trim().toLowerCase() ?? null;
+
+        if (
+            cleanedLightningAddress &&
+            !HelperRegex.isValidLightningAddress(cleanedLightningAddress)
+        ) {
+            throw new Error("Invlid lightning address.");
+        }
+
+        const updatedDbRegistration = await context.db.registration.update({
+            where: { id: args.registrationId },
+            data: {
+                lightningAddress: cleanedLightningAddress,
+            },
+        });
+
+        return updatedDbRegistration;
+    }
+
+    @Authorized()
+    @Query((returns) => NostrAddressStatisticsOutput)
+    async nostrAddressStatistics(
+        @Ctx() context: GraphqlContext,
+        @Arg("registrationId") registrationId: string
+    ): Promise<NostrAddressStatisticsOutput> {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: registrationId },
+        });
+
+        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
+            throw new Error("Could not find registration or unauthorized.");
+        }
+
+        const now = DateTime.now();
+        const nowString = now.toJSDate().toISOString().slice(0, 10);
+        const yesterday = now.plus({ days: -1 });
+        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
+
+        const noOfLookups = dbRegistration.nipped;
+
+        const query = `SELECT
+            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            FROM
+            dbo.RegistrationLookup registrationLookup
+            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
+            JOIN dbo.[User] [user] ON [user].id = registration.userId 
+            WHERE 
+            Registration.id = 'asd'
+            AND registrationLookup.[date] in (
+                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
+                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
+            )
+            AND [user].isSystemAgent = 0`;
+        const result3 = await context.db.$queryRawUnsafe(query);
+        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
+        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
+
+        const stats: NostrAddressStatisticsOutput = {
+            id: registrationId,
+            noOfLookups,
+            noOfLookupsToday,
+            noOfLookupsYesterday,
+        };
+
+        return stats;
     }
 }
 

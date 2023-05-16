@@ -25,6 +25,7 @@ export class UserRelatedResolver {
         return dbUser;
     }
 
+    // @Authorized() // IMPORTANT: MUST NOT HAVE @Authorized attribute
     @Query((returns) => [RegistrationOutput], { nullable: true })
     async myRegistrations(
         @Ctx() context: GraphqlContext
