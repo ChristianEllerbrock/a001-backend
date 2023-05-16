@@ -25,14 +25,24 @@ export class UserRelatedResolver {
         return dbUser;
     }
 
-    @Authorized()
+    // @Authorized() // IMPORTANT: MUST NOT HAVE @Authorized attribute
     @Query((returns) => [RegistrationOutput], { nullable: true })
     async myRegistrations(
         @Ctx() context: GraphqlContext
     ): Promise<RegistrationOutput[] | null> {
+        if (!context.user) {
+            return null;
+        }
+
+        const isAuthenticated = await context.user.hasValidTokenAsync();
+
+        if (!isAuthenticated) {
+            return null;
+        }
+
         const dbRegistrations = await context.db.registration.findMany({
             where: {
-                userId: context.user?.userId,
+                userId: context.user.userId,
                 verifiedAt: {
                     not: null,
                 },
