@@ -10,10 +10,11 @@ import { graphqlHTTP } from "express-graphql";
 import { getGraphqlContext } from "./graphql/type-defs";
 import { buildSchema } from "type-graphql";
 import { schemaOptions } from "./graphql/schema";
-import { wellKnownController } from "./controllers/well-known-controller";
+import { wellKnownNostrController } from "./controllers/well-known-nostr-controller";
 import { hexController } from "./controllers/hex-controller";
 import { reportFraudController } from "./controllers/report-fraud-controller";
 import { confirmFraudController } from "./controllers/confirm-fraud-controller";
+import { wellKnownLightningController } from "./controllers/well-known-lightning-controller";
 var path = require("path");
 
 // Load any environmental variables from the local .env file
@@ -31,7 +32,8 @@ app.set("views", path.join(__dirname, "views"));
 app.engine("html", require("ejs").renderFile);
 
 // API Controller routes
-app.get("/.well-known/nostr.json", wellKnownController);
+app.get("/.well-known/nostr.json", wellKnownNostrController);
+app.get("/.well-known/lnurlp/:username", wellKnownLightningController);
 app.get("/hex", hexController);
 app.get("/", (req, res, next) => {
     let appUrl = "";

@@ -8,7 +8,7 @@ interface Query {
     name?: string;
 }
 
-export async function wellKnownController(
+export async function wellKnownNostrController(
     req: Request,
     res: Response,
     next: NextFunction
