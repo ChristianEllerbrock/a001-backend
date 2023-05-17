@@ -370,7 +370,7 @@ Your nip05.social Team`;
             JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
             JOIN dbo.[User] [user] ON [user].id = registration.userId 
             WHERE 
-            Registration.id = 'asd'
+            registration.id = '${dbRegistration.id}'
             AND registrationLookup.[date] in (
                 (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
                 (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
