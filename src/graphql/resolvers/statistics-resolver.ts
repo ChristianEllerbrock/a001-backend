@@ -35,7 +35,8 @@ export class StatisticsResolver {
             FROM 
             dbo.Registration registration
             LEFT JOIN dbo.[User] [user] ON registration.userId  = [user].id
-            WHERE [user].[isSystemAgent] = 0 AND registration.id IS NOT NULL`;
+            WHERE [user].[isSystemAgent] = 0 AND registration.id IS NOT NULL
+            AND registration.verifiedAt IS NOT NULL`;
         const result1 = await context.db.$queryRawUnsafe(queryNoOfUsers);
         const noOfUsers = (result1 as any[])[0].noOfUsers;
 
