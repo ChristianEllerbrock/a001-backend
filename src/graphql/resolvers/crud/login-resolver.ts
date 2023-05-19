@@ -185,14 +185,20 @@ export class LoginResolver {
         });
 
         // Create MESSAGE to send to the queue
+        const url = context.req.hostname.includes("localhost")
+            ? "https://dev.app.nip05.social"
+            : context.req.protocol + "://" + context.req.hostname;
+
         const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
         const content = `Your LOGIN code is:
 
 ${Array.from(code).join(" ")}
 
-If you did not initiate this login you can either ignore this message or click on the following link to report a fraud attempt:
+Click [here](${url}/alogin/${dbUser.id}/${code}) to automatically login.
 
-https://nip05.social/report-fraud/${dbUser.id}/${fraudId}
+If you did not initiate this login you can either ignore this message or click on this [link](https://nip05.social/report-fraud/${
+            dbUser.id
+        }/${fraudId}) to report a fraud attempt.
 
 Your nip05.social Team`;
 
