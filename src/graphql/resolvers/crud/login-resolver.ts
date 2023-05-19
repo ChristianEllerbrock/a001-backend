@@ -185,9 +185,14 @@ export class LoginResolver {
         });
 
         // Create MESSAGE to send to the queue
-        const url = context.req.hostname.includes("localhost")
-            ? "https://dev.app.nip05.social"
-            : context.req.protocol + "://" + context.req.hostname;
+        let url = "";
+        if (context.req.hostname.includes("localhost")) {
+            url = "https://dev.app.nip05.social";
+        } else if (context.req.hostname.includes("dev")) {
+            url = "https://dev.app.nip05.social";
+        } else {
+            url = "https://app.nip05.social";
+        }
 
         const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
         const content = `Your LOGIN code is:
