@@ -1,7 +1,6 @@
 import { DateTime } from "luxon";
 import { Args, Ctx, Mutation, Resolver } from "type-graphql";
 import { HelperAuth } from "../../../helpers/helper-auth";
-import { Nostr } from "../../../nostr/nostr";
 import { SystemConfigId } from "../../../prisma/assortments";
 import { PrismaService } from "../../../services/prisma-service";
 import { LoginCodeCreateInputArgs } from "../../inputs/login-code-create-input";
@@ -22,6 +21,9 @@ import {
     NostrHelperV2,
     NostrPubkeyObject,
 } from "../../../nostr/nostr-helper-2";
+import { JobType } from "../../../common/enums/job-type";
+import { JobState } from "../../../common/enums/job-state";
+import { ServiceBusDataDirectMessage } from "../../../common/data-types/service-bus-data-direct-message";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -172,8 +174,18 @@ export class LoginResolver {
             },
         });
 
-        const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
+        // Create JOB
+        const dbJob = await context.db.job.create({
+            data: {
+                userId: dbUser.id,
+                // createdAt: new Date()
+                jobTypeId: JobType.NostrDirectMessage,
+                jobStateId: JobState.Created,
+            },
+        });
 
+        // Create MESSAGE to send to the queue
+        const fraudId = await cleanAndAddUserFraudOption(dbUser.id);
         const content = `Your LOGIN code is:
 
 ${Array.from(code).join(" ")}
@@ -189,13 +201,16 @@ Your nip05.social Team`;
                 cleanedRelay
             );
 
+        const data: ServiceBusDataDirectMessage = {
+            pubkey: pubkeyObject.hex,
+            content,
+            relay: cleanedRelay,
+            agentPubkey: agentInfo[0],
+            jobId: dbJob.id,
+        };
+
         const sbMessage: ServiceBusMessage = {
-            body: {
-                pubkey: pubkeyObject.hex,
-                content,
-                relay: cleanedRelay,
-                agentPubkey: agentInfo[0],
-            },
+            body: data,
         };
         await AzureServiceBus.instance.sendAsync(
             sbMessage,
