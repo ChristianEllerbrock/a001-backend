@@ -36,6 +36,9 @@ import {
 import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
 import { HelperRegex } from "../../../helpers/helper-regex";
 import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
+import { JobType } from "../../../common/enums/job-type";
+import { JobState } from "../../../common/enums/job-state";
+import { ServiceBusDataDirectMessage } from "../../../common/data-types/service-bus-data-direct-message";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -125,6 +128,7 @@ export class RegistrationResolver {
 
     @Mutation((returns) => Boolean)
     async createRegistrationCode(
+        @Ctx() context: GraphqlContext,
         @Args() args: RegistrationCodeCreateInput
     ): Promise<boolean> {
         await cleanupExpiredRegistrationsAsync();
@@ -179,6 +183,15 @@ export class RegistrationResolver {
                 },
             });
 
+        // Create JOB
+        const dbJob = await context.db.job.create({
+            data: {
+                userId: dbRegistration.userId,
+                jobTypeId: JobType.NostrDirectMessage,
+                jobStateId: JobState.Created,
+            },
+        });
+
         const fraudId = await cleanAndAddUserFraudOption(dbRegistration.userId);
 
         const content = `Your REGISTRATION code is:
@@ -196,13 +209,16 @@ Your nip05.social Team`;
                 cleanedRelay
             );
 
+        const data: ServiceBusDataDirectMessage = {
+            pubkey: dbRegistration.user.pubkey,
+            content,
+            relay: cleanedRelay,
+            agentPubkey: agentInfo[0],
+            jobId: dbJob.id,
+        };
+
         const sbMessage: ServiceBusMessage = {
-            body: {
-                pubkey: dbRegistration.user.pubkey,
-                content,
-                relay: cleanedRelay,
-                agentPubkey: agentInfo[0],
-            },
+            body: data,
         };
 
         await AzureServiceBus.instance.sendAsync(

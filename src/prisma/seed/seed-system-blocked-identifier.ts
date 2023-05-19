@@ -13,9 +13,11 @@ const seed = async function (prisma: PrismaClient) {
             { name: "iijat" },
             { name: "info" },
             { name: "information" },
+            { name: "lightning" },
             { name: "nostr" },
             { name: "registration" },
             { name: "support" },
+            { name: "wallet" },
         ],
     });
 };
