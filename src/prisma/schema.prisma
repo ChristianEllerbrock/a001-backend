@@ -20,6 +20,7 @@ model User {
     userTokens       UserToken[]
     userLoginCode    UserLoginCode?
     userFraudOptions UserFraudOption[]
+    jobs             Job[]
 }
 
 model UserToken {
@@ -140,4 +141,39 @@ model StatUser {
     id    Int      @id @default(autoincrement())
     date  DateTime
     users Int
+}
+
+// The JobState describes the state of the job:
+// 1: created / queued
+// 2: running
+// 3: finished
+model JobState {
+    id   Int    @id
+    name String
+    jobs Job[]
+}
+
+// The JobType describes the nature of the job:
+// 1: Nostr Direct Message
+// ...
+model JobType {
+    id   Int    @id
+    name String
+    jobs Job[]
+}
+
+model Job {
+    id                String    @id @default(uuid())
+    userId            String?
+    createdAt         DateTime  @default(now())
+    finishedAt        DateTime?
+    finishedOk        Boolean?
+    message           String?
+    durationInSeconds Int?
+    jobStateId        Int
+    jobTypeId         Int
+
+    user     User?    @relation(fields: [userId], references: [id])
+    jobState JobState @relation(fields: [jobStateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    jobType  JobType  @relation(fields: [jobTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
