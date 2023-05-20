@@ -192,15 +192,27 @@ export class RegistrationResolver {
             },
         });
 
-        const fraudId = await cleanAndAddUserFraudOption(dbRegistration.userId);
+        let aUrl = "";
+        if (context.req.hostname.includes("localhost")) {
+            aUrl = "https://dev.app.nip05.social";
+        } else if (context.req.hostname.includes("dev")) {
+            aUrl = "https://dev.app.nip05.social";
+        } else {
+            aUrl = "https://app.nip05.social";
+        }
 
+        const fraudId = await cleanAndAddUserFraudOption(dbRegistration.userId);
         const content = `Your REGISTRATION code is:
             
 ${Array.from(dbRegistrationCode.code).join(" ")}
 
-If you did not initiate this registration you can either ignore this message or click on the following link to report a fraud attempt:
+Click [here](${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${
+            dbRegistrationCode.code
+        }) to finalize your registration.
 
-https://nip05.social/report-fraud/${dbRegistration.userId}/${fraudId}
+If you did not initiate this registration you can either ignore this message or click on this [link](https://nip05.social/report-fraud/${
+            dbRegistration.userId
+        }/${fraudId}) to report a fraud attempt.
 
 Your nip05.social Team`;
 
