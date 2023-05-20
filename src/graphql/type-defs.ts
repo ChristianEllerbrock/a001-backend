@@ -1,15 +1,20 @@
 import { PrismaClient, User } from "@prisma/client";
 import { IncomingMessage } from "node:http";
 import { AuthChecker } from "type-graphql";
-import { Nostr } from "../nostr/nostr";
 import { PrismaService } from "../services/prisma-service";
 import * as uuid from "uuid";
 import { DateTime } from "luxon";
 import { SystemConfigId } from "../prisma/assortments";
 import { UserTokenOutput } from "./outputs/user-token-output";
+import { Request } from "express";
 
 export interface GraphqlContext {
     db: PrismaClient;
+    req: {
+        protocol: string;
+        hostname: string;
+        domain: string;
+    };
     user:
         | {
               userId: string;
@@ -39,6 +44,13 @@ export const getGraphqlContext = function (
     } catch (error) {
         console.log(error);
     }
+
+    const hostname = (req as any).hostname;
+    const protocol = (req as any).protocol;
+    const hostnameParts = hostname.toLowerCase().split(".");
+    const lastIndex = hostnameParts.length - 1;
+    const domain =
+        hostnameParts[lastIndex - 1] + "." + hostnameParts[lastIndex];
 
     const user =
         typeof userId !== "undefined" &&
@@ -101,6 +113,11 @@ export const getGraphqlContext = function (
     return {
         db: PrismaService.instance.db,
         user,
+        req: {
+            hostname,
+            protocol,
+            domain,
+        },
     };
 };
 
