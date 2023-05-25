@@ -8,8 +8,9 @@ import { RegistrationResolverRelations } from "./resolvers/registration-resolver
 import { UserRelatedResolver } from "./resolvers/user-related-resolver";
 import { UserResolverRelations } from "./resolvers/user-resolver-relations";
 import { customAuthChecker } from "./type-defs";
-import { SystemResolver } from "./resolvers/system-resolver";
+import { SystemResolver } from "./resolvers/crud/system-resolver";
 import { StatisticsResolver } from "./resolvers/statistics-resolver";
+import { JobSubResolver } from "./resolvers/subscriptions/job-sub-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -23,6 +24,9 @@ export const schemaOptions: BuildSchemaOptions = {
         RegistrationRelayResolver,
         StatisticsResolver,
         SystemResolver,
+
+        // Subscription resolvers
+        JobSubResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },

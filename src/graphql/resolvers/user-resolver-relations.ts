@@ -1,15 +1,15 @@
 import { Authorized, Ctx, FieldResolver, Resolver, Root } from "type-graphql";
-import { Nostr } from "../../nostr/nostr";
 import { RegistrationOutput } from "../outputs/registration-output";
 import { UserOutput } from "../outputs/user-output";
 import { GraphqlContext } from "../type-defs";
+import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
 
 @Resolver((of) => UserOutput)
 export class UserResolverRelations {
     @Authorized()
     @FieldResolver((returns) => String)
     npub(@Root() user: UserOutput): string {
-        return Nostr.Pubkey2nPub(user.pubkey);
+        return NostrHelperV2.pubkey2npub(user.pubkey);
     }
 
     @Authorized()
@@ -30,3 +30,4 @@ export class UserResolverRelations {
         return (await dbRegistrations).sortBy((x) => x.identifier);
     }
 }
+

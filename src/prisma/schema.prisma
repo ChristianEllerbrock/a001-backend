@@ -135,6 +135,12 @@ model SystemDomain {
     registrations Registration[]
 }
 
+model SystemRelay {
+    id       Int     @id
+    url      String
+    isActive Boolean
+}
+
 // StatUsers has to be filled/triggered by "something from outside the Api"
 // => Azure Function
 model StatUser {

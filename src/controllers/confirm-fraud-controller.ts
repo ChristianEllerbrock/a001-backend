@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../services/prisma-service";
-import { Nostr } from "../nostr/nostr";
+import { NostrHelperV2 } from "../nostr/nostr-helper-2";
 
 interface ConfirmFraudControllerResponse {
     success: boolean;
@@ -56,7 +56,9 @@ export async function confirmFraudController(
                     where: { userId },
                 });
 
-                const npub = Nostr.Pubkey2nPub(dbUserFraudOption?.user.pubkey);
+                const npub = NostrHelperV2.pubkey2npub(
+                    dbUserFraudOption?.user.pubkey
+                );
 
                 res.render("confirm-fraud-ok.html", {
                     npub,

@@ -22,6 +22,8 @@ export class EnvServiceEnv {
     SERVICE_BUS_CONNECTION_STRING!: string;
     SERVICE_BUS_DM_QUEUE!: string;
 
+    KEYVAULT_URI!: string;
+
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
     }
