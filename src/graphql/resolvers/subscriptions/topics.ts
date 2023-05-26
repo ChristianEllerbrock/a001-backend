@@ -1,0 +1,4 @@
+export const PUBLISH_TOPICS = {
+    JOB_STATE_CHANGE: "JOB_STATE_CHANGE",
+};
+

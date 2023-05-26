@@ -1,8 +1,7 @@
-import { Prisma } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../services/prisma-service";
-import { Nostr } from "../nostr/nostr";
 import { SystemConfigId } from "../prisma/assortments";
+import { NostrHelperV2 } from "../nostr/nostr-helper-2";
 
 export async function reportFraudController(
     req: Request,
@@ -37,7 +36,9 @@ export async function reportFraudController(
             } else {
                 res.render("report-fraud-ok.html", {
                     url: req.baseUrl + `/confirm-fraud/${userId}/${fraudId}`,
-                    npub: Nostr.Pubkey2nPub(dbUserFraudOption?.user.pubkey),
+                    npub: NostrHelperV2.pubkey2npub(
+                        dbUserFraudOption?.user.pubkey
+                    ),
                 });
             }
         } else {

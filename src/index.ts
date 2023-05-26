@@ -15,12 +15,17 @@ import { hexController } from "./controllers/hex-controller";
 import { reportFraudController } from "./controllers/report-fraud-controller";
 import { confirmFraudController } from "./controllers/confirm-fraud-controller";
 import { wellKnownLightningController } from "./controllers/well-known-lightning-controller";
+import { testController } from "./controllers/test-controller";
+import { WebSocketServer } from "ws";
+import { useServer } from "graphql-ws/lib/use/ws";
+import { Context as WsContext } from "graphql-ws";
 var path = require("path");
 
 // Load any environmental variables from the local .env file
 dotenv.config();
 
 const GRAPHQL_ENDPOINT = "/graphql";
+const WS_ENDPOINT = "/subscriptions";
 
 const app: Express = express();
 const port = EnvService.instance.env.PORT;
@@ -32,6 +37,7 @@ app.set("views", path.join(__dirname, "views"));
 app.engine("html", require("ejs").renderFile);
 
 // API Controller routes
+app.get("/.test", testController);
 app.get("/.well-known/nostr.json", wellKnownNostrController);
 app.get("/.well-known/lnurlp/:username", wellKnownLightningController);
 app.get("/hex", hexController);
@@ -83,49 +89,52 @@ async function bootstrap() {
     const server = app.listen(port, () => {
         console.log(`⚡️[server]: Running at http://localhost:${port}`);
         console.log(`⚡️[server]: GraphQL endpoint is '${GRAPHQL_ENDPOINT}'`);
-        //console.log(`⚡️[server]: WS endpoint is '${WS_ENDPOINT}'`);
+        console.log(`⚡️[server]: WS endpoint is '${WS_ENDPOINT}'`);
 
         // Start the Web Socket Server on the same port
-        // const wsServer = new WebSocketServer({
-        //     server,
-        //     path: WS_ENDPOINT,
-        // });
+        const wsServer = new WebSocketServer({
+            server,
+            path: WS_ENDPOINT,
+        });
 
         // https://github.com/enisdenjo/graphql-ws
-        // useServer(
-        //     {
-        //         schema,
-        //         // On initial WS connect: Check and verify the user JWT and only setup the subscription with a valid token
-        //         onConnect: async (ctx: WsContext) => {
-        //             const params =
-        //                 ctx.connectionParams as unknown as WebSocketConnectionParams;
-        //             try {
-        //                 const decodedPayload =
-        //                     await AccessTokenService.instance.verifyAsync(
-        //                         params.accessToken
-        //                     );
-        //                 console.log(
-        //                     `[ws-server] - ${new Date().toISOString()} - ${
-        //                         decodedPayload.email
-        //                     } has opened an authenticated web socket connection.`
-        //                 );
-        //             } catch (error) {
-        //                 (ctx.extra as WsContextExtra).socket.close(
-        //                     4401,
-        //                     "Unauthorized"
-        //                 ); // This will force the client to NOT reconnect
-        //             }
-        //             return true;
-        //         },
-        //         // Every following subscription access will uses the initial JWT (from the "onConnect") in the connectionParams
-        //         context: (ctx: WsContext) => {
-        //             return getGraphqlSubContext(
-        //                 ctx.connectionParams as unknown as WebSocketConnectionParams
-        //             );
-        //         },
-        //     },
-        //     wsServer
-        // );
+        useServer(
+            {
+                schema,
+                // On initial WS connect: Check and verify the user JWT and only setup the subscription with a valid token
+                // onConnect: async (ctx: WsContext) => {
+                //     const params =
+                //         ctx.connectionParams as unknown as WebSocketConnectionParams;
+                //     try {
+                //         const decodedPayload =
+                //             await AccessTokenService.instance.verifyAsync(
+                //                 params.accessToken
+                //             );
+                //         console.log(
+                //             `[ws-server] - ${new Date().toISOString()} - ${
+                //                 decodedPayload.email
+                //             } has opened an authenticated web socket connection.`
+                //         );
+                //     } catch (error) {
+                //         (ctx.extra as WsContextExtra).socket.close(
+                //             4401,
+                //             "Unauthorized"
+                //         ); // This will force the client to NOT reconnect
+                //     }
+                //     return true;
+                // },
+                // Every following subscription access will uses the initial JWT (from the "onConnect") in the connectionParams
+                context: (ctx: WsContext) => {
+                    return {
+                        name: "Peter",
+                    };
+                    // return getGraphqlSubContext(
+                    //     ctx.connectionParams as unknown as WebSocketConnectionParams
+                    // );
+                },
+            },
+            wsServer
+        );
     });
 }
 

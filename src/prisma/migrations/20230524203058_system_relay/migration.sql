@@ -1,0 +1,24 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[SystemRelay] (
+    [id] INT NOT NULL,
+    [url] NVARCHAR(1000) NOT NULL,
+    [isActive] BIT NOT NULL,
+    CONSTRAINT [SystemRelay_pkey] PRIMARY KEY CLUSTERED ([id])
+);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH

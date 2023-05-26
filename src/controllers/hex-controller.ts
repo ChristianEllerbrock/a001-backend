@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { Nostr } from "../nostr/nostr";
+import { NostrHelperV2 } from "../nostr/nostr-helper-2";
 
 interface Query {
     value?: string;
@@ -12,7 +12,7 @@ export function hexController(req: Request, res: Response, next: NextFunction) {
             throw new Error("Please provide the param 'value'.");
         }
 
-        const hexObject = Nostr.nXXXToHexObject(query.value);
+        const hexObject = NostrHelperV2.getNostrPubkeyObject(query.value);
         res.json(hexObject);
     } catch (error) {
         next(error);

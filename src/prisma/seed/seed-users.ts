@@ -1,6 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { Nostr } from "../../nostr/nostr";
-import { EnvService } from "../../services/env-service";
 
 async function seedBot(
     prisma: PrismaClient,
