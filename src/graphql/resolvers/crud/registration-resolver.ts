@@ -4,7 +4,10 @@ import {
     Args,
     Authorized,
     Ctx,
+    Int,
     Mutation,
+    PubSub,
+    PubSubEngine,
     Query,
     Resolver,
 } from "type-graphql";
@@ -14,7 +17,6 @@ import { SystemConfigId } from "../../../prisma/assortments";
 import { PrismaService } from "../../../services/prisma-service";
 import { RegistrationCodeCreateInput } from "../../inputs/registration-code-create-input";
 import { RegistrationCodeRedeemInput } from "../../inputs/registration-code-redeem-input";
-import { RegistrationCreateInput } from "../../inputs/registration-create-input";
 import { RegistrationOutput } from "../../outputs/registration-output";
 import { UserTokenOutput } from "../../outputs/user-token-output";
 import * as uuid from "uuid";
@@ -24,11 +26,7 @@ import {
     getOrCreateUserInDatabaseAsync,
 } from "../../type-defs";
 import { RegistrationDeleteInputArgs } from "../../inputs/registration-delete-input";
-import { AzureServiceBus } from "../../../services/azure-service-bus";
-import { ServiceBusMessage } from "@azure/service-bus";
-import { EnvService } from "../../../services/env-service";
 import { ErrorMessage } from "../error-messages";
-import { AgentService } from "../../../services/agent-service";
 import {
     NostrHelperV2,
     NostrPubkeyObject,
@@ -36,9 +34,13 @@ import {
 import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
 import { HelperRegex } from "../../../helpers/helper-regex";
 import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
-import { JobType } from "../../../common/enums/job-type";
-import { JobState } from "../../../common/enums/job-state";
-import { ServiceBusDataDirectMessage } from "../../../common/data-types/service-bus-data-direct-message";
+import { IdentifierRegisterCheckOutput } from "../../outputs/identifier-register-check-output";
+import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
+import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
+import { JobStateChangePayload } from "../../payloads/job-state-change-payload";
+import { PUBLISH_TOPICS } from "../subscriptions/topics";
+import { Registration } from "@prisma/client";
+import { RegistrationCodeResendInput } from "../../inputs/registration-code-resend-input";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -55,6 +57,79 @@ const cleanupExpiredRegistrationsAsync = async () => {
 
 @Resolver()
 export class RegistrationResolver {
+    // #region Queries
+
+    @Query((returns) => IdentifierRegisterCheckOutput)
+    async isRegistrationAvailable(
+        @Ctx() context: GraphqlContext,
+        @Arg("name") name: string,
+        @Arg("systemDomainId", (type) => Int) systemDomainId: number
+    ): Promise<IdentifierRegisterCheckOutput> {
+        return await HelperIdentifier.canIdentifierBeRegisteredAsync(
+            name.trim().toLowerCase(),
+            systemDomainId
+        );
+    }
+
+    @Authorized()
+    @Query((returns) => NostrAddressStatisticsOutput)
+    async nostrAddressStatistics(
+        @Ctx() context: GraphqlContext,
+        @Arg("registrationId") registrationId: string
+    ): Promise<NostrAddressStatisticsOutput> {
+        const dbRegistration = await context.db.registration.findUnique({
+            where: { id: registrationId },
+        });
+
+        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
+            throw new Error("Could not find registration or unauthorized.");
+        }
+
+        const now = DateTime.now();
+        const nowString = now.toJSDate().toISOString().slice(0, 10);
+        const yesterday = now.plus({ days: -1 });
+        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
+
+        const noOfLookups = dbRegistration.nipped;
+
+        const query = `SELECT
+            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
+                registrationLookup.total,
+                0
+            )), 0)
+            FROM
+            dbo.RegistrationLookup registrationLookup
+            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
+            JOIN dbo.[User] [user] ON [user].id = registration.userId 
+            WHERE 
+            registration.id = '${dbRegistration.id}'
+            AND registrationLookup.[date] in (
+                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
+                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
+            )
+            AND [user].isSystemAgent = 0`;
+        const result3 = await context.db.$queryRawUnsafe(query);
+        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
+        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
+
+        const stats: NostrAddressStatisticsOutput = {
+            id: registrationId,
+            noOfLookups,
+            noOfLookupsToday,
+            noOfLookupsYesterday,
+        };
+
+        return stats;
+    }
+
+    // #endregion Queries
+
+    // #region Mutations
+
     @Mutation((returns) => UserTokenOutput)
     async redeemRegistrationCode(
         @Args() args: RegistrationCodeRedeemInput
@@ -126,71 +201,88 @@ export class RegistrationResolver {
         return dbUserToken;
     }
 
-    @Mutation((returns) => Boolean)
+    @Mutation((returns) => RegistrationOutput)
     async createRegistrationCode(
         @Ctx() context: GraphqlContext,
-        @Args() args: RegistrationCodeCreateInput
-    ): Promise<boolean> {
+        @Args() args: RegistrationCodeCreateInput,
+        @PubSub() pubSub: PubSubEngine
+    ): Promise<RegistrationOutput> {
         await cleanupExpiredRegistrationsAsync();
+        const now = DateTime.now();
 
-        let cleanedRelay = args.relay;
-        if (args.relay.startsWith("wss://wss://")) {
-            cleanedRelay = args.relay.slice(6);
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
         }
 
-        const now = DateTime.now();
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+
+        // Only continue, if the user was NOT reported as fraud.
+        if (dbUser.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
+        }
+
+        const check = await HelperIdentifier.canIdentifierBeRegisteredAsync(
+            args.name,
+            args.systemDomainId
+        );
+
+        if (!check.canBeRegistered) {
+            throw new Error(check.reason);
+        }
+
+        const registrationValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.RegistrationValidityInMinutes
+            );
+        if (!registrationValidityInMinutes) {
+            throw new Error(
+                "System config not found in database. Please contact support."
+            );
+        }
 
         const registrationCodeValidityInMinutes =
             await PrismaService.instance.getSystemConfigAsNumberAsync(
                 SystemConfigId.RegistrationCodeValidityInMinutes
             );
-
         if (!registrationCodeValidityInMinutes) {
             throw new Error("Invalid system config. Please contact support.");
         }
 
+        // Create registration in database
         const dbRegistration =
-            await PrismaService.instance.db.registration.findFirst({
-                where: { id: args.registrationId, userId: args.userId },
-                include: { registrationCode: true, user: true },
+            await PrismaService.instance.db.registration.create({
+                data: {
+                    userId: dbUser.id,
+                    identifier: check.name,
+                    systemDomainId: args.systemDomainId,
+                    createdAt: now.toJSDate(),
+                    validUntil: now
+                        .plus({ minute: registrationValidityInMinutes })
+                        .toJSDate(),
+                    verifiedAt: null,
+                    lightningAddress: null,
+                },
             });
 
-        if (!dbRegistration) {
-            throw new Error("No registration found with these parameters.");
-        }
-
-        if (dbRegistration.verifiedAt) {
-            throw new Error("The registration is already verified.");
-        }
-
-        // Delete old code if one is available
-        if (dbRegistration.registrationCode) {
-            await PrismaService.instance.db.registrationCode.delete({
-                where: { id: dbRegistration.registrationCode.id },
-            });
-        }
-
-        // Create new code
+        const code = HelperAuth.generateCode();
         const dbRegistrationCode =
             await PrismaService.instance.db.registrationCode.create({
                 data: {
-                    registrationId: args.registrationId,
+                    registrationId: dbRegistration.id,
+                    code,
                     createdAt: now.toJSDate(),
                     validUntil: now
                         .plus({ minute: registrationCodeValidityInMinutes })
                         .toJSDate(),
-                    code: HelperAuth.generateCode(),
                 },
             });
 
-        // Create JOB
-        const dbJob = await context.db.job.create({
-            data: {
-                userId: dbRegistration.userId,
-                jobTypeId: JobType.NostrDirectMessage,
-                jobStateId: JobState.Created,
-            },
-        });
+        ///////////////
 
         let aUrl = "";
         if (context.req.hostname.includes("localhost")) {
@@ -216,92 +308,196 @@ If you did not initiate this registration you can either ignore this message or 
 
 Your nip05.social Team`;
 
-        const agentInfo =
-            await AgentService.instance.determineAgentInfoForNextJobAsync(
-                cleanedRelay
-            );
+        // Determine the sending of the code
+        // Option 1: Via the full set of defined SystemRelays
+        // Option 2: Via one relay provided by the user
+        enum Option {
+            WithSystemRelayer = 1,
+            WithCustomRelayer = 3,
+        }
+        const option: Option =
+            typeof args.relay === "undefined"
+                ? Option.WithSystemRelayer
+                : Option.WithCustomRelayer;
 
-        const data: ServiceBusDataDirectMessage = {
-            pubkey: dbRegistration.user.pubkey,
-            content,
-            relay: cleanedRelay,
-            agentPubkey: agentInfo[0],
-            jobId: dbJob.id,
-        };
-
-        const sbMessage: ServiceBusMessage = {
-            body: data,
-        };
-
-        await AzureServiceBus.instance.sendAsync(
-            sbMessage,
-            EnvService.instance.env.SERVICE_BUS_DM_QUEUE,
-            agentInfo[1]
-        );
-
-        return true;
-    }
-
-    @Mutation((returns) => RegistrationOutput)
-    async createRegistration(
-        @Args() args: RegistrationCreateInput
-    ): Promise<RegistrationOutput> {
-        await cleanupExpiredRegistrationsAsync();
-
-        const now = DateTime.now();
-
-        let pubkeyObject: NostrPubkeyObject | undefined;
-        try {
-            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
-        } catch (error) {
-            throw new Error(
-                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
-            );
+        let ar: AgentRelayer | undefined;
+        if (option === Option.WithCustomRelayer) {
+            ar = await AgentRelayerService.instance.initWithCustomRelayer([
+                args.relay ?? "",
+            ]);
+        } else {
+            await AgentRelayerService.instance.init();
+            ar = AgentRelayerService.instance.getAgentRelayer();
         }
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const noOfRelays = ar?.relayClients.length ?? 0;
+        let relayResponses = 0;
 
-        // Only continue, if the user was NOT reported as fraud.
-        if (dbUser.fraudReportedAt != null) {
-            throw new Error(ErrorMessage.fraud);
-        }
+        const subscription = ar?.sendEvent.subscribe((event) => {
+            console.log(event);
+            if (event.jobId !== args.jobId) {
+                return; // from some other process
+            }
+            relayResponses++;
+            if (relayResponses === noOfRelays) {
+                console.log("END");
+                subscription?.unsubscribe();
+            }
 
-        const check = await HelperIdentifier.canIdentifierBeRegisteredAsync(
-            args.identifier,
-            args.systemDomainId
-        );
-
-        if (!check.canBeRegistered) {
-            throw new Error(check.reason);
-        }
-
-        const registrationValidityInMinutes =
-            await PrismaService.instance.getSystemConfigAsNumberAsync(
-                SystemConfigId.RegistrationValidityInMinutes
-            );
-        if (!registrationValidityInMinutes) {
-            throw new Error(
-                "System config not found in database. Please contact support."
-            );
-        }
-
-        // Create registration in database
-        const dbRegistration =
-            await PrismaService.instance.db.registration.create({
-                data: {
-                    userId: dbUser.id,
-                    identifier: check.name,
-                    systemDomainId: args.systemDomainId,
-                    createdAt: new Date(),
-                    validUntil: now
-                        .plus({ minute: registrationValidityInMinutes })
-                        .toJSDate(),
-                    verifiedAt: null,
-                    lightningAddress: null,
+            const payload: JobStateChangePayload = {
+                relay: event.relay,
+                success: event.success,
+                item: relayResponses,
+                ofItems: noOfRelays,
+                destinationFilter: {
+                    jobId: args.jobId,
+                    pubkey: args.pubkey,
                 },
-            });
+            };
+            pubSub.publish(PUBLISH_TOPICS.JOB_STATE_CHANGE, payload);
+        });
+
+        if (option === Option.WithCustomRelayer) {
+            if (typeof ar === "undefined") {
+                throw new Error(
+                    "Internal server error. Could not initialize agent relayer."
+                );
+            }
+            await AgentRelayerService.instance.sendWithCustomRelayer(
+                pubkeyObject.hex,
+                content,
+                args.jobId,
+                ar
+            );
+        } else {
+            // Send with system relayer
+            await AgentRelayerService.instance.send(
+                pubkeyObject.hex,
+                content,
+                args.jobId
+            );
+        }
 
         return dbRegistration;
+    }
+
+    @Mutation((returns) => Boolean)
+    async resendRegistrationCode(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationCodeResendInput,
+        @PubSub() pubSub: PubSubEngine
+    ): Promise<boolean> {
+        await cleanupExpiredRegistrationsAsync();
+
+        const dbRegistration = await context.db.registration.findFirst({
+            where: { id: args.registrationId, userId: args.userId },
+            include: {
+                registrationCode: true,
+                user: true,
+            },
+        });
+
+        if (!dbRegistration || !dbRegistration.registrationCode) {
+            throw new Error("No registration found with the provided id.");
+        }
+
+        const code = dbRegistration.registrationCode.code;
+
+        let aUrl = "";
+        if (context.req.hostname.includes("localhost")) {
+            aUrl = "https://dev.app.nip05.social";
+        } else if (context.req.hostname.includes("dev")) {
+            aUrl = "https://dev.app.nip05.social";
+        } else {
+            aUrl = "https://app.nip05.social";
+        }
+
+        const fraudId = await cleanAndAddUserFraudOption(dbRegistration.userId);
+        const content = `Your REGISTRATION code is:
+            
+${Array.from(code).join(" ")}
+
+Click [here](${aUrl}/aregister/${dbRegistration.userId}/${
+            dbRegistration.id
+        }/${code}) to finalize your registration.
+
+If you did not initiate this registration you can either ignore this message or click on this [link](https://nip05.social/report-fraud/${
+            dbRegistration.userId
+        }/${fraudId}) to report a fraud attempt.
+
+Your nip05.social Team`;
+
+        // Determine the sending of the code
+        // Option 1: Via the full set of defined SystemRelays
+        // Option 2: Via one relay provided by the user
+        enum Option {
+            WithSystemRelayer = 1,
+            WithCustomRelayer = 3,
+        }
+        const option: Option =
+            typeof args.relay === "undefined"
+                ? Option.WithSystemRelayer
+                : Option.WithCustomRelayer;
+
+        let ar: AgentRelayer | undefined;
+        if (option === Option.WithCustomRelayer) {
+            ar = await AgentRelayerService.instance.initWithCustomRelayer([
+                args.relay ?? "",
+            ]);
+        } else {
+            await AgentRelayerService.instance.init();
+            ar = AgentRelayerService.instance.getAgentRelayer();
+        }
+
+        const noOfRelays = ar?.relayClients.length ?? 0;
+        let relayResponses = 0;
+
+        const subscription = ar?.sendEvent.subscribe((event) => {
+            console.log(event);
+            if (event.jobId !== args.jobId) {
+                return; // from some other process
+            }
+            relayResponses++;
+            if (relayResponses === noOfRelays) {
+                console.log("END");
+                subscription?.unsubscribe();
+            }
+
+            const payload: JobStateChangePayload = {
+                relay: event.relay,
+                success: event.success,
+                item: relayResponses,
+                ofItems: noOfRelays,
+                destinationFilter: {
+                    jobId: args.jobId,
+                    pubkey: args.pubkey,
+                },
+            };
+            pubSub.publish(PUBLISH_TOPICS.JOB_STATE_CHANGE, payload);
+        });
+
+        if (option === Option.WithCustomRelayer) {
+            if (typeof ar === "undefined") {
+                throw new Error(
+                    "Internal server error. Could not initialize agent relayer."
+                );
+            }
+            await AgentRelayerService.instance.sendWithCustomRelayer(
+                dbRegistration.user.pubkey,
+                content,
+                args.jobId,
+                ar
+            );
+        } else {
+            // Send with system relayer
+            await AgentRelayerService.instance.send(
+                dbRegistration.user.pubkey,
+                content,
+                args.jobId
+            );
+        }
+
+        return true;
     }
 
     @Authorized()
@@ -363,59 +559,6 @@ Your nip05.social Team`;
         return updatedDbRegistration;
     }
 
-    @Authorized()
-    @Query((returns) => NostrAddressStatisticsOutput)
-    async nostrAddressStatistics(
-        @Ctx() context: GraphqlContext,
-        @Arg("registrationId") registrationId: string
-    ): Promise<NostrAddressStatisticsOutput> {
-        const dbRegistration = await context.db.registration.findUnique({
-            where: { id: registrationId },
-        });
-
-        if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
-            throw new Error("Could not find registration or unauthorized.");
-        }
-
-        const now = DateTime.now();
-        const nowString = now.toJSDate().toISOString().slice(0, 10);
-        const yesterday = now.plus({ days: -1 });
-        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
-
-        const noOfLookups = dbRegistration.nipped;
-
-        const query = `SELECT
-            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            FROM
-            dbo.RegistrationLookup registrationLookup
-            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
-            JOIN dbo.[User] [user] ON [user].id = registration.userId 
-            WHERE 
-            registration.id = '${dbRegistration.id}'
-            AND registrationLookup.[date] in (
-                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
-                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
-            )
-            AND [user].isSystemAgent = 0`;
-        const result3 = await context.db.$queryRawUnsafe(query);
-        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
-        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
-
-        const stats: NostrAddressStatisticsOutput = {
-            id: registrationId,
-            noOfLookups,
-            noOfLookupsToday,
-            noOfLookupsYesterday,
-        };
-
-        return stats;
-    }
+    // #endregion Mutations
 }
 
