@@ -183,3 +183,12 @@ model Job {
     jobState JobState @relation(fields: [jobStateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
     jobType  JobType  @relation(fields: [jobTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
+
+// kind0 = profile
+model NostrEvent {
+    id        String @id
+    pubkey    String
+    createdAt Int
+    kind      Int
+    value     String
+}
