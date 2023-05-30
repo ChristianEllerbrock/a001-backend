@@ -1,12 +1,12 @@
 import { ArgsType, Field, Int } from "type-graphql";
 
 @ArgsType()
-export class RegistrationCodeCreateInput {
+export class RegistrationCodeResendInput {
     @Field((type) => String)
-    name!: string;
+    registrationId!: string;
 
-    @Field((type) => Int)
-    systemDomainId!: number;
+    @Field((type) => String)
+    userId!: string;
 
     @Field((type) => String)
     pubkey!: string;

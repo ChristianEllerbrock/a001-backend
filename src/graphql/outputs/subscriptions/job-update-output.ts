@@ -1,7 +1,7 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
 @ObjectType()
-export class LoginJobUpdateOutput {
+export class JobUpdateOutput {
     @Field((type) => String)
     jobId!: string;
 

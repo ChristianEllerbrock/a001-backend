@@ -1,9 +1,9 @@
 import { Arg, Root, Subscription } from "type-graphql";
 import { JobStateChangePayload } from "../../payloads/job-state-change-payload";
-import { LoginJobUpdateOutput } from "../../outputs/subscriptions/login-job-update-output";
+import { JobUpdateOutput } from "../../outputs/subscriptions/job-update-output";
 
 export class JobSubResolver {
-    @Subscription((returns) => LoginJobUpdateOutput, {
+    @Subscription((returns) => JobUpdateOutput, {
         topics: ["JOB_STATE_CHANGE"],
         filter: (call: { args: any; payload: JobStateChangePayload }) => {
             console.log(call.args);
@@ -22,7 +22,8 @@ export class JobSubResolver {
         @Arg("pubkey") pubkey: string,
         @Arg("jobId") jobId: string,
         @Root() payload: JobStateChangePayload
-    ): Promise<LoginJobUpdateOutput> {
+    ): Promise<JobUpdateOutput> {
+        console.log("sub fired");
         return {
             jobId,
             relay: payload.relay,
