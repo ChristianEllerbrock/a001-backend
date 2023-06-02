@@ -24,6 +24,7 @@
     "build:debug": "npm run clean && npx tsc",
     "start": "node dist/index.js",
     "dev": "npm run clean && npm run cp-views && concurrently \"npx tsc --watch\" \"nodemon --inspect src/index.ts\"",
+    "dev2": "npm run clean && npm run cp-views && concurrently --kill-others \"npx tsc -w\" \"nodemon -q -w dist dist/index.js\"",
     "kill": "fuser 4000/tcp -k"
   },
   "dependencies": {

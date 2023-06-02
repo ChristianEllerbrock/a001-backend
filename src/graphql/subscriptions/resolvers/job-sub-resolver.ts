@@ -1,13 +1,11 @@
 import { Arg, Root, Subscription } from "type-graphql";
-import { JobStateChangePayload } from "../../payloads/job-state-change-payload";
+import { JobStateChangePayload } from "../payloads/job-state-change-payload";
 import { JobUpdateOutput } from "../../outputs/subscriptions/job-update-output";
 
 export class JobSubResolver {
     @Subscription((returns) => JobUpdateOutput, {
         topics: ["JOB_STATE_CHANGE"],
         filter: (call: { args: any; payload: JobStateChangePayload }) => {
-            console.log(call.args);
-
             if (
                 call.args.pubkey === call.payload.destinationFilter.pubkey &&
                 call.args.jobId === call.payload.destinationFilter.jobId

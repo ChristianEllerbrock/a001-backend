@@ -37,8 +37,8 @@ import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-add
 import { IdentifierRegisterCheckOutput } from "../../outputs/identifier-register-check-output";
 import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
 import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
-import { JobStateChangePayload } from "../../payloads/job-state-change-payload";
-import { PUBLISH_TOPICS } from "../subscriptions/topics";
+import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
+import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { Registration } from "@prisma/client";
 import { RegistrationCodeResendInput } from "../../inputs/registration-code-resend-input";
 

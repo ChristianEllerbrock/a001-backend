@@ -31,8 +31,8 @@ import {
 import { JobType } from "../../../common/enums/job-type";
 import { JobState } from "../../../common/enums/job-state";
 import { ServiceBusDataDirectMessage } from "../../../common/data-types/service-bus-data-direct-message";
-import { JobStateChangePayload } from "../../payloads/job-state-change-payload";
-import { PUBLISH_TOPICS } from "../subscriptions/topics";
+import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
+import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
 import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
 

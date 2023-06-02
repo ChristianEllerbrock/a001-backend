@@ -1,13 +1,13 @@
 import { Ctx, Query, Resolver } from "type-graphql";
 import {
-    LookupStatisticsOutput,
-    RegistrationStatisticsOutput,
     RegistrationsPerDomainStatisticsOutput,
     UsageStatisticsOutput,
-} from "../outputs/usage-statistics-output";
-import { GraphqlContext } from "../type-defs";
+} from "../../outputs/usage-statistics-output";
+import { GraphqlContext } from "../../type-defs";
 import { DateTime } from "luxon";
-import { CacheService } from "../../services/cache-service";
+import { CacheService } from "../../../services/cache-service";
+import { RegistrationStatisticsOutput } from "../../outputs/statistics/registration-statistics-output";
+import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statistics-output";
 
 const USAGE_STATISTICS = "usageStatistics";
 
@@ -82,6 +82,7 @@ export class StatisticsResolver {
             , domain = domain.name
             --, [date] = registrationLookup.[date] 
             , total = registrationLookup.total
+            , pubkey = [user].pubkey
             FROM
             dbo.RegistrationLookup registrationLookup
             JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
@@ -99,6 +100,7 @@ export class StatisticsResolver {
             [date] = registration.verifiedAt
             , registration.identifier
             , domain = domain.name
+            , pubkey = [user].pubkey
             FROM
             dbo.Registration registration 
             JOIN dbo.[User] [user] ON [user].id = registration.userId 
