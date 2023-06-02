@@ -190,5 +190,5 @@ model NostrEvent {
     pubkey    String
     createdAt Int
     kind      Int
-    value     String
+    value     String @db.NVarChar(max)
 }
