@@ -1,12 +1,14 @@
 import WebSocket from "ws";
 import { v4 } from "uuid";
-import { NostrEvent } from "../nostr";
+import { NostrEvent, NostrFilters } from "../nostr";
 import EventEmitter = require("events");
+import { TIMEOUT } from "dns";
 
 export enum RelayClientEvent {
     onPlayEventOk = "play-event-ok",
     onPlayEventFailed = "play-event-failed",
-    //onSubscriptionEvent = "subscription-event",
+    onSubscriptionEvent = "subscription-event",
+    onSubscriptionEventEose = "subscription-event-eose",
     onError = "error",
     onOpen = "open",
     //onMessage = "message",
@@ -18,6 +20,7 @@ export enum RelayClientEvent {
 export type RelayClientConfig = {
     debug: boolean;
     sendTimeoutInMs: number;
+    requestTimeoutInMs: number;
 };
 
 export class RelayClient {
@@ -42,6 +45,13 @@ export class RelayClient {
     private _ws: WebSocket | undefined;
     private _playNostrEvents: NostrEvent[] = [];
     private _config: RelayClientConfig;
+    private _subscriptionsActive: Map<string, NostrFilters> = new Map<
+        string,
+        NostrFilters
+    >();
+
+    // Hold the subscriptionIds that should be closed
+    private _subscriptionsToBeClosed: string[] = [];
 
     // #endregion Private Properties
 
@@ -58,6 +68,7 @@ export class RelayClient {
             this._config = {
                 debug: false,
                 sendTimeoutInMs: 10000,
+                requestTimeoutInMs: 10000,
             };
         }
     }
@@ -172,6 +183,104 @@ export class RelayClient {
         });
     }
 
+    request(filters: NostrFilters, subscriptionId: string): Promise<any[]> {
+        return new Promise((resolve, reject) => {
+            if (this._subscriptionsActive.has(subscriptionId)) {
+                reject("Already subscribed to.");
+                return;
+            }
+
+            const timeout = setTimeout(() => {
+                this.events.off(
+                    RelayClientEvent.onSubscriptionEvent,
+                    onSubscriptionEvent.bind(this)
+                );
+                reject("Timeout");
+                return;
+            }, this._config.requestTimeoutInMs);
+
+            const that = this;
+            const eventData: any[] = [];
+
+            const onSubscriptionEvent = function (
+                reqSubscriptionId: string,
+                data: any
+            ) {
+                if (subscriptionId !== reqSubscriptionId) {
+                    return;
+                }
+
+                eventData.push(data);
+            };
+
+            const onSubscriptionEventEose = function (
+                reqSubscriptionId: string
+            ) {
+                if (subscriptionId !== reqSubscriptionId) {
+                    return;
+                }
+
+                clearTimeout(timeout);
+
+                that.events.off(
+                    RelayClientEvent.onSubscriptionEvent,
+                    onSubscriptionEvent.bind(that)
+                );
+                that.events.off(
+                    RelayClientEvent.onSubscriptionEventEose,
+                    onSubscriptionEventEose.bind(that)
+                );
+
+                // Make sure that the client unsubscribes with the relay.
+                resolve(eventData);
+                that.requestClose(subscriptionId);
+
+                return;
+            };
+
+            // Subscribe to all relevant internal events.
+            this.events.on(
+                RelayClientEvent.onSubscriptionEvent,
+                onSubscriptionEvent.bind(this)
+            );
+            this.events.on(
+                RelayClientEvent.onSubscriptionEventEose,
+                onSubscriptionEventEose.bind(this)
+            );
+
+            this._subscriptionsActive.set(subscriptionId, filters);
+
+            this._assureConnection();
+
+            if (this._ws?.readyState === WebSocket.OPEN) {
+                // We are already online and can directly request our events.
+                this._consoleLog(`Requesting subscription '${subscriptionId}'`);
+                this._ws.send(JSON.stringify(["REQ", subscriptionId, filters]));
+            } else {
+                // The request will be sent once the connection is open.
+                // Nothing to do here.
+            }
+        });
+    }
+
+    requestClose(subscriptionId: string) {
+        if (!this._subscriptionsActive.has(subscriptionId)) {
+            return;
+        }
+
+        this._assureConnection();
+        if (this._ws?.readyState === WebSocket.OPEN) {
+            // We are already online and can directly act.
+            this._subscriptionsActive.delete(subscriptionId);
+            this._consoleLog(`Closing subscription '${subscriptionId}'`);
+            this._ws.send(JSON.stringify(["CLOSE", subscriptionId]));
+        } else {
+            // The request will be sent once the connection is established.
+            // Just push the subscriptionId to the stack.
+            this._subscriptionsToBeClosed.push(subscriptionId);
+        }
+    }
+
     close() {
         if (!this._ws) {
             return;
@@ -191,9 +300,25 @@ export class RelayClient {
 
     private _onOpen(event: WebSocket.Event): any {
         this._consoleLog("OPEN");
+        for (let subscriptionId of this._subscriptionsToBeClosed) {
+            if (!this._subscriptionsActive.has(subscriptionId)) {
+                continue;
+            }
+            this._subscriptionsActive.delete(subscriptionId);
+            this._ws?.send(JSON.stringify(["CLOSE", subscriptionId]));
+        }
+        this._subscriptionsToBeClosed = [];
+
         for (let playEvent of this._playNostrEvents) {
             this._consoleLog(`Sending nostr event '${playEvent.id}'`);
             this._ws?.send(JSON.stringify(["EVENT", playEvent]));
+        }
+
+        for (let subscription of this._subscriptionsActive) {
+            this._consoleLog(`Requesting subscription '${subscription[0]}'`);
+            this._ws?.send(
+                JSON.stringify(["REQ", subscription[0], subscription[1]])
+            );
         }
 
         this.events.emit(RelayClientEvent.onOpen, event);
@@ -204,7 +329,13 @@ export class RelayClient {
 
         const data = JSON.parse(event.data as string) as any[];
 
-        this._handleNostrEvents(data);
+        if (data[0] === "EOSE") {
+            this._handleNostrSubscriptionEose(data);
+        } else if (data[0] === "EVENT") {
+            this._handleNostrSubscriptions(data);
+        } else {
+            this._handleNostrEvents(data);
+        }
     }
 
     private _onClose(event: WebSocket.CloseEvent) {
@@ -218,6 +349,7 @@ export class RelayClient {
         if (index === -1) {
             // Not from us.
             this._consoleLog("Message not for an event that we sent => ignore");
+            this._consoleWarn(JSON.stringify(data));
             return;
         }
 
@@ -236,12 +368,48 @@ export class RelayClient {
         }
     }
 
+    private _handleNostrSubscriptions(data: any[]) {
+        // This should be an event coming from a subscription.
+        const subscriptionId = data[1];
+        if (!this._subscriptionsActive.has(subscriptionId)) {
+            return;
+        }
+
+        this.events.emit(
+            RelayClientEvent.onSubscriptionEvent,
+            subscriptionId,
+            data[2]
+        );
+    }
+    private _handleNostrSubscriptionEose(data: any[]) {
+        // EOSE: End Of Stored Events
+        // data looks like:
+        // ["EOSE","c6ac6b18-e58c-4af2-b995-03138c6d6a3d"]
+        const subscriptionId = data[1];
+        if (!this._subscriptionsActive.has(subscriptionId)) {
+            return;
+        }
+
+        this.events.emit(
+            RelayClientEvent.onSubscriptionEventEose,
+            subscriptionId
+        );
+    }
+
     private _consoleLog(text: string) {
         if (!this._config.debug) {
             return;
         }
 
         console.log(`Relay ${this.relay} - ${text}`);
+    }
+
+    private _consoleWarn(text: string) {
+        if (!this._config.debug) {
+            return;
+        }
+
+        console.warn(`Relay ${this.relay} - ${text}`);
     }
 }
 

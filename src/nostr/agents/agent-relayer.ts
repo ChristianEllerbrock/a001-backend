@@ -1,5 +1,5 @@
 import { Subject } from "rxjs";
-import { NostrEvent, NostrEventKind } from "../nostr";
+import { NostrEvent, NostrEventKind, NostrFilters } from "../nostr";
 import { NostrHelperV2 } from "../nostr-helper-2";
 import { Agent } from "./agent";
 import { RelayClient } from "./relay-client";
@@ -16,6 +16,7 @@ export type AgentRelayerSendAsyncResponse = {
 export type AgentRelayerConfig = {
     debug: boolean;
     sendTimeoutInMs: number;
+    requestTimeoutInMs: number;
 };
 
 export type AgentRelayerSendEvent = {
@@ -25,12 +26,21 @@ export type AgentRelayerSendEvent = {
     message?: string;
 };
 
+export type AgentRelayerRequestEvent = {
+    jobId: string;
+    relay: string;
+    success: boolean;
+    messages: any[];
+};
+
 export class AgentRelayer {
     // #region Public Properties
 
     get sendEvent() {
         return this._sendEvent;
     }
+
+    readonly requestEvent = new Subject<AgentRelayerRequestEvent>();
 
     get relayClients() {
         return this._relayClients;
@@ -63,6 +73,7 @@ export class AgentRelayer {
             this._config = {
                 debug: false,
                 sendTimeoutInMs: 10000,
+                requestTimeoutInMs: 10000,
             };
         }
 
@@ -170,6 +181,29 @@ export class AgentRelayer {
                         jobId,
                         relay: relayClient.relay,
                         success: false,
+                    });
+                });
+        }
+    }
+
+    async request(filters: NostrFilters, jobId: string) {
+        for (let relayClient of this._relayClients) {
+            relayClient
+                .request(filters, jobId)
+                .then((x) => {
+                    this.requestEvent.next({
+                        jobId,
+                        relay: relayClient.relay,
+                        success: true,
+                        messages: x,
+                    });
+                })
+                .catch((error) => {
+                    this.requestEvent.next({
+                        jobId,
+                        relay: relayClient.relay,
+                        success: false,
+                        messages: [error],
                     });
                 });
         }

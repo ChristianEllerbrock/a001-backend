@@ -1,4 +1,5 @@
 import { AzureSecretService } from "../../services/azure-secret-service";
+import { NostrFilters } from "../nostr";
 import { Agent } from "./agent";
 import { AgentRelayer, AgentRelayerSendAsyncResponse } from "./agent-relayer";
 
@@ -64,6 +65,10 @@ export class AgentRelayerService {
         return this._ar?.sendEvent;
     }
 
+    getRequestEvent() {
+        return this._ar?.requestEvent;
+    }
+
     getAgentRelayer() {
         return this._ar;
     }
@@ -84,6 +89,14 @@ export class AgentRelayerService {
         ar: AgentRelayer
     ) {
         await ar.send(toPubkey, content, jobId);
+    }
+
+    async request(filters: NostrFilters, jobId: string) {
+        await this._init();
+        if (!this._ar) {
+            return;
+        }
+        await this._ar.request(filters, jobId);
     }
 
     close() {
@@ -114,6 +127,7 @@ export class AgentRelayerService {
         this._ar = new AgentRelayer(agents[0], this._relays, {
             debug: true,
             sendTimeoutInMs: 15000,
+            requestTimeoutInMs: 10000,
         });
     }
 
@@ -133,6 +147,7 @@ export class AgentRelayerService {
         return new AgentRelayer(this._agents[1], relays, {
             debug: true,
             sendTimeoutInMs: 15000,
+            requestTimeoutInMs: 10000,
         });
     }
 

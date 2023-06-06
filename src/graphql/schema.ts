@@ -9,8 +9,10 @@ import { UserRelatedResolver } from "./resolvers/user-related-resolver";
 import { UserResolverRelations } from "./resolvers/user-resolver-relations";
 import { customAuthChecker } from "./type-defs";
 import { SystemResolver } from "./resolvers/crud/system-resolver";
-import { StatisticsResolver } from "./resolvers/statistics-resolver";
-import { JobSubResolver } from "./resolvers/subscriptions/job-sub-resolver";
+import { StatisticsResolver } from "./resolvers/crud/statistics-resolver";
+import { JobSubResolver } from "./subscriptions/resolvers/job-sub-resolver";
+import { NostrEventResolver } from "./resolvers/crud/nostr-event-resolver";
+import { NostrEventSubscriptionResolver } from "./subscriptions/resolvers/nostr-event-subscription-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -27,6 +29,10 @@ export const schemaOptions: BuildSchemaOptions = {
 
         // Subscription resolvers
         JobSubResolver,
+        NostrEventSubscriptionResolver,
+
+        // Nostr
+        NostrEventResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },
