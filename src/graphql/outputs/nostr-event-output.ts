@@ -3,18 +3,21 @@ import { Field, Int, ObjectType } from "type-graphql";
 @ObjectType()
 export class NostrEventOutput {
     @Field((type) => String)
-    id!: string;
-
-    @Field((type) => String)
     pubkey!: string;
 
-    @Field((type) => Int)
-    createdAt!: number;
+    @Field((type) => Boolean)
+    isEot!: boolean;
 
-    @Field((type) => Int)
-    kind!: number;
+    @Field((type) => String, { nullable: true })
+    id?: string;
 
-    @Field((type) => String)
-    value!: string;
+    @Field((type) => Int, { nullable: true })
+    createdAt?: number;
+
+    @Field((type) => Int, { nullable: true })
+    kind?: number;
+
+    @Field((type) => String, { nullable: true })
+    value?: string;
 }
 

@@ -32,10 +32,16 @@ export class NostrEventResolver {
             throw new Error("Currently you have to provide a pubkey.");
         }
 
-        let pubkeyObject: NostrPubkeyObject | undefined;
+        let pubkeyHex: string | undefined;
         try {
-            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
+            pubkeyHex = NostrHelperV2.getNostrPubkeyObject(args.pubkey).hex;
         } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        if (!pubkeyHex) {
             throw new Error(
                 "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
             );
@@ -44,7 +50,7 @@ export class NostrEventResolver {
         const dbNostrEvent = await context.db.nostrEvent.findFirst({
             where: {
                 kind: 0,
-                pubkey: pubkeyObject.hex,
+                pubkey: pubkeyHex,
             },
             orderBy: {
                 createdAt: "desc",
@@ -103,7 +109,7 @@ export class NostrEventResolver {
                     const newDbNostrEvent = await context.db.nostrEvent.create({
                         data: {
                             id: kind0Event.id,
-                            pubkey: pubkeyObject?.hex ?? "will not happen",
+                            pubkey: pubkeyHex ?? "will not happen",
                             createdAt: kind0Event.created_at,
                             kind: NostrEventKind.Metadata,
                             value: JSON.stringify(kind0Event),
@@ -116,7 +122,14 @@ export class NostrEventResolver {
                         destinationFilter: {
                             subscriptionId: args.subscriptionId,
                         },
-                        nostrEvent: newDbNostrEvent,
+                        nostrEvent: {
+                            id: newDbNostrEvent.id,
+                            pubkey: newDbNostrEvent.pubkey,
+                            kind: newDbNostrEvent.kind,
+                            createdAt: newDbNostrEvent.createdAt,
+                            value: newDbNostrEvent.value,
+                            isEot: false,
+                        },
                     };
 
                     await pubSub.publish(
@@ -127,18 +140,41 @@ export class NostrEventResolver {
             }
 
             if (lastLoop) {
-                // TODO
-                // Send EOT
+                const payload: SubscribeToNostrEventPayload = {
+                    destinationFilter: {
+                        subscriptionId: args.subscriptionId,
+                    },
+                    nostrEvent: {
+                        pubkey: pubkeyHex ?? "will not happen",
+                        isEot: true,
+                    },
+                };
+
+                await pubSub.publish(
+                    PUBLISH_TOPICS.PROFILE_NOSTR_EVENT,
+                    payload
+                );
             }
         });
 
         const filters: NostrFilters = {
-            authors: [pubkeyObject.hex],
+            authors: [pubkeyHex],
             kinds: [NostrEventKind.Metadata],
         };
         await AgentRelayerService.instance.request(filters, jobId);
 
-        return dbNostrEvent;
+        if (!dbNostrEvent) {
+            return null;
+        }
+
+        return {
+            id: dbNostrEvent.id,
+            pubkey: dbNostrEvent.pubkey,
+            kind: dbNostrEvent.kind,
+            createdAt: dbNostrEvent.createdAt,
+            value: dbNostrEvent.value,
+            isEot: false,
+        };
     }
 }
 

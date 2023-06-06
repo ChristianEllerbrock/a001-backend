@@ -17,10 +17,10 @@ export class NostrEventSubscriptionResolver {
                 : false;
         },
     })
-    async subscribeToNostrEvent(
+    subscribeToNostrEvent(
         @Args() args: SubscribeToNostrEventArgs,
         @Root() payload: SubscribeToNostrEventPayload
-    ): Promise<NostrEventOutput> {
+    ): NostrEventOutput {
         return payload.nostrEvent;
     }
 }
