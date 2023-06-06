@@ -13,6 +13,7 @@ import { StatisticsResolver } from "./resolvers/crud/statistics-resolver";
 import { JobSubResolver } from "./subscriptions/resolvers/job-sub-resolver";
 import { NostrEventResolver } from "./resolvers/crud/nostr-event-resolver";
 import { NostrEventSubscriptionResolver } from "./subscriptions/resolvers/nostr-event-subscription-resolver";
+import { DirectoryResolver } from "./resolvers/crud/directory-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -26,6 +27,7 @@ export const schemaOptions: BuildSchemaOptions = {
         RegistrationRelayResolver,
         StatisticsResolver,
         SystemResolver,
+        DirectoryResolver,
 
         // Subscription resolvers
         JobSubResolver,
