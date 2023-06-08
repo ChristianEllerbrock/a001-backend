@@ -18,6 +18,18 @@ export type NostrPubkeyObject = {
 };
 
 export class NostrHelperV2 {
+    static verifySignature(event: NostrEvent): boolean {
+        try {
+            return schnorr.verify(
+                event.sig,
+                NostrHelperV2._getEventHash(event),
+                event.pubkey
+            );
+        } catch (err) {
+            return false;
+        }
+    }
+
     static createEvent(create: {
         privkey: string;
         data: NostrEventCreateData;
@@ -174,6 +186,14 @@ export class NostrHelperV2 {
             evt.tags,
             evt.content,
         ]);
+    }
+
+    private static _getEventHash(event: NostrEvent): string {
+        const utf8Encoder = new TextEncoder();
+        let eventHash = sha256(
+            utf8Encoder.encode(NostrHelperV2._serializeEvent(event))
+        );
+        return utils.bytesToHex(eventHash);
     }
 
     // #endregion Private Methods

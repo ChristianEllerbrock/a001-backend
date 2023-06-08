@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import {
+    Arg,
     Args,
     Ctx,
     Mutation,
@@ -19,22 +20,17 @@ import {
     GraphqlContext,
 } from "../../type-defs";
 import * as uuid from "uuid";
-import { AzureServiceBus } from "../../../services/azure-service-bus";
-import { ServiceBusMessage } from "@azure/service-bus";
-import { EnvService } from "../../../services/env-service";
 import { ErrorMessage } from "../error-messages";
-import { AgentService } from "../../../services/agent-service";
 import {
     NostrHelperV2,
     NostrPubkeyObject,
 } from "../../../nostr/nostr-helper-2";
-import { JobType } from "../../../common/enums/job-type";
-import { JobState } from "../../../common/enums/job-state";
-import { ServiceBusDataDirectMessage } from "../../../common/data-types/service-bus-data-direct-message";
 import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
 import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
 import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
+import { LoginNip07RedeemInputArgs } from "../../inputs/login-nip07-redeem-input";
+import { NostrEvent } from "../../../nostr/nostr";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -48,9 +44,145 @@ const cleanupExpiredLoginsAsync = async () => {
 
 @Resolver()
 export class LoginResolver {
-    //
-    // redeemLoginCode
-    //
+    @Mutation((returns) => String)
+    async createLoginNip07Code(
+        @Ctx() context: GraphqlContext,
+        @Arg("pubkey") pubkey: string
+    ): Promise<string> {
+        const now = DateTime.now();
+
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        if (!pubkeyObject.hex) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        const loginNip07CodeValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.LoginNip07CodeValidityInMinutes
+            );
+        if (!loginNip07CodeValidityInMinutes) {
+            throw new Error(
+                "System config not found in database. Please contact support."
+            );
+        }
+
+        await cleanupExpiredLoginsAsync();
+
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+
+        const code = uuid.v4();
+
+        const dbUserLoginNip07 = await context.db.userLoginCode.upsert({
+            where: { userId: dbUser.id },
+            update: {
+                code,
+                createdAt: now.toJSDate(),
+                validUntil: now
+                    .plus({ minute: loginNip07CodeValidityInMinutes })
+                    .toJSDate(),
+            },
+            create: {
+                userId: dbUser.id,
+                code,
+                createdAt: now.toJSDate(),
+                validUntil: now
+                    .plus({ minute: loginNip07CodeValidityInMinutes })
+                    .toJSDate(),
+            },
+        });
+
+        return code;
+    }
+
+    @Mutation((returns) => UserTokenOutput)
+    async redeemLoginNip07Code(
+        @Args() args: LoginNip07RedeemInputArgs,
+        @Ctx() context: GraphqlContext
+    ): Promise<UserTokenOutput> {
+        await cleanupExpiredLoginsAsync();
+
+        const dbUser = await context.db.user.findFirst({
+            where: { pubkey: args.data.pubkey },
+        });
+
+        if (!dbUser) {
+            throw new Error("No user found in the database with that pubkey.");
+        }
+
+        const dbUserLogin = await context.db.userLoginCode.findFirst({
+            where: { userId: dbUser.id },
+        });
+
+        if (!dbUserLogin) {
+            throw new Error(
+                "No generated code found in the database. Invalid attempt."
+            );
+        }
+
+        // Check 1: The content includes the server side generated code.
+        if (!args.data.content.includes(dbUserLogin.code)) {
+            throw new Error("The provided content is not valid.");
+        }
+
+        // Check 2: The provided event
+        if (!NostrHelperV2.verifySignature(args.data as NostrEvent)) {
+            throw new Error("The signature is invalid.");
+        }
+
+        // Everything checks out. Finalize login.
+        const now = DateTime.now();
+        const userTokenValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.UserTokenValidityInMinutes
+            );
+
+        if (!userTokenValidityInMinutes) {
+            throw new Error("Invalid system config. Please contact support.");
+        }
+
+        // Create or update user token.
+
+        const dbUserToken = await context.db.userToken.upsert({
+            where: {
+                userId_deviceId: {
+                    userId: dbUser.id,
+                    deviceId: args.deviceId,
+                },
+            },
+            update: {
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+            create: {
+                userId: dbUser.id,
+                deviceId: args.deviceId,
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+        });
+
+        // Delete record in
+        await context.db.userLoginCode.delete({
+            where: { userId: dbUser.id },
+        });
+
+        return dbUserToken;
+    }
+
     @Mutation((returns) => UserTokenOutput)
     async redeemLoginCode(
         @Args() args: LoginCodeRedeemInput,
