@@ -1,9 +1,6 @@
 import { Field, ObjectType } from "type-graphql";
 
-@ObjectType("RegistrationRelayOutput", {
-    isAbstract: true,
-    simpleResolvers: true,
-})
+@ObjectType()
 export class RegistrationRelayOutput {
     @Field((type) => String)
     id!: string;

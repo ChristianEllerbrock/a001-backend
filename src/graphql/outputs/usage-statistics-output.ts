@@ -2,7 +2,7 @@ import { Field, Int, ObjectType } from "type-graphql";
 import { RegistrationStatisticsOutput } from "./statistics/registration-statistics-output";
 import { LookupStatisticsOutput } from "./statistics/lookup-statistics-output";
 
-@ObjectType("RegistrationsPerDomainStatisticsOutput")
+@ObjectType()
 export class RegistrationsPerDomainStatisticsOutput {
     @Field((type) => String)
     domain!: string;
@@ -11,7 +11,7 @@ export class RegistrationsPerDomainStatisticsOutput {
     registrations!: number;
 }
 
-@ObjectType("UsageStatisticsOutput")
+@ObjectType()
 export class UsageStatisticsOutput {
     @Field((type) => Date)
     date!: Date;

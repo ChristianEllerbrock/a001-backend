@@ -1,9 +1,6 @@
 import { Field, ObjectType } from "type-graphql";
 
-@ObjectType("IdentifierRegisterCheckOutput", {
-    isAbstract: true,
-    simpleResolvers: true,
-})
+@ObjectType()
 export class IdentifierRegisterCheckOutput {
     @Field((type) => String)
     name!: string;

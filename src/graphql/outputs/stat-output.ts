@@ -1,16 +1,16 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
-@ObjectType("StatOutput", { isAbstract: true, simpleResolvers: true })
+@ObjectType()
 export class StatOutput {
     @Field((type) => Date)
     noOfLookupsDate!: Date;
 
-    @Field(type => Int)
+    @Field((type) => Int)
     noOfLookups!: number;
 
     @Field((type) => Date)
     noOfUsersDate!: Date;
 
-    @Field(type => Int)
+    @Field((type) => Int)
     noOfUsers!: number;
 }
