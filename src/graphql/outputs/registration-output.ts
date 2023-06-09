@@ -4,10 +4,7 @@ import { RegistrationRelayOutput } from "./registration-relay-output";
 import { UserOutput } from "./user-output";
 import { SystemDomainOutput } from "./system-domain";
 
-@ObjectType("RegistrationOutput", {
-    isAbstract: true,
-    simpleResolvers: true,
-})
+@ObjectType()
 export class RegistrationOutput {
     @Field((type) => String)
     id!: string;

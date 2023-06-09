@@ -1,7 +1,7 @@
 import { Field, ObjectType } from "type-graphql";
 import { UserOutput } from "./user-output";
 
-@ObjectType("UserTokenOutput", { isAbstract: true, simpleResolvers: true })
+@ObjectType()
 export class UserTokenOutput {
     @Field((type) => String)
     id!: string;

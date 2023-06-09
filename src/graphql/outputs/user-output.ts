@@ -1,7 +1,7 @@
 import { Field, ObjectType } from "type-graphql";
 import { RegistrationOutput } from "./registration-output";
 
-@ObjectType("UserOutput", { isAbstract: true, simpleResolvers: true })
+@ObjectType()
 export class UserOutput {
     @Field((type) => String)
     id!: string;
@@ -12,7 +12,7 @@ export class UserOutput {
     @Field((type) => Date)
     createdAt!: Date;
 
-    @Field(type => Boolean, { nullable: true })
+    @Field((type) => Boolean, { nullable: true })
     isSystemUser?: boolean | null;
 
     // Model Relations
@@ -20,7 +20,7 @@ export class UserOutput {
     @Field((type) => [RegistrationOutput], { nullable: true })
     registrations?: RegistrationOutput[] | null;
 
-    @Field(type => String)
+    @Field((type) => String)
     npub?: string;
 }
 

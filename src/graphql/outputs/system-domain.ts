@@ -1,6 +1,6 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
-@ObjectType("SystemDomainOutput")
+@ObjectType()
 export class SystemDomainOutput {
     @Field((type) => Int)
     id!: number;

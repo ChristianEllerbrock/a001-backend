@@ -29,7 +29,7 @@ import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-ch
 import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
 import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
-import { LoginNip07RedeemInputArgs } from "../../inputs/login-nip07-redeem-input";
+import { LoginNip07RedeemInputArgs } from "../../inputs/loginNip07RedeemInputArgs";
 import { NostrEvent } from "../../../nostr/nostr";
 
 const cleanupExpiredLoginsAsync = async () => {
@@ -134,7 +134,7 @@ export class LoginResolver {
             throw new Error("The provided content is not valid.");
         }
 
-        // Check 2: The provided event
+        // Check 2: The provided event-signature is valid.
         if (!NostrHelperV2.verifySignature(args.data as NostrEvent)) {
             throw new Error("The signature is invalid.");
         }

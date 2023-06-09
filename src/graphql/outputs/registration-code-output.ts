@@ -1,10 +1,7 @@
 import { Field, ObjectType } from "type-graphql";
 import { RegistrationOutput } from "./registration-output";
 
-@ObjectType("RegistrationCodeOutput", {
-    isAbstract: true,
-    simpleResolvers: true,
-})
+@ObjectType()
 export class RegistrationCodeOutput {
     @Field((type) => String)
     id!: string;

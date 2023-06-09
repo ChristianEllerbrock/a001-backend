@@ -1,6 +1,6 @@
 import { Field, Int, ObjectType } from "type-graphql";
 
-@ObjectType("RegistrationLookupOutput")
+@ObjectType()
 export class RegistrationLookupOutput {
     @Field((type) => Int)
     id!: number;
@@ -14,3 +14,4 @@ export class RegistrationLookupOutput {
     @Field((type) => Int)
     total!: number;
 }
+
