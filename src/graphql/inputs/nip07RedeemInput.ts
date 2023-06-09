@@ -1,7 +1,7 @@
-import { ArgsType, Field, InputType, Int } from "type-graphql";
+import { Field, InputType, Int } from "type-graphql";
 
 @InputType()
-export class LoginNip07RedeemInput {
+export class Nip07RedeemInput {
     @Field((type) => String)
     id!: string;
 
@@ -22,14 +22,5 @@ export class LoginNip07RedeemInput {
 
     @Field((type) => Int)
     kind!: number;
-}
-
-@ArgsType()
-export class LoginNip07RedeemInputArgs {
-    @Field((type) => String)
-    deviceId!: string;
-
-    @Field((type) => LoginNip07RedeemInput)
-    data!: LoginNip07RedeemInput;
 }
 

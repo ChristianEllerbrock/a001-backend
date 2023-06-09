@@ -4,7 +4,8 @@ import { PrismaService } from "../services/prisma-service";
 export class HelperIdentifier {
     static async canIdentifierBeRegisteredAsync(
         identifier: string,
-        systemDomainId: number
+        systemDomainId: number,
+        pubkey: string | undefined = undefined
     ): Promise<IdentifierRegisterCheckOutput> {
         const cleanIdentifier = identifier.trim().toLowerCase();
 
@@ -81,12 +82,16 @@ export class HelperIdentifier {
                     systemDomainId,
                     verifiedAt: null,
                 },
+                include: { user: true },
             });
-        if (dbPendingRegistration) {
+        if (
+            dbPendingRegistration &&
+            dbPendingRegistration.user.pubkey !== pubkey
+        ) {
             return {
                 name: cleanIdentifier,
                 canBeRegistered: false,
-                reason: "Name is pending registration.",
+                reason: "Name is pending registration by some user.",
             };
         }
 
