@@ -61,6 +61,7 @@ model Registration {
     systemDomain            SystemDomain             @relation(fields: [systemDomainId], references: [id])
     registrationLookups     RegistrationLookup[]
     lightningAddressLookups LightningAddressLookup[]
+    registrationNip07Code   RegistrationNip07Code?
 
     @@unique([identifier, systemDomainId])
 }
@@ -90,6 +91,16 @@ model DailyLookup {
 }
 
 model RegistrationCode {
+    id             String   @id @default(uuid())
+    registrationId String   @unique
+    code           String
+    createdAt      DateTime
+    validUntil     DateTime
+
+    registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model RegistrationNip07Code {
     id             String   @id @default(uuid())
     registrationId String   @unique
     code           String

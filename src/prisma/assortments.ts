@@ -5,5 +5,6 @@ export enum SystemConfigId {
     LoginCodeValidityInMinutes = 4,
     UserFraudOptionValidityInDays = 5,
     LoginNip07CodeValidityInMinutes = 6,
+    RegistrationNip07CodeValidityInMinutes = 7,
 }
 

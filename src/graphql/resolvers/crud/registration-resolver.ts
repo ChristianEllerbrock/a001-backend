@@ -39,8 +39,9 @@ import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
 import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
 import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
 import { PUBLISH_TOPICS } from "../../subscriptions/topics";
-import { Registration } from "@prisma/client";
 import { RegistrationCodeResendInput } from "../../inputs/registration-code-resend-input";
+import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrationNip07CodeOutput";
+import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -201,6 +202,225 @@ export class RegistrationResolver {
         return dbUserToken;
     }
 
+    @Mutation((returns) => CreateRegistrationNip07CodeOutput)
+    async createRegistrationNip07Code(
+        @Ctx() context: GraphqlContext,
+        @Arg("pubkey") pubkey: string,
+        @Arg("name") name: string,
+        @Arg("systemDomainId", (type) => Int) systemDomainId: number
+    ): Promise<CreateRegistrationNip07CodeOutput> {
+        await cleanupExpiredRegistrationsAsync();
+        const now = DateTime.now();
+
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+
+        // Only continue, if the user was NOT reported as fraud.
+        if (dbUser.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
+        }
+
+        const checked = await HelperIdentifier.canIdentifierBeRegisteredAsync(
+            name,
+            systemDomainId,
+            pubkeyObject.hex
+        );
+
+        if (!checked.canBeRegistered) {
+            throw new Error(checked.reason);
+        }
+
+        const registrationValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.RegistrationValidityInMinutes
+            );
+        if (!registrationValidityInMinutes) {
+            throw new Error(
+                "System config not found in database. Please contact support."
+            );
+        }
+
+        // Check if the registration already exists
+        let dbRegistration = await context.db.registration.findFirst({
+            where: {
+                userId: dbUser.id,
+                identifier: checked.name,
+                systemDomainId,
+            },
+        });
+
+        if (!dbRegistration) {
+            // Registration does NOT exist. Create it.
+            dbRegistration =
+                await PrismaService.instance.db.registration.create({
+                    data: {
+                        userId: dbUser.id,
+                        identifier: checked.name,
+                        systemDomainId: systemDomainId,
+                        createdAt: now.toJSDate(),
+                        validUntil: now
+                            .plus({ minute: registrationValidityInMinutes })
+                            .toJSDate(),
+                        verifiedAt: null,
+                        lightningAddress: null,
+                    },
+                });
+        }
+
+        const registrationNip07CodeValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.RegistrationNip07CodeValidityInMinutes
+            );
+        if (!registrationNip07CodeValidityInMinutes) {
+            throw new Error("Invalid system config. Please contact support.");
+        }
+
+        // Create or update
+        const code = uuid.v4();
+        const dbRegistrationCode =
+            await PrismaService.instance.db.registrationNip07Code.upsert({
+                where: { registrationId: dbRegistration.id },
+                update: {
+                    code,
+                    createdAt: now.toJSDate(),
+                    validUntil: now
+                        .plus({
+                            minute: registrationNip07CodeValidityInMinutes,
+                        })
+                        .toJSDate(),
+                },
+                create: {
+                    registrationId: dbRegistration.id,
+                    code,
+                    createdAt: now.toJSDate(),
+                    validUntil: now
+                        .plus({
+                            minute: registrationNip07CodeValidityInMinutes,
+                        })
+                        .toJSDate(),
+                },
+            });
+
+        return {
+            code,
+            registrationId: dbRegistration.id,
+        };
+    }
+
+    @Mutation((returns) => UserTokenOutput)
+    async redeemRegistrationNip07Code(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationNip07RedeemInputArgs
+    ): Promise<UserTokenOutput> {
+        const now = DateTime.now();
+        await cleanupExpiredRegistrationsAsync();
+
+        let pubkeyObject: NostrPubkeyObject | undefined;
+        try {
+            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.data.pubkey);
+        } catch (error) {
+            throw new Error(
+                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
+            );
+        }
+
+        const dbRegistration = await context.db.registration.findFirst({
+            where: { id: args.registrationId },
+            include: {
+                registrationNip07Code: true,
+                user: true,
+            },
+        });
+
+        if (
+            !dbRegistration ||
+            dbRegistration.user.pubkey !== pubkeyObject.hex ||
+            !dbRegistration.registrationNip07Code
+        ) {
+            throw new Error("Cannot find registration.");
+        }
+
+        if (dbRegistration.verifiedAt) {
+            throw new Error("Registration is already validated.");
+        }
+
+        // Check 1: Has the code already expired
+        if (dbRegistration.registrationNip07Code.validUntil < now.toJSDate()) {
+            throw new Error(
+                "The registration is already expired. Please try again."
+            );
+        }
+
+        // Check 2: The content includes the server side generated code.
+        if (
+            !args.data.content.includes(
+                dbRegistration.registrationNip07Code.code
+            )
+        ) {
+            throw new Error("The provided content is not valid");
+        }
+
+        // Check 3: The provided event-signature is valid.
+        if (!NostrHelperV2.verifySignature(args.data)) {
+            throw new Error("The signature is invalid.");
+        }
+
+        // Everything checks out. Finalize registration.
+        await PrismaService.instance.db.registration.update({
+            where: { id: dbRegistration.id },
+            data: {
+                verifiedAt: now.toJSDate(),
+            },
+        });
+
+        await PrismaService.instance.db.registrationNip07Code.delete({
+            where: { id: dbRegistration.registrationNip07Code.id },
+        });
+
+        const userTokenValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.UserTokenValidityInMinutes
+            );
+
+        if (!userTokenValidityInMinutes) {
+            throw new Error("Invalid system config. Please contact support.");
+        }
+
+        // Create or update user token.
+        const dbUserToken = await PrismaService.instance.db.userToken.upsert({
+            where: {
+                userId_deviceId: {
+                    userId: dbRegistration.userId,
+                    deviceId: args.deviceId,
+                },
+            },
+            update: {
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+            create: {
+                userId: dbRegistration.userId,
+                deviceId: args.deviceId,
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+        });
+
+        return dbUserToken;
+    }
+
     @Mutation((returns) => RegistrationOutput)
     async createRegistrationCode(
         @Ctx() context: GraphqlContext,
@@ -228,7 +448,8 @@ export class RegistrationResolver {
 
         const check = await HelperIdentifier.canIdentifierBeRegisteredAsync(
             args.name,
-            args.systemDomainId
+            args.systemDomainId,
+            pubkeyObject.hex
         );
 
         if (!check.canBeRegistered) {

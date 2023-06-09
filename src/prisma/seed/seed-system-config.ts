@@ -76,6 +76,18 @@ const seed = async function (prisma: PrismaClient) {
             value: "2",
         },
     });
+
+    i = 7;
+
+    await prisma.systemConfig.upsert({
+        where: { id: i },
+        update: {},
+        create: {
+            id: i,
+            name: "REGISTRATION_NIP07_CODE_VALIDITY_IN_MINUTES",
+            value: "2",
+        },
+    });
 };
 
 export { seed as seedSystemConfig };
