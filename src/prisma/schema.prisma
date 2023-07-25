@@ -21,6 +21,9 @@ model User {
     userLoginCode    UserLoginCode?
     userFraudOptions UserFraudOption[]
     jobs             Job[]
+
+    userLoginNip07Codes UserLoginNip07Code[]
+    userLoginNip46Codes UserLoginNip46Code[]
 }
 
 model UserToken {
@@ -126,6 +129,32 @@ model UserLoginCode {
     validUntil DateTime
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model UserLoginNip07Code {
+    id         String   @id @default(uuid())
+    userId     String
+    deviceId   String
+    code       String
+    createdAt  DateTime
+    validUntil DateTime
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@unique([userId, deviceId])
+}
+
+model UserLoginNip46Code {
+    id         String   @id @default(uuid())
+    userId     String
+    deviceId   String
+    code       String
+    createdAt  DateTime
+    validUntil DateTime
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@unique([userId, deviceId])
 }
 
 model SystemConfig {
