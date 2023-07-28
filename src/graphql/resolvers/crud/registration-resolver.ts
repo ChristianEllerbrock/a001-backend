@@ -42,6 +42,7 @@ import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { RegistrationCodeResendInput } from "../../inputs/registration-code-resend-input";
 import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrationNip07CodeOutput";
 import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
+import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -200,6 +201,104 @@ export class RegistrationResolver {
         });
 
         return dbUserToken;
+    }
+
+    @Mutation((returns) => CreateRegistrationNip46CodeOutput)
+    async createRegistrationNip46Code(
+        @Ctx() context: GraphqlContext,
+        @Arg("pubkey") pubkey: string,
+        @Arg("name") name: string,
+        @Arg("systemDomainId", (type) => Int) systemDomainId: number
+    ): Promise<CreateRegistrationNip46CodeOutput> {
+        await cleanupExpiredRegistrationsAsync();
+        const now = DateTime.now();
+
+        const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(pubkey);
+
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+
+        // Only continue, if the user was NOT reported as fraud.
+        if (dbUser.fraudReportedAt != null) {
+            throw new Error(ErrorMessage.fraud);
+        }
+
+        const checked = await HelperIdentifier.canIdentifierBeRegisteredAsync(
+            name,
+            systemDomainId,
+            pubkeyObject.hex
+        );
+
+        if (!checked.canBeRegistered) {
+            throw new Error(checked.reason);
+        }
+
+        const registrationValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.RegistrationValidityInMinutes
+            );
+        if (!registrationValidityInMinutes) {
+            throw new Error(
+                "System config not found in database. Please contact support."
+            );
+        }
+
+        // Check if the registration already exists
+        let dbRegistration = await context.db.registration.findFirst({
+            where: {
+                userId: dbUser.id,
+                identifier: checked.name,
+                systemDomainId,
+            },
+        });
+
+        if (!dbRegistration) {
+            // Registration does NOT exist. Create it.
+            dbRegistration =
+                await PrismaService.instance.db.registration.create({
+                    data: {
+                        userId: dbUser.id,
+                        identifier: checked.name,
+                        systemDomainId: systemDomainId,
+                        createdAt: now.toJSDate(),
+                        validUntil: now
+                            .plus({ minute: registrationValidityInMinutes })
+                            .toJSDate(),
+                        verifiedAt: null,
+                        lightningAddress: null,
+                    },
+                });
+        }
+
+        // Create or update
+        const code = uuid.v4();
+        const dbRegistrationCode =
+            await PrismaService.instance.db.registrationNip46Code.upsert({
+                where: { registrationId: dbRegistration.id },
+                update: {
+                    code,
+                    createdAt: now.toJSDate(),
+                    validUntil: now
+                        .plus({
+                            minute: 2,
+                        })
+                        .toJSDate(),
+                },
+                create: {
+                    registrationId: dbRegistration.id,
+                    code,
+                    createdAt: now.toJSDate(),
+                    validUntil: now
+                        .plus({
+                            minute: 2,
+                        })
+                        .toJSDate(),
+                },
+            });
+
+        return {
+            code,
+            registrationId: dbRegistration.id,
+        };
     }
 
     @Mutation((returns) => CreateRegistrationNip07CodeOutput)
