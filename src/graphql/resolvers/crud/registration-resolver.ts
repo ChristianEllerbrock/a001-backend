@@ -43,6 +43,7 @@ import { RegistrationCodeResendInput } from "../../inputs/registration-code-rese
 import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrationNip07CodeOutput";
 import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
 import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
+import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46RedeemInputArgs";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -415,6 +416,107 @@ export class RegistrationResolver {
     }
 
     @Mutation((returns) => UserTokenOutput)
+    async redeemRegistrationNip46Code(
+        @Ctx() context: GraphqlContext,
+        @Args() args: RegistrationNip46RedeemInputArgs
+    ): Promise<UserTokenOutput> {
+        const now = DateTime.now();
+        await cleanupExpiredRegistrationsAsync();
+
+        const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(
+            args.data.pubkey
+        );
+
+        const dbRegistration = await context.db.registration.findFirst({
+            where: { id: args.registrationId },
+            include: {
+                registrationNip46Code: true,
+                user: true,
+            },
+        });
+
+        if (
+            !dbRegistration ||
+            dbRegistration.user.pubkey !== pubkeyObject.hex ||
+            !dbRegistration.registrationNip46Code
+        ) {
+            throw new Error("Cannot find registration.");
+        }
+
+        if (dbRegistration.verifiedAt) {
+            throw new Error("Registration is already validated.");
+        }
+
+        // Check 1: Has the code already expired
+        if (dbRegistration.registrationNip46Code.validUntil < now.toJSDate()) {
+            throw new Error(
+                "The registration has already expired. Please try again."
+            );
+        }
+
+        // Check 2: The content includes the server side generated code.
+        if (
+            !args.data.content.includes(
+                dbRegistration.registrationNip46Code.code
+            )
+        ) {
+            throw new Error("The provided content is not valid");
+        }
+
+        // Check 3: The provided event-signature is valid.
+        if (!NostrHelperV2.verifySignature(args.data)) {
+            throw new Error("The signature is invalid.");
+        }
+
+        // Everything checks out. Finalize registration.
+        await PrismaService.instance.db.registration.update({
+            where: { id: dbRegistration.id },
+            data: {
+                verifiedAt: now.toJSDate(),
+            },
+        });
+
+        await PrismaService.instance.db.registrationNip46Code.delete({
+            where: { id: dbRegistration.registrationNip46Code.id },
+        });
+
+        const userTokenValidityInMinutes =
+            await PrismaService.instance.getSystemConfigAsNumberAsync(
+                SystemConfigId.UserTokenValidityInMinutes
+            );
+
+        if (!userTokenValidityInMinutes) {
+            throw new Error("Invalid system config. Please contact support.");
+        }
+
+        // Create or update user token.
+        const dbUserToken = await PrismaService.instance.db.userToken.upsert({
+            where: {
+                userId_deviceId: {
+                    userId: dbRegistration.userId,
+                    deviceId: args.deviceId,
+                },
+            },
+            update: {
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+            create: {
+                userId: dbRegistration.userId,
+                deviceId: args.deviceId,
+                token: uuid.v4(),
+                validUntil: now
+                    .plus({ minute: userTokenValidityInMinutes })
+                    .toJSDate(),
+            },
+        });
+
+        return dbUserToken;
+    }
+
+    @Mutation((returns) => UserTokenOutput)
     async redeemRegistrationNip07Code(
         @Ctx() context: GraphqlContext,
         @Args() args: RegistrationNip07RedeemInputArgs
@@ -454,7 +556,7 @@ export class RegistrationResolver {
         // Check 1: Has the code already expired
         if (dbRegistration.registrationNip07Code.validUntil < now.toJSDate()) {
             throw new Error(
-                "The registration is already expired. Please try again."
+                "The registration has already expired. Please try again."
             );
         }
 
