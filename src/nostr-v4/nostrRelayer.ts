@@ -296,27 +296,18 @@ export class NostrRelayer {
                         created_at: Math.floor(new Date().getTime() / 1000),
                     };
 
-                    connector
-                        .signEvent(eventTemplate)
-                        .then((event) => {
-                            const channelId = v4();
-                            const returnedRelayEvents: RelayEvent[] = [];
-                            this.nostrPubSub.on(
-                                channelId,
-                                (eos, relayEvents) => {
-                                    returnedRelayEvents.push(...relayEvents);
-                                    if (eos) {
-                                        resolve(returnedRelayEvents);
-                                        return;
-                                    }
-                                }
-                            );
-                            this.publishEvent(channelId, event, toRelays);
-                        })
-                        .catch((error) => {
-                            reject(error);
+                    const event = connector.signEvent(eventTemplate);
+
+                    const channelId = v4();
+                    const returnedRelayEvents: RelayEvent[] = [];
+                    this.nostrPubSub.on(channelId, (eos, relayEvents) => {
+                        returnedRelayEvents.push(...relayEvents);
+                        if (eos) {
+                            resolve(returnedRelayEvents);
                             return;
-                        });
+                        }
+                    });
+                    this.publishEvent(channelId, event, toRelays);
                 })
                 .catch((error) => {
                     reject(error);
