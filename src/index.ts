@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import "./extensions";
-
+import "websocket-polyfill";
 import express, { Express } from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -19,7 +19,9 @@ import { testController } from "./controllers/test-controller";
 import { WebSocketServer } from "ws";
 import { useServer } from "graphql-ws/lib/use/ws";
 import { Context as WsContext } from "graphql-ws";
+import { emailController } from "./controllers/email-controller";
 var path = require("path");
+import multer from "multer";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -71,6 +73,14 @@ app.get("/", (req, res, next) => {
 });
 app.get("/report-fraud/:userId/:fraudId", reportFraudController);
 app.get("/confirm-fraud/:userId/:fraudId", confirmFraudController);
+app.post(
+    `/${EnvService.instance.env.EMAIL_ENDPOINT}/`,
+    multer().any(),
+    emailController
+);
+app.get(`/${EnvService.instance.env.EMAIL_ENDPOINT}/`, (req, res) => {
+    res.json("OK");
+});
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);

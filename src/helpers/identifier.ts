@@ -9,6 +9,16 @@ export class HelperIdentifier {
     ): Promise<IdentifierRegisterCheckOutput> {
         const cleanIdentifier = identifier.trim().toLowerCase();
 
+        // 0st check:
+        // email identifier (starting with "email_")
+        if (cleanIdentifier.startsWith("email_")) {
+            return {
+                name: cleanIdentifier,
+                canBeRegistered: false,
+                reason: "Name is reserved.",
+            };
+        }
+
         // 1st check:
         // more than 2 characters
         if (cleanIdentifier.length <= 2) {

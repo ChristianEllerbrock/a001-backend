@@ -5,20 +5,20 @@ import { EnvService } from "./env-service";
 export class AzureSecretService {
     // #region Singleton
 
-    private static _instance: AzureSecretService;
+    static #instance: AzureSecretService;
     static get instance() {
-        if (!this._instance) {
-            this._instance = new AzureSecretService();
+        if (!this.#instance) {
+            this.#instance = new AzureSecretService();
         }
 
-        return this._instance;
+        return this.#instance;
     }
 
     // #endregion Singleton
 
     // #region Private Properties
 
-    private _client: SecretClient;
+    #client: SecretClient;
 
     // #endregion Private Properties
 
@@ -26,7 +26,7 @@ export class AzureSecretService {
 
     constructor() {
         const azureCredential = new DefaultAzureCredential();
-        this._client = new SecretClient(
+        this.#client = new SecretClient(
             EnvService.instance.env.KEYVAULT_URI,
             azureCredential
         );
@@ -37,13 +37,25 @@ export class AzureSecretService {
     // #region Public Methods
 
     async tryGetValue<T>(secretName: string): Promise<T | undefined> {
-        const secret = await this._client.getSecret(secretName);
+        const secret = await this.#client.getSecret(secretName);
         if (!secret.value) {
             return undefined;
         }
 
         const value = JSON.parse(secret.value) as T;
         return value;
+    }
+
+    async trySetValue<T>(secretName: string, value: T): Promise<boolean> {
+        const secret = await this.#client.setSecret(
+            secretName,
+            JSON.stringify(value)
+        );
+
+        if (!secret.value) {
+            return false;
+        }
+        return true;
     }
 
     // #endregion Public Methods

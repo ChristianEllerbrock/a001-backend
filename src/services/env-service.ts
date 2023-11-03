@@ -23,6 +23,7 @@ export class EnvServiceEnv {
     SERVICE_BUS_DM_QUEUE!: string;
 
     KEYVAULT_URI!: string;
+    EMAIL_ENDPOINT!: string;
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
