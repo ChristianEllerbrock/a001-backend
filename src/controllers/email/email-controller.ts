@@ -12,6 +12,7 @@ import { v4 } from "uuid";
 import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
 import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { SendGridEmailEnvelope } from "./type-defs";
+import { DateTime } from "luxon";
 
 export async function emailController(
     req: Request,
@@ -220,6 +221,25 @@ const handleEmail = async function (req: Request) {
         kind4Event,
         targetRelays
     );
+
+    // Update Stats
+    const today = DateTime.now().startOf("day");
+    await PrismaService.instance.db.registrationEmailForwarding.upsert({
+        where: {
+            registrationId_date: {
+                registrationId: dbRegistration.id,
+                date: today.toJSDate(),
+            },
+        },
+        update: {
+            total: { increment: 1 },
+        },
+        create: {
+            registrationId: dbRegistration.id,
+            date: today.toJSDate(),
+            total: 1,
+        },
+    });
 };
 
 const fetchRelayListForPubkey = function (
