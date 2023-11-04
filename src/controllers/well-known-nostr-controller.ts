@@ -3,7 +3,7 @@ import { buildNip05FromDatabaseAsync } from "../nostr/helpers";
 import { PrismaService } from "../services/prisma-service";
 import { Nip05CacheService } from "../services/nip05-cache-service";
 import { DateTime } from "luxon";
-import { EmailCacheService } from "../services/email-cache-service";
+import { EmailCacheService, EmailNip05 } from "../services/email-cache-service";
 
 interface Query {
     name?: string;
@@ -47,33 +47,50 @@ export async function wellKnownNostrController(
         // If so, it will be handled differently.
         if (identifier.startsWith("email_")) {
             const fullIdentifier = `${identifier}@${domain}`.toLowerCase();
-            let nip05 = EmailCacheService.instance.cache.get(fullIdentifier);
-            if (nip05) {
-                res.json(nip05);
-                return;
-            }
+            let emailNip05 =
+                EmailCacheService.instance.cache.get(fullIdentifier);
+            if (!emailNip05) {
+                const dbEmailNostr =
+                    await PrismaService.instance.db.emailNostr.findFirst({
+                        where: {
+                            nip05: fullIdentifier,
+                        },
+                        include: { email: true },
+                    });
+                if (!dbEmailNostr) {
+                    res.json({
+                        names: {},
+                    });
+                    return;
+                }
 
-            // No cache entry. Check in database.
-            const dbEmailNostr =
-                await PrismaService.instance.db.emailNostr.findFirst({
-                    where: {
-                        nip05: fullIdentifier,
+                emailNip05 = {
+                    emailNostrId: dbEmailNostr.id,
+                    emailId: dbEmailNostr.emailId,
+                    nip05: {
+                        names: {},
                     },
-                });
-            if (!dbEmailNostr) {
-                // No entry in the database found.
-                res.json({
-                    names: {},
-                });
-                return;
+                };
+
+                emailNip05.nip05.names[identifier] = dbEmailNostr.pubkey;
+                EmailCacheService.instance.cache.set(
+                    fullIdentifier,
+                    emailNip05
+                );
             }
 
-            nip05 = {
-                names: {},
-            };
-            nip05.names[identifier] = dbEmailNostr.pubkey;
-            EmailCacheService.instance.cache.set(fullIdentifier, nip05);
-            res.json(nip05);
+            // Update Stats
+            PrismaService.instance.db.emailNostr.update({
+                where: {
+                    id: emailNip05.emailNostrId,
+                },
+                data: {
+                    lookups: { increment: 1 },
+                    lastLookupDate: new Date(),
+                },
+            });
+
+            res.json(emailNip05.nip05);
             return;
         }
 

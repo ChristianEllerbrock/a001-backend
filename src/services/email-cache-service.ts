@@ -1,5 +1,11 @@
 import { Nip05 } from "../nostr/type-defs";
 
+export interface EmailNip05 {
+    nip05: Nip05;
+    emailNostrId: number;
+    emailId: number;
+}
+
 export class EmailCacheService {
     // #region Singleton
 
@@ -16,5 +22,6 @@ export class EmailCacheService {
 
     // #endregion Singleton
 
-    readonly cache = new Map<string, Nip05>();
+    readonly cache = new Map<string, EmailNip05>();
 }
+
