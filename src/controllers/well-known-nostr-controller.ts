@@ -80,7 +80,7 @@ export async function wellKnownNostrController(
             }
 
             // Update Stats
-            PrismaService.instance.db.emailNostr.update({
+            await PrismaService.instance.db.emailNostr.update({
                 where: {
                     id: emailNip05.emailNostrId,
                 },
