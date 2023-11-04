@@ -19,7 +19,7 @@ import { testController } from "./controllers/test-controller";
 import { WebSocketServer } from "ws";
 import { useServer } from "graphql-ws/lib/use/ws";
 import { Context as WsContext } from "graphql-ws";
-import { emailController } from "./controllers/email-controller";
+import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
 
