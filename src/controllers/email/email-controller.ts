@@ -1,27 +1,17 @@
 import { NextFunction, Request, Response } from "express";
-import { PrismaService } from "../services/prisma-service";
-import { systemDomainIds } from "../common/enums/system-domain";
-import { Email, EmailNostr } from "@prisma/client";
-import { AzureSecretService } from "../services/azure-secret-service";
-import {
-    Event,
-    EventTemplate,
-    generatePrivateKey,
-    getEventHash,
-    getPublicKey,
-    getSignature,
-    signEvent,
-} from "nostr-tools";
+import { PrismaService } from "../../services/prisma-service";
+import { systemDomainIds } from "../../common/enums/system-domain";
+import { AzureSecretService } from "../../services/azure-secret-service";
+import { EventTemplate, generatePrivateKey, getPublicKey } from "nostr-tools";
 import {
     EmailKeyvaultType,
     emailKeyvaultTypeKeyPrefix,
-} from "../common/keyvault-types/email-keyvault-type";
-import { NostrRelayer } from "../nostr-v4/nostrRelayer";
-import { NostrConnector } from "../nostr-v4/nostrConnector";
-import { NostrPubSub } from "../nostr-v4/nostrPubSub";
+} from "../../common/keyvault-types/email-keyvault-type";
+import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { v4 } from "uuid";
-import { Nip65RelayList, RelayEvent } from "../nostr-v4/type-defs";
-import { NostrRelayerService } from "../services/nostr-relayer.service";
+import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
+import { NostrRelayerService } from "../../services/nostr-relayer.service";
+import { SendGridEmailEnvelope } from "./type-defs";
 
 export async function emailController(
     req: Request,
@@ -35,16 +25,20 @@ export async function emailController(
 const handleEmail = async function (req: Request) {
     const body = req.body;
 
-    if (!body.from || !body.to || !body.text) {
-        console.log(`EMAIL: Trigger without TEXT, FROM or TO`);
+    if (!body.from || !body.envelope || !body.text) {
+        console.log(`EMAIL: Trigger without TEXT, FROM or TO (via ENVELOPE)`);
         return;
     }
 
-    console.log(`EMAIL: ${body.to} < ${body.from}`);
+    const envelope: SendGridEmailEnvelope = JSON.parse(body.envelope);
+    const to = envelope.to[0];
+
+    console.log(`EMAIL: ${to} < ${body.from}`);
+    console.log(body);
 
     // 1. Check if the intended TO domain exists in the database.
     const receiverDomainId = systemDomainIds.get(
-        body.to.split("@")[1].toLowerCase()
+        to.split("@")[1].toLowerCase()
     );
     if (!receiverDomainId) {
         // This will most likely not happen since sendgrid will be configured to
@@ -57,7 +51,7 @@ const handleEmail = async function (req: Request) {
         await PrismaService.instance.db.registration.findFirst({
             where: {
                 systemDomainId: receiverDomainId,
-                identifier: body.to.split("@")[0].toLowerCase(),
+                identifier: to.split("@")[0].toLowerCase(),
             },
             include: {
                 user: true,
@@ -66,7 +60,7 @@ const handleEmail = async function (req: Request) {
         });
     if (!dbRegistration) {
         console.log(
-            `${body.to} - No registration found in the database for the receiver.`
+            `${to} - No registration found in the database for the receiver.`
         );
         return;
     }
@@ -74,14 +68,14 @@ const handleEmail = async function (req: Request) {
     // 3. Check if email forwarding is activated for the registration.
     if (!dbRegistration.emailForwardingOn) {
         console.log(
-            `${body.to} - Email forwarding is NOT activated for the registration.`
+            `${to} - Email forwarding is NOT activated for the registration.`
         );
         return;
     }
 
     // 4. Check if the account has configured at least one relay.
     if (dbRegistration.registrationRelays.length === 0) {
-        console.log(`${body.to} - The receiver has NOT configured any relays.`);
+        console.log(`${to} - The receiver has NOT configured any relays.`);
         return;
     }
 
@@ -96,7 +90,7 @@ const handleEmail = async function (req: Request) {
         fromEmail = fromEmailString.split("<")[1].replace(">", "");
     }
 
-    const dbEmail = await assureEmailExists(fromEmail, body.to);
+    const dbEmail = await assureEmailExists(fromEmail, to);
 
     // Get the privkey/pubkey info from the Azure keyvault.
     const emailKeyvault =
@@ -105,7 +99,7 @@ const handleEmail = async function (req: Request) {
         );
     if (!emailKeyvault) {
         throw new Error(
-            `${body.to} - Could not retrieve email object from Azure keyvault.`
+            `${to} - Could not retrieve email object from Azure keyvault.`
         );
     }
 
@@ -168,9 +162,7 @@ const handleEmail = async function (req: Request) {
         const kind0Event = connector.signEvent(eventTemplate);
 
         console.log(
-            `${
-                body.to
-            } - Publish metadata to the relays: ${missingRelaysForMetadata.join(
+            `${to} - Publish metadata to the relays: ${missingRelaysForMetadata.join(
                 ", "
             )}`
         );
@@ -187,9 +179,7 @@ const handleEmail = async function (req: Request) {
             new Set<string>(publishedRelayEvents.map((x) => x.url))
         );
         console.log(
-            `${
-                body.to
-            } - Successfully published metadata to the relays ${publishedRelays.join(
+            `${to} - Successfully published metadata to the relays ${publishedRelays.join(
                 ", "
             )}`
         );
@@ -210,6 +200,9 @@ const handleEmail = async function (req: Request) {
 
     // Finally, generate the DM and publish to all targetRelays.
     let message = `SUBJECT: ${body.subject}\n` + `FROM: ${dbEmail.address}\n`;
+    if (body.cc) {
+        message += `CC: ${body.cc}\n`;
+    }
     if ((body.attachments as number) > 0) {
         message += `ATTACHMENTS: ${body.attachments}\n`;
     }
@@ -220,7 +213,7 @@ const handleEmail = async function (req: Request) {
         dbRegistration.user.pubkey
     );
     console.log(
-        `${body.to} - Sending DM event to the relays ${targetRelays.join(", ")}`
+        `${to} - Sending DM event to the relays ${targetRelays.join(", ")}`
     );
 
     await NostrRelayerService.instance.publishEventAsync(
