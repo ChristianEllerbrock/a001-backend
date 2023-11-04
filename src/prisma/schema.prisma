@@ -268,15 +268,16 @@ model Email {
 }
 
 model EmailNostr {
-    id      Int     @id @default(autoincrement())
-    emailId Int     @unique
-    pubkey  String
-    nip05   String
-    name    String?
-    about   String?
-    picture String?
-    banner  String?
-    lookups Int
+    id             Int       @id @default(autoincrement())
+    emailId        Int       @unique
+    pubkey         String
+    nip05          String
+    name           String?
+    about          String?
+    picture        String?
+    banner         String?
+    lookups        Int
+    lastLookupDate DateTime?
 
     email              Email               @relation(fields: [emailId], references: [id])
     emailNostrProfiles EmailNostrProfile[]

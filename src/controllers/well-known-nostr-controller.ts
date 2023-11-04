@@ -86,6 +86,7 @@ export async function wellKnownNostrController(
                 },
                 data: {
                     lookups: { increment: 1 },
+                    lastLookupDate: new Date(),
                 },
             });
 
