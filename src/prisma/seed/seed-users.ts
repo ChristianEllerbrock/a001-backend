@@ -127,7 +127,7 @@ const seed = async function (prisma: PrismaClient) {
             createdAt: seedDate,
         },
     });
-    const chrisDbRegistration = await prisma.registration.upsert({
+    await prisma.registration.upsert({
         where: {
             identifier_systemDomainId: {
                 identifier: "chris",
@@ -144,25 +144,25 @@ const seed = async function (prisma: PrismaClient) {
             verifiedAt: seedDate,
         },
     });
-    await prisma.registrationRelay.deleteMany({
-        where: { registrationId: chrisDbRegistration.id },
-    });
-    await prisma.registrationRelay.createMany({
-        data: [
-            {
-                registrationId: chrisDbRegistration.id,
-                address: "wss://nostr-pub.wellorder.net",
-            },
-            {
-                registrationId: chrisDbRegistration.id,
-                address: "wss://relay.damus.io",
-            },
-            {
-                registrationId: chrisDbRegistration.id,
-                address: "wss://relay.snort.social",
-            },
-        ],
-    });
+    // await prisma.registrationRelay.deleteMany({
+    //     where: { registrationId: chrisDbRegistration.id },
+    // });
+    // await prisma.registrationRelay.createMany({
+    //     data: [
+    //         {
+    //             registrationId: chrisDbRegistration.id,
+    //             address: "wss://nostr-pub.wellorder.net",
+    //         },
+    //         {
+    //             registrationId: chrisDbRegistration.id,
+    //             address: "wss://relay.damus.io",
+    //         },
+    //         {
+    //             registrationId: chrisDbRegistration.id,
+    //             address: "wss://relay.snort.social",
+    //         },
+    //     ],
+    // });
 
     // #endregion chris User
 };
