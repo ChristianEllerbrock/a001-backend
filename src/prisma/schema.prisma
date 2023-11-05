@@ -15,6 +15,7 @@ model User {
     isSystemUser    Boolean?  @default(false)
     fraudReportedAt DateTime?
     isSystemAgent   Boolean   @default(false)
+    //subscriptionId  Int       @default(1)
 
     registrations    Registration[]
     userTokens       UserToken[]
@@ -24,6 +25,7 @@ model User {
 
     userLoginNip07Codes UserLoginNip07Code[]
     userLoginNip46Codes UserLoginNip46Code[]
+    //subscription        Subscription         @relation(fields: [subscriptionId], references: [id])
 }
 
 model UserToken {
@@ -290,4 +292,14 @@ model EmailNostrProfile {
     publishedRelay String
 
     emailNostr EmailNostr @relation(fields: [emailNostrId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Subscription {
+    id                            Int    @id
+    name                          String
+    satsPerMonth                  Int
+    maxNoOfNostrAddresses         Int
+    maxNoOfInboundEmailsPerMOnth  Int
+    maxNoOfOutboundEmailsPerMonth Int
+    //users                         User[]
 }
