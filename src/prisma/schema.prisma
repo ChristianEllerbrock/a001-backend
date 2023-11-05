@@ -15,7 +15,8 @@ model User {
     isSystemUser    Boolean?  @default(false)
     fraudReportedAt DateTime?
     isSystemAgent   Boolean   @default(false)
-    //subscriptionId  Int       @default(1)
+    subscriptionId  Int       @default(1)
+    subscriptionEnd DateTime?
 
     registrations    Registration[]
     userTokens       UserToken[]
@@ -25,7 +26,7 @@ model User {
 
     userLoginNip07Codes UserLoginNip07Code[]
     userLoginNip46Codes UserLoginNip46Code[]
-    //subscription        Subscription         @relation(fields: [subscriptionId], references: [id])
+    subscription        Subscription         @relation(fields: [subscriptionId], references: [id])
 }
 
 model UserToken {
@@ -301,5 +302,5 @@ model Subscription {
     maxNoOfNostrAddresses         Int
     maxNoOfInboundEmailsPerMOnth  Int
     maxNoOfOutboundEmailsPerMonth Int
-    //users                         User[]
+    users                         User[]
 }
