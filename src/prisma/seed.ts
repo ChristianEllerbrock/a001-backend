@@ -6,10 +6,12 @@ import { seedSystemDomain } from "./seed/seed-system-domain";
 import { seedJobState } from "./seed/seed-job-state";
 import { seedJobType } from "./seed/seed-job-type";
 import { seedSystemRelay } from "./seed/seed-system-relay";
+import { seedSubscription } from "./seed/seed-subscription";
 
 const prisma = new PrismaClient();
 
 async function main() {
+    await seedSubscription(prisma);
     await seedJobState(prisma);
     await seedJobType(prisma);
     await seedSystemConfig(prisma);
