@@ -4,6 +4,9 @@ import { ArgsType, Field, InputType } from "type-graphql";
 export class RegistrationInputUpdate {
     @Field((type) => String, { nullable: true })
     lightningAddress?: string | null;
+
+    @Field((type) => Boolean, { nullable: true })
+    emailForwardingOn?: boolean | null;
 }
 
 @ArgsType()
