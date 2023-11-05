@@ -36,8 +36,10 @@ export class RegistrationOutput {
     @Field((type) => String, { nullable: true })
     lightningAddress!: string | null;
 
-    // Model Relations
+    @Field((type) => Boolean, { nullable: true })
+    emailForwardingOn!: boolean | null;
 
+    // Model Relations
     @Field((type) => UserOutput)
     user?: UserOutput;
 

@@ -968,13 +968,14 @@ Your nip05.social Team`;
             cleanedLightningAddress &&
             !HelperRegex.isValidLightningAddress(cleanedLightningAddress)
         ) {
-            throw new Error("Invlid lightning address.");
+            throw new Error("Invalid lightning address.");
         }
 
         const updatedDbRegistration = await context.db.registration.update({
             where: { id: args.registrationId },
             data: {
                 lightningAddress: cleanedLightningAddress,
+                emailForwardingOn: args.data.emailForwardingOn,
             },
         });
 
