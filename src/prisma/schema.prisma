@@ -71,6 +71,7 @@ model Registration {
     registrationNip07Code        RegistrationNip07Code?
     registrationNip46Code        RegistrationNip46Code?
     registrationEmailForwardings RegistrationEmailForwarding[]
+    registrationEmailOuts        RegistrationEmailOut[]
 
     @@unique([identifier, systemDomainId])
 }
@@ -261,6 +262,16 @@ model RegistrationEmailForwarding {
     @@unique([registrationId, date])
 }
 
+model RegistrationEmailOut {
+    id             Int          @id @default(autoincrement())
+    registrationId String
+    date           DateTime
+    total          Int
+    registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@unique([registrationId, date])
+}
+
 model Email {
     id          Int      @id @default(autoincrement())
     address     String   @unique
@@ -284,6 +295,17 @@ model EmailNostr {
 
     email              Email               @relation(fields: [emailId], references: [id])
     emailNostrProfiles EmailNostrProfile[]
+    emailNostrDms      EmailNostrDm[]
+}
+
+model EmailNostrDm {
+    id             Int       @id @default(autoincrement())
+    emailNostrId   Int
+    eventId        String
+    eventCreatedAt Int
+    sent           DateTime?
+
+    emailNostr EmailNostr @relation(fields: [emailNostrId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model EmailNostrProfile {
