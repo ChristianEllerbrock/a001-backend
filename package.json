@@ -28,7 +28,9 @@
     "kill": "fuser 4000/tcp -k"
   },
   "dependencies": {
-    "@azure/identity": "^3.2.2",
+    "@azure/arm-communication": "^4.0.0",
+    "@azure/communication-email": "^1.0.0",
+    "@azure/identity": "^3.3.2",
     "@azure/keyvault-secrets": "^4.7.0",
     "@azure/service-bus": "^7.8.1",
     "@noble/curves": "^1.0.0",
