@@ -29,6 +29,7 @@ export class NostrRelayer {
     readonly authRelayConnectors = new Map<string, NostrConnector>();
 
     #relayAuthEvent = new EventEmitter();
+    #multiKind4Subscriptions = new Map<string, Sub[]>();
 
     constructor() {} //public conf: NostrRelayerConfig,
 
@@ -73,6 +74,46 @@ export class NostrRelayer {
         }
 
         return subs;
+    }
+
+    async multiKind4SubscribeOn(
+        relayPubkeys: Map<string, Set<string>>,
+        onEvent: (event: Event) => Promise<void>,
+        startXSecondsInThePast: number = 0
+    ): Promise<string> {
+        const subs: Sub[] = [];
+
+        for (const data of relayPubkeys) {
+            const relay = this.#getRelay(data[0]);
+            await relay.connect();
+
+            const filters: Filter = {
+                kinds: [4],
+                "#p": Array.from(data[1]),
+                since:
+                    Math.floor(new Date().getTime() / 1000) -
+                    startXSecondsInThePast,
+            };
+            console.log(filters);
+            const sub = relay.sub([filters]);
+            subs.push(sub);
+            sub.on("event", async (event) => {
+                await onEvent(event);
+            });
+        }
+
+        const id = v4();
+        this.#multiKind4Subscriptions.set(id, subs);
+        return id;
+    }
+
+    multiKind4SubscribeOff(id: string) {
+        const subscriptions = this.#multiKind4Subscriptions.get(id);
+        for (const subscription of subscriptions ?? []) {
+            subscription.unsub();
+        }
+
+        this.#multiKind4Subscriptions.delete(id);
     }
 
     publishEvent(channelId: string, event: Event, toRelays: string[]) {

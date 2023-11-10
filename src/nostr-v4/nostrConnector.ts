@@ -4,7 +4,6 @@ import {
     UnsignedEvent,
     getEventHash,
     getSignature,
-    nip44,
 } from "nostr-tools";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { randomBytes } from "@noble/hashes/utils";
@@ -87,6 +86,36 @@ export class NostrConnector {
         return this.signEvent(eventTemplate);
     }
 
+    async decryptDM(event: Event): Promise<string> {
+        let [ctb64, ivb64] = event.content.split("?iv=");
+        let key = secp256k1.getSharedSecret(
+            this.conf.privkey,
+            "02" + event.pubkey
+        );
+        let normalizedKey = this.#getNormalizedX(key);
+
+        let cryptoKey = await crypto.subtle.importKey(
+            "raw",
+            normalizedKey,
+            { name: "AES-CBC" },
+            false,
+            ["decrypt"]
+        );
+        let ciphertext = base64.decode(ctb64);
+        let iv = base64.decode(ivb64);
+
+        let plaintext = await crypto.subtle.decrypt(
+            { name: "AES-CBC", iv },
+            cryptoKey,
+            ciphertext
+        );
+
+        const utf8Decoder = new TextDecoder();
+
+        let text = utf8Decoder.decode(plaintext);
+        return text;
+    }
+
     async decrypt(cipherText: string): Promise<string> {
         // if (this.conf.use === "nip-07" && window.nostr?.nip04) {
         //     const plaintext = await window.nostr.nip04.decrypt(
@@ -109,6 +138,10 @@ export class NostrConnector {
         // }
 
         throw new Error("Not implemented yet.");
+    }
+
+    #getNormalizedX(key: Uint8Array): Uint8Array {
+        return key.slice(1, 33);
     }
 }
 
