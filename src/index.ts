@@ -22,6 +22,7 @@ import { Context as WsContext } from "graphql-ws";
 import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
+import { EmailOutboundService } from "./services/email-outbound-service";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -146,6 +147,8 @@ async function bootstrap() {
             wsServer
         );
     });
+
+    EmailOutboundService.instance.start();
 }
 
 bootstrap();

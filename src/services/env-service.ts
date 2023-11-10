@@ -24,6 +24,10 @@ export class EnvServiceEnv {
 
     KEYVAULT_URI!: string;
     EMAIL_ENDPOINT!: string;
+    COMMUNICATION_SERVICES_CONNECTION_STRING!: string;
+    COMMUNICATION_SERVICES_SUBSCRIPTION_ID!: string;
+    COMMUNICATION_SERVICES_RESOURCE_GROUP_NAME!: string;
+    COMMUNICATION_SERVICES_EMAIL_SERVICE_NAME!: string;
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
