@@ -30,6 +30,8 @@ type DbUser = {
     subscriptionEnd: Date | null;
 };
 
+type DMCommand = "help";
+
 const _log = function (text: string) {
     console.log("EMAIL OUT - " + text);
 };
@@ -65,7 +67,7 @@ export class EmailOutboundService {
         if (!this.#subscriptionId) {
             return;
         }
-        NostrRelayerService.instance.multiKind4SubscribeOff(
+        NostrRelayerService.instance.relayer.multiKind4SubscribeOff(
             this.#subscriptionId
         );
     }
@@ -87,7 +89,7 @@ export class EmailOutboundService {
             include: {
                 subscription: true,
                 registrations: {
-                    include: { systemDomain: true },
+                    include: { systemDomain: true, registrationRelays: true },
                 },
             },
         });
@@ -138,7 +140,11 @@ export class EmailOutboundService {
         _log(`Will use email address as sender: ${senderEmail}`);
 
         // Everything is ok. We can send the email.
-        const emailNostrId = await this.#sendEmailOut(event, senderEmail);
+        const emailNostrId = await this.#sendEmailOutOrDMResponse(
+            event,
+            senderEmail,
+            dbFirstRegistration.registrationRelays.map((x) => x.address)
+        );
 
         if (emailNostrId) {
             // Send ok.
@@ -175,9 +181,10 @@ export class EmailOutboundService {
         }
     }
 
-    async #sendEmailOut(
+    async #sendEmailOutOrDMResponse(
         event: Event,
-        senderEmail: string
+        senderEmail: string,
+        senderRegistrationRelays: string[]
     ): Promise<number | undefined> {
         // Determine the receiver pubkey.
         let receiverPubkey: string | undefined;
@@ -212,15 +219,6 @@ export class EmailOutboundService {
             return;
         }
 
-        if (
-            dbEmailNostr.emailNostrDms.find(
-                (x) => x.eventId === event.id && typeof x.sent !== "undefined"
-            )
-        ) {
-            _log("DM was already sent. Do nothing");
-            return;
-        }
-
         const keyvaultResult =
             await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
                 dbEmailNostr.email.keyvaultKey
@@ -233,34 +231,104 @@ export class EmailOutboundService {
             return;
         }
 
-        // Make sure that the email exists in Azure as sender.
-        await AzureCommunicationService.instance.addEmail(senderEmail);
-
+        // Decrypt message.
         const connector = new NostrConnector({
             pubkey: keyvaultResult.pubkey,
             privkey: keyvaultResult.privkey,
         });
-
         const message = await connector.decryptDM(event);
 
+        // Check if the message includes commands (like help)
+        const command = this.#analyzeIntendedOutMessageForCommands(message);
+        if (command === "help") {
+            // Send help DM back. DO NOT CREATE EMAIL.
+            _log("HELP command received. Will respond with a DM.");
+            await this.#sendDM(
+                connector,
+                event.pubkey,
+                senderRegistrationRelays,
+                this.#getCommandResponseText(command)
+            );
+            _log("Done.");
+            return;
+        }
+
+        // Check if the intended email was already sent.
+        if (
+            dbEmailNostr.emailNostrDms.find(
+                (x) => x.eventId === event.id && typeof x.sent !== "undefined"
+            )
+        ) {
+            _log("DM was already sent. Do nothing");
+            return;
+        }
+
+        const splitMessage = this.#splitMessageInSubjectAndRest(message);
+
+        // Make sure that the email exists in Azure as sender.
+        await AzureCommunicationService.instance.addEmail(senderEmail);
+
+        // Send Email.
         const client = new EmailClient(
             EnvService.instance.env.COMMUNICATION_SERVICES_CONNECTION_STRING
         );
         const emailMessage = {
             senderAddress: senderEmail,
             content: {
-                subject: "Nostr",
-                plainText: message,
+                subject: splitMessage[0] ?? "Nostr 2 Email",
+                plainText: splitMessage[1],
             },
             recipients: {
                 to: [{ address: dbEmailNostr.email.address }],
             },
         };
-
         // https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/add-multiple-senders-mgmt-sdks?pivots=programming-language-javascript
         const poller = await client.beginSend(emailMessage);
         await poller.pollUntilDone();
         return dbEmailNostr.id;
+    }
+
+    #analyzeIntendedOutMessageForCommands(message: string): "help" | undefined {
+        if (message.toLowerCase().trim() === "help") {
+            return "help";
+        }
+
+        return undefined;
+    }
+
+    async #sendDM(
+        connector: NostrConnector,
+        receiverPubkey: string,
+        initialRelays: string[],
+        text: string
+    ) {
+        // A) Fetch NIP-65 relay lists from the initial relays.
+        const relayLists =
+            await NostrRelayerService.instance.fetchRelayListForPubkey(
+                receiverPubkey,
+                Array.from(new Set(initialRelays))
+            );
+        const destinationRelays = Array.from(
+            new Set<string>([
+                ...initialRelays,
+                ...relayLists
+                    .filter(
+                        (x) =>
+                            x.operation === "read" ||
+                            x.operation === "read+write"
+                    )
+                    .map((x) => x.url),
+            ])
+        );
+
+        // B) Generate DM event.
+        const event = await connector.generateDM(text, receiverPubkey);
+
+        // C) Publish DM event to all relevant relays.
+        await NostrRelayerService.instance.relayer.publishEventAsync(
+            event,
+            destinationRelays
+        );
     }
 
     async #initialize() {
@@ -291,7 +359,7 @@ export class EmailOutboundService {
         }
 
         const subscriptionId =
-            NostrRelayerService.instance.multiKind4SubscribeOn(
+            NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
                 this.#relayPubkeys,
                 this.#onDMEvent.bind(this),
                 300
@@ -398,9 +466,62 @@ export class EmailOutboundService {
         });
     }
 
-    #deconstructMessage(message: string) {
-        // TODO
-        return message;
+    #splitMessageInSubjectAndRest(
+        message: string
+    ): [string | undefined, string] {
+        const patternFull = /^-s "[^"]+"/i;
+        const rFull = new RegExp(patternFull);
+        const rFullResult = rFull.exec(message);
+
+        if (rFullResult == null) {
+            return [undefined, message];
+        }
+
+        const patternSubject = /"[^"]+"/;
+        const rSubject = new RegExp(patternSubject);
+        const rSubjectResult = rSubject.exec(message);
+        if (rSubjectResult == null) {
+            return [undefined, message];
+        }
+
+        const patternMatch = rSubjectResult[0];
+
+        const subject = patternMatch.substring(1, patternMatch.length - 1);
+        return [subject, message.replace(rFullResult[0], "").trimStart()];
+    }
+
+    #getCommandResponseText(command: DMCommand): string {
+        let text = "";
+        if (command === "help") {
+            text =
+                "Hi, I am an account that was automatically created to handle INBOUND and OUTBOUND #email forwarding for #nostr addresses registered on";
+            text += "\n\n";
+            text += "https://nip05.social";
+
+            text += "\n\n";
+            text += "I handle exactly one #email address.";
+
+            text += "\n\n";
+            text +=
+                "If you are a registered user and have activated INBOUND #email forwarding for a specific #nostr address, " +
+                "you will receive #emails to this address as direct messages from either me or one of the other mirror-accounts.";
+
+            text += "\n\n";
+
+            text +=
+                "If you send me a message, I will handle the OUTBOUND #email forwarding by generating an #email with the content of your message and sending" +
+                " it to the #email address that I mirror.";
+
+            text += "\n\n";
+            text +=
+                "As subject for the #email, I will use a default that you can configure in your account. If you want " +
+                "to set the subject yourself, you have to start your message like this:";
+
+            text += "\n\n";
+            text += '-s "your subject goes here"\n';
+        }
+
+        return text;
     }
 }
 
