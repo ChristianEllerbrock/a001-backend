@@ -318,11 +318,11 @@ model EmailNostrProfile {
 }
 
 model Subscription {
-    id                            Int    @id
-    name                          String
-    satsPerMonth                  Int
-    maxNoOfNostrAddresses         Int
-    maxNoOfInboundEmailsPerMOnth  Int
-    maxNoOfOutboundEmailsPerMonth Int
-    users                         User[]
+    id                             Int    @id
+    name                           String
+    satsPer30Days                  Int
+    maxNoOfNostrAddresses          Int
+    maxNoOfInboundEmailsPer30Days  Int
+    maxNoOfOutboundEmailsPer30Days Int
+    users                          User[]
 }

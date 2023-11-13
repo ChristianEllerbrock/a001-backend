@@ -94,7 +94,6 @@ export class NostrRelayer {
                     Math.floor(new Date().getTime() / 1000) -
                     startXSecondsInThePast,
             };
-            console.log(filters);
             const sub = relay.sub([filters]);
             subs.push(sub);
             sub.on("event", async (event) => {

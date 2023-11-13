@@ -7,10 +7,10 @@ const seed = async function (prisma: PrismaClient) {
         create: {
             id: 1,
             name: "Free",
-            satsPerMonth: 0,
+            satsPer30Days: 0,
             maxNoOfNostrAddresses: 1,
-            maxNoOfInboundEmailsPerMOnth: 25,
-            maxNoOfOutboundEmailsPerMonth: 0,
+            maxNoOfInboundEmailsPer30Days: 25,
+            maxNoOfOutboundEmailsPer30Days: 0,
         },
     });
 
@@ -20,10 +20,10 @@ const seed = async function (prisma: PrismaClient) {
         create: {
             id: 2,
             name: "Basic",
-            satsPerMonth: 6000,
+            satsPer30Days: 6000,
             maxNoOfNostrAddresses: 5,
-            maxNoOfInboundEmailsPerMOnth: -1, // unlimited
-            maxNoOfOutboundEmailsPerMonth: 25,
+            maxNoOfInboundEmailsPer30Days: -1, // unlimited
+            maxNoOfOutboundEmailsPer30Days: 25,
         },
     });
 
@@ -33,10 +33,10 @@ const seed = async function (prisma: PrismaClient) {
         create: {
             id: 3,
             name: "Pro",
-            satsPerMonth: 10000,
+            satsPer30Days: 10000,
             maxNoOfNostrAddresses: -1,
-            maxNoOfInboundEmailsPerMOnth: -1,
-            maxNoOfOutboundEmailsPerMonth: -1,
+            maxNoOfInboundEmailsPer30Days: -1,
+            maxNoOfOutboundEmailsPer30Days: -1,
         },
     });
 };
