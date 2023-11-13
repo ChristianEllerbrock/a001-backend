@@ -14,10 +14,10 @@ type DbUser = {
     subscription: {
         id: number;
         name: string;
-        satsPerMonth: number;
+        satsPer30Days: number;
         maxNoOfNostrAddresses: number;
-        maxNoOfInboundEmailsPerMOnth: number;
-        maxNoOfOutboundEmailsPerMonth: number;
+        maxNoOfInboundEmailsPer30Days: number;
+        maxNoOfOutboundEmailsPer30Days: number;
     };
 } & {
     id: string;
@@ -190,7 +190,7 @@ export class EmailOutboundService {
                 "==\n" +
                 "== INFO FROM NIP05.social ==\n" +
                 "==\n\n" +
-                `You have exhausted your maximum number of allowed outbound emails per 30 day period (${dbUser.subscription.maxNoOfOutboundEmailsPerMonth}). `;
+                `You have exhausted your maximum number of allowed outbound emails per 30 day period (${dbUser.subscription.maxNoOfOutboundEmailsPer30Days}). `;
 
             // 2 Situations: No more next period or more next period(s)
             const nextPeriodStart = this.#determineNextPeriodStart(
@@ -498,7 +498,7 @@ export class EmailOutboundService {
      */
     async #checkSubscription(dbUser: DbUser): Promise<number | undefined> {
         const maxNoOfOutboundEmailsPerMonth =
-            dbUser.subscription.maxNoOfOutboundEmailsPerMonth;
+            dbUser.subscription.maxNoOfOutboundEmailsPer30Days;
 
         if (maxNoOfOutboundEmailsPerMonth === -1) {
             return -1;
