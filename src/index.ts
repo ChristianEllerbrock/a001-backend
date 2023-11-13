@@ -23,6 +23,7 @@ import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
 import { EmailOutboundService } from "./services/email-outbound-service";
+import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -82,6 +83,9 @@ app.post(
 app.get(`/${EnvService.instance.env.EMAIL_ENDPOINT}/`, (req, res) => {
     res.json("OK");
 });
+
+// Admin controllers
+app.get("/admin/update-email-about", adminUpdateEmailAboutController);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);

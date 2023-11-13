@@ -311,6 +311,10 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
     }
 
     // Create database record(s).
+    const about =
+        `I was created to mirror the email ${fromEmail} and handle email forwarding on https://nip05.social\n\n` +
+        `Send me a DM with the text "help", and I will answer with instructions about what I can do.`;
+
     dbEmail = await PrismaService.instance.db.email.create({
         data: {
             address: fromEmail,
@@ -321,7 +325,7 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
                     pubkey,
                     nip05,
                     name: fromEmail,
-                    about: `I mirror the email '${fromEmail}'. I was created to handle email forwarding on https://nip05.social.`,
+                    about,
                     picture:
                         "https://nip05assets.blob.core.windows.net/public/robot-head-01.jpg",
                     banner: "https://nip05assets.blob.core.windows.net/public/profile-background-3.jpg",

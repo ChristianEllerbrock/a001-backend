@@ -28,6 +28,7 @@ export class EnvServiceEnv {
     COMMUNICATION_SERVICES_SUBSCRIPTION_ID!: string;
     COMMUNICATION_SERVICES_RESOURCE_GROUP_NAME!: string;
     COMMUNICATION_SERVICES_EMAIL_SERVICE_NAME!: string;
+    API_ADMIN_KEY!: string;
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
