@@ -32,8 +32,10 @@ type DbUser = {
 
 type DMCommand = "help";
 
-const _log = function (text: string) {
-    console.log("EMAIL OUT - " + text);
+const _log = function (event: Event | undefined, text: string) {
+    const id =
+        typeof event === "undefined" ? "system" : event.id.substring(0, 10);
+    console.log(`EMAIL OUT - [${id}] - ${text}`);
 };
 
 export class EmailOutboundService {
@@ -73,9 +75,12 @@ export class EmailOutboundService {
     }
 
     async #onDMEvent(event: Event) {
-        _log("DM event received from pubkey " + event.pubkey);
+        _log(event, "DM event received from pubkey " + event.pubkey);
         if (this.#dmEventIds.has(event.id)) {
-            _log("DM was already processed or is currently being processed.");
+            _log(
+                event,
+                "DM was already processed or is currently being processed. Do nothing."
+            );
             return;
         }
 
@@ -95,14 +100,63 @@ export class EmailOutboundService {
         });
         if (!dbUser) {
             // Not user found in the database. Ignore.
-            _log("Unknown pubkey " + event.pubkey);
+            _log(event, "Unknown pubkey " + event.pubkey);
             return;
         }
+        const senderInitialRelays: string[] = [];
+        for (const dbRegistration of dbUser.registrations) {
+            senderInitialRelays.push(
+                ...dbRegistration.registrationRelays.map((x) => x.address)
+            );
+        }
+
+        // The message comes from a registers NIP05.social user.
+        // Continue.
+
+        // Get some data that will later be used.
+
+        const receiverPubkey = this.#getReceiverPubkeyFromKind4Event(event);
+        if (!receiverPubkey) {
+            _log(
+                event,
+                "Could not determine receiver pubkey from event. Do nothing."
+            );
+            return;
+        }
+
+        const receiverDbEmailNostr = await this.#getReceiverDbEmailNostr(
+            receiverPubkey
+        );
+        if (!receiverDbEmailNostr) {
+            _log(
+                event,
+                "Could not fetch the emailNostr record from the database for the given receiver pubkey."
+            );
+            return;
+        }
+
+        const receiverKeyvault = await this.#getReceiverKeyvaultRecord(
+            receiverDbEmailNostr.email.keyvaultKey
+        );
+        if (!receiverKeyvault) {
+            _log(
+                event,
+                "Could not retrieve the keyvault data for the emailNostr record."
+            );
+            return;
+        }
+        const receiverConnector = new NostrConnector({
+            pubkey: receiverKeyvault.pubkey,
+            privkey: receiverKeyvault.privkey,
+        });
+
+        // Continue with all relevant data at hand.
 
         // Check if the user has a valid subscription
         // for OUTBOUND EMAIL FORWARDING.
         const checkResult = await this.#checkSubscription(dbUser);
         _log(
+            event,
             "Subscription check (for user's 30-day-period): " +
                 checkResult +
                 " for " +
@@ -112,10 +166,61 @@ export class EmailOutboundService {
         if (typeof checkResult === "undefined") {
             // The user's subscription does NOT cover EMAIL OUT
             // TODO: Answer DM
+
+            let text =
+                "==\n" +
+                "== INFO FROM NIP05.social ==\n" +
+                "==\n\n" +
+                "Your current subscription does not include OUTBOUND EMAIL FORWARDING. " +
+                "Please subscribe to a higher plan on\n\n" +
+                "https://nip05.social";
+
+            await this.#sendDM(
+                receiverConnector,
+                event.pubkey,
+                senderInitialRelays,
+                text
+            );
+
             return;
         } else if (checkResult === 0) {
             // The user has exhausted his contingent in this 30-day-period.
-            // TODO: Answer DM
+
+            let text =
+                "==\n" +
+                "== INFO FROM NIP05.social ==\n" +
+                "==\n\n" +
+                `You have exhausted your maximum number of allowed outbound emails per 30 day period (${dbUser.subscription.maxNoOfOutboundEmailsPerMonth}). `;
+
+            // 2 Situations: No more next period or more next period(s)
+            const nextPeriodStart = this.#determineNextPeriodStart(
+                dbUser.subscriptionEnd
+            );
+
+            if (nextPeriodStart) {
+                text += `Please wait until the next period starts (at ${nextPeriodStart
+                    .toUTC()
+                    .toFormat(
+                        "yyyy-MM-dd HH:mm"
+                    )} UTC), or subscribe to a higher plan on \n\n`;
+                text += "https://nip05.social";
+            } else {
+                text += `Your subscription ends at ${DateTime.fromJSDate(
+                    dbUser.subscriptionEnd ?? new Date()
+                )
+                    .toUTC()
+                    .toFormat(
+                        "yyyy-MM-dd HH:mm"
+                    )} (UTC). Please consider prolonging your subscription on\n\n`;
+                text += "https://nip05.social";
+            }
+
+            await this.#sendDM(
+                receiverConnector,
+                event.pubkey,
+                senderInitialRelays,
+                text
+            );
             return;
         }
 
@@ -126,7 +231,7 @@ export class EmailOutboundService {
             event.pubkey !==
             "090e4e48e07e331b7a9eb527532794969ab1086ddfa4d805fff88c6358e9d15d"
         ) {
-            _log("DEBUG PHASE: ONLY Chris is allowed.");
+            _log(event, "DEBUG PHASE: ONLY Chris is allowed.");
             return;
         }
 
@@ -137,7 +242,7 @@ export class EmailOutboundService {
             dbFirstRegistration.identifier +
             "@" +
             dbFirstRegistration.systemDomain.name;
-        _log(`Will use email address as sender: ${senderEmail}`);
+        _log(event, `Will use email address as sender: ${senderEmail}`);
 
         // Everything is ok. We can send the email.
         const emailNostrId = await this.#sendEmailOutOrDMResponse(
@@ -176,6 +281,7 @@ export class EmailOutboundService {
                     },
                 });
             _log(
+                event,
                 `Sent ${dbRegistrationEmailOut.total} today on behalf of the user.`
             );
         }
@@ -198,7 +304,7 @@ export class EmailOutboundService {
         }
 
         if (!receiverPubkey) {
-            _log("Could not get receiver pubkey from DM event.");
+            _log(event, "Could not get receiver pubkey from DM event.");
             return;
         }
 
@@ -215,7 +321,7 @@ export class EmailOutboundService {
             });
 
         if (!dbEmailNostr) {
-            _log("No email receiver record found in database.");
+            _log(event, "No email receiver record found in database.");
             return;
         }
 
@@ -225,6 +331,7 @@ export class EmailOutboundService {
             );
         if (!keyvaultResult) {
             _log(
+                event,
                 "Could not retrieve data from Azure KeyVault for secret " +
                     dbEmailNostr.email.keyvaultKey
             );
@@ -242,14 +349,14 @@ export class EmailOutboundService {
         const command = this.#analyzeIntendedOutMessageForCommands(message);
         if (command === "help") {
             // Send help DM back. DO NOT CREATE EMAIL.
-            _log("HELP command received. Will respond with a DM.");
+            _log(event, "HELP command received. Will respond with a DM.");
             await this.#sendDM(
                 connector,
                 event.pubkey,
                 senderRegistrationRelays,
                 this.#getCommandResponseText(command)
             );
-            _log("Done.");
+            _log(event, "Done.");
             return;
         }
 
@@ -259,7 +366,7 @@ export class EmailOutboundService {
                 (x) => x.eventId === event.id && typeof x.sent !== "undefined"
             )
         ) {
-            _log("DM was already sent. Do nothing");
+            _log(event, "DM was already sent. Do nothing");
             return;
         }
 
@@ -333,7 +440,7 @@ export class EmailOutboundService {
 
     async #initialize() {
         const start = DateTime.now();
-        _log("STARTUP start: " + start.toJSDate().toISOString());
+        _log(undefined, "STARTUP start: " + start.toJSDate().toISOString());
 
         const pubkeys = new Set<string>();
 
@@ -366,16 +473,17 @@ export class EmailOutboundService {
             );
 
         const end = DateTime.now();
-        _log("STARTUP finished: " + end.toJSDate().toISOString());
+        _log(undefined, "STARTUP finished: " + end.toJSDate().toISOString());
 
         _log(
+            undefined,
             "STARTUP #duration (seconds): " +
                 end.diff(start, "seconds").toObject().seconds
         );
 
-        _log("STARTUP #relays: " + this.#relayPubkeys.size);
+        _log(undefined, "STARTUP #relays: " + this.#relayPubkeys.size);
 
-        _log("STARTUP #pubkeys: " + pubkeys.size);
+        _log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
 
         return subscriptionId;
     }
@@ -460,7 +568,7 @@ export class EmailOutboundService {
             return;
         }
 
-        _log(`Purge ${keysToDelete.length} old DM event ids.`);
+        _log(undefined, `Purge ${keysToDelete.length} old DM event ids.`);
         keysToDelete.forEach((x) => {
             this.#dmEventIds.delete(x);
         });
@@ -522,6 +630,92 @@ export class EmailOutboundService {
         }
 
         return text;
+    }
+
+    #getReceiverPubkeyFromKind4Event(event: Event): string | undefined {
+        for (const tag of event.tags) {
+            if (tag[0] !== "p") {
+                continue;
+            }
+
+            return tag[1];
+        }
+
+        return undefined;
+    }
+
+    async #getReceiverDbEmailNostr(receiverPubkey: string): Promise<
+        | ({
+              email: {
+                  id: number;
+                  address: string;
+                  createdAt: Date;
+                  keyvaultKey: string;
+              };
+              emailNostrProfiles: {
+                  id: number;
+                  emailNostrId: number;
+                  publishedAt: Date;
+                  publishedRelay: string;
+              }[];
+              emailNostrDms: {
+                  id: number;
+              }[];
+          } & {
+              id: number;
+              emailId: number;
+              pubkey: string;
+              nip05: string;
+              name: string | null;
+              about: string | null;
+              picture: string | null;
+              banner: string | null;
+              lookups: number;
+              lastLookupDate: Date | null;
+          })
+        | null
+    > {
+        return await PrismaService.instance.db.emailNostr.findFirst({
+            where: {
+                pubkey: receiverPubkey,
+            },
+            include: {
+                email: true,
+                emailNostrDms: true,
+                emailNostrProfiles: true,
+            },
+        });
+    }
+
+    async #getReceiverKeyvaultRecord(keyvaultKey: string) {
+        return await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+            keyvaultKey
+        );
+    }
+
+    #determineNextPeriodStart(
+        subscriptionEnd: Date | undefined | null
+    ): DateTime | undefined {
+        if (!subscriptionEnd) {
+            return undefined;
+        }
+
+        const now = new Date();
+        if (subscriptionEnd.getTime() < now.getTime()) {
+            return undefined; // Subscription already has ended.
+        }
+
+        let movingDateTime = DateTime.fromJSDate(subscriptionEnd);
+        do {
+            movingDateTime = movingDateTime.plus({ days: -30 });
+        } while (movingDateTime.toJSDate().getTime() > now.getTime());
+
+        const nextPeriodStart = movingDateTime.plus({ days: 30 });
+        if (nextPeriodStart.toJSDate().getTime() > subscriptionEnd.getTime()) {
+            return undefined; // The next period is after subscription end.
+        }
+
+        return nextPeriodStart;
     }
 }
 
