@@ -17,7 +17,7 @@ export async function adminUpdateEmailAboutController(
     res: Response,
     next: NextFunction
 ) {
-    const apiKey = req.headers["X-Auth-Token"];
+    const apiKey = req.headers["x-auth-token"];
     if (
         typeof apiKey === "undefined" ||
         apiKey !== EnvService.instance.env.API_ADMIN_KEY
