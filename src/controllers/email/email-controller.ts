@@ -35,7 +35,6 @@ const handleEmail = async function (req: Request) {
     const to = envelope.to[0];
 
     console.log(`EMAIL: ${to} < ${body.from}`);
-    console.log(body);
 
     // 1. Check if the intended TO domain exists in the database.
     const receiverDomainId = systemDomainIds.get(

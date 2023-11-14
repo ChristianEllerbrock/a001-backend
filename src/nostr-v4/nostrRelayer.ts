@@ -12,7 +12,7 @@ import { v4 } from "uuid";
 import EventEmitter from "events";
 
 import { FetchResult, Nip11RID, RelayEvent } from "./type-defs";
-import { WebSocket } from "ws";
+import { OPEN, WebSocket } from "ws";
 import { NostrConnector } from "./nostrConnector";
 import { NostrPubSub } from "./nostrPubSub";
 import { NostrEventCache } from "./nostrEventCahce";
@@ -80,12 +80,18 @@ export class NostrRelayer {
         relayPubkeys: Map<string, Set<string>>,
         onEvent: (event: Event) => Promise<void>,
         startXSecondsInThePast: number = 0
-    ): Promise<string> {
+    ): Promise<[string, string[]]> {
         const subs: Sub[] = [];
+
+        const listeningOnRelays: string[] = [];
 
         for (const data of relayPubkeys) {
             const relay = this.#getRelay(data[0]);
             await relay.connect();
+            if (relay.status !== OPEN) {
+                continue;
+            }
+            listeningOnRelays.push(relay.url);
 
             const filters: Filter = {
                 kinds: [4],
@@ -103,7 +109,7 @@ export class NostrRelayer {
 
         const id = v4();
         this.#multiKind4Subscriptions.set(id, subs);
-        return id;
+        return [id, listeningOnRelays];
     }
 
     multiKind4SubscribeOff(id: string) {
@@ -372,6 +378,12 @@ export class NostrRelayer {
 
         relay = relayInit(url);
         this.relays.set(url, relay);
+        relay.on("error", () => {
+            console.log(`Relay error on '${relay?.url}'`);
+        });
+        relay.on("disconnect", () => {
+            console.log(`Relay disconnect on '${relay?.url}'`);
+        });
         return relay;
     }
 

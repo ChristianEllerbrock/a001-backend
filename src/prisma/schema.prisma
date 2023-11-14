@@ -27,6 +27,43 @@ model User {
     userLoginNip07Codes UserLoginNip07Code[]
     userLoginNip46Codes UserLoginNip46Code[]
     subscription        Subscription         @relation(fields: [subscriptionId], references: [id])
+    userSubscriptions   UserSubscription[]
+}
+
+model UserSubscription {
+    id                      Int                      @id @default(autoincrement())
+    userId                  String
+    createdAt               DateTime
+    pending                 Boolean
+    cancelled               Boolean
+    oldSubscriptionId       Int
+    newSubscriptionId       Int
+    newSubscriptionEnd      DateTime?
+    userSubscriptionInvoice UserSubscriptionInvoice?
+    user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    oldSubscription         Subscription             @relation(name: "old", fields: [oldSubscriptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    newSubscription         Subscription             @relation(name: "new", fields: [newSubscriptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model UserSubscriptionInvoice {
+    id                             Int                             @id @default(autoincrement())
+    userSubscriptionId             Int                             @unique
+    createdAt                      DateTime
+    amount                         Int
+    description                    String
+    expiresAt                      DateTime
+    paymentHash                    String                          @unique
+    paymentRequest                 String
+    userSubscription               UserSubscription                @relation(fields: [userSubscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    userSubscriptionInvoicePayment UserSubscriptionInvoicePayment?
+}
+
+model UserSubscriptionInvoicePayment {
+    id                        Int                     @id @default(autoincrement())
+    userSubscriptionInvoiceId Int                     @unique
+    settled                   Boolean?
+    settledAt                 DateTime?
+    userSubscriptionInvoice   UserSubscriptionInvoice @relation(fields: [userSubscriptionInvoiceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model UserToken {
@@ -318,11 +355,13 @@ model EmailNostrProfile {
 }
 
 model Subscription {
-    id                             Int    @id
+    id                             Int                @id
     name                           String
     satsPer30Days                  Int
     maxNoOfNostrAddresses          Int
     maxNoOfInboundEmailsPer30Days  Int
     maxNoOfOutboundEmailsPer30Days Int
     users                          User[]
+    userOldSubscriptions           UserSubscription[] @relation(name: "old")
+    userNewSubscriptions           UserSubscription[] @relation(name: "new")
 }

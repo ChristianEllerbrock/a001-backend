@@ -1,14 +1,20 @@
 import { DateTime } from "luxon";
 import { PrismaService } from "./prisma-service";
 import { NostrRelayerService } from "./nostr-relayer.service";
-import { Event, nip04, nip44 } from "nostr-tools";
-import { User } from "@prisma/client";
+import { Event } from "nostr-tools";
 import { AzureSecretService } from "./azure-secret-service";
 import { EmailKeyvaultType } from "../common/keyvault-types/email-keyvault-type";
 import { NostrConnector } from "../nostr-v4/nostrConnector";
 import { EmailClient } from "@azure/communication-email";
 import { EnvService } from "./env-service";
 import { AzureCommunicationService } from "./azure-communication-service";
+
+const paidRelays: string[] = [
+    "wss://nostr.wine",
+    "wss://relay.snort.social",
+    "wss://relay.orangepill.dev",
+    "wss://relay.nostr.com.au",
+];
 
 type DbUser = {
     subscription: {
@@ -60,12 +66,34 @@ export class EmailOutboundService {
     // already included here.
     #dmEventIds = new Map<string, Date>();
 
+    #healthTimer: NodeJS.Timer | undefined;
+
     async start() {
         this.stop();
-        this.#subscriptionId = await this.#initialize();
+        const result = await this.#initialize();
+        this.#subscriptionId = result[0];
+        console.log(result[1]);
+
+        this.#healthTimer = setInterval(() => {
+            const wsStatus = new Map<number, string>([
+                [0, "CONNECTING"],
+                [1, "OPEN"],
+                [2, "CLOSING"],
+                [3, "CLOSED"],
+            ]);
+            NostrRelayerService.instance.relayer.relays.forEach((x) => {
+                _log(
+                    undefined,
+                    `Relay Health Check for '${x.url}': ${wsStatus.get(
+                        x.status
+                    )}`
+                );
+            });
+        }, 1000 * 60);
     }
 
     stop() {
+        clearInterval(this.#healthTimer);
         if (!this.#subscriptionId) {
             return;
         }
@@ -453,6 +481,11 @@ export class EmailOutboundService {
             pubkeys.add(dbEmailNostr.pubkey);
 
             for (const profile of dbEmailNostr.emailNostrProfiles) {
+                // Only add PUBLIC relays.
+                if (paidRelays.includes(profile.publishedRelay)) {
+                    continue;
+                }
+
                 const record = this.#relayPubkeys.get(profile.publishedRelay);
                 if (typeof record === "undefined") {
                     this.#relayPubkeys.set(
@@ -512,12 +545,15 @@ export class EmailOutboundService {
 
         this.stop(); // Stop (unsubscribe) old subscription.
 
-        this.#subscriptionId =
+        const result =
             await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
                 this.#relayPubkeys,
                 this.#onDMEvent.bind(this),
                 10
             );
+
+        this.#subscriptionId = result[0];
+        console.log(result[1]);
 
         const end = DateTime.now();
         _log(undefined, "RE-STARTUP finished: " + end.toJSDate().toISOString());
