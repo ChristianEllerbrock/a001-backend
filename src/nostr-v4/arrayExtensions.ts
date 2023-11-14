@@ -7,12 +7,26 @@ declare global {
         sortBy<K>(keyFunction: (t: T) => K, order?: "asc" | "desc"): T[];
 
         empty(): boolean;
+
+        sum<K>(keyFunction: (t: T) => K): number;
     }
 }
 
 if (!Array.prototype.empty) {
     Array.prototype.empty = function (): boolean {
         return this.length === 0;
+    };
+}
+
+if (!Array.prototype.sum) {
+    Array.prototype.sum = function <T, K>(keyFunction: (t: T) => K): number {
+        if (this.length === 0) {
+            return 0;
+        }
+
+        return this.reduce((prevValue, currentValue) => {
+            return prevValue + keyFunction(currentValue);
+        }, 0);
     };
 }
 
@@ -67,3 +81,4 @@ if (!Array.prototype.sortBy) {
 }
 
 export {};
+
