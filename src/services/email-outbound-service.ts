@@ -466,7 +466,7 @@ export class EmailOutboundService {
         }
 
         const subscriptionId =
-            NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
+            await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
                 this.#relayPubkeys,
                 this.#onDMEvent.bind(this),
                 300
@@ -486,6 +486,59 @@ export class EmailOutboundService {
         _log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
 
         return subscriptionId;
+    }
+
+    async initializeNewRelay(relays: string[], pubkey: string) {
+        let addedSomething = false;
+        for (const relay of relays) {
+            const pubkeys = this.#relayPubkeys.get(relay);
+            if (typeof pubkeys === "undefined") {
+                addedSomething = true;
+                this.#relayPubkeys.set(relay, new Set<string>(pubkey));
+            } else {
+                if (!pubkeys.has(pubkey)) {
+                    addedSomething = true;
+                    pubkeys.add(pubkey);
+                }
+            }
+        }
+
+        if (!addedSomething) {
+            return; // No changes were made.
+        }
+
+        const start = DateTime.now();
+        _log(undefined, "RE-STARTUP start: " + start.toJSDate().toISOString());
+
+        this.stop(); // Stop (unsubscribe) old subscription.
+
+        this.#subscriptionId =
+            await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
+                this.#relayPubkeys,
+                this.#onDMEvent.bind(this),
+                10
+            );
+
+        const end = DateTime.now();
+        _log(undefined, "RE-STARTUP finished: " + end.toJSDate().toISOString());
+
+        _log(
+            undefined,
+            "RE-STARTUP #duration (seconds): " +
+                end.diff(start, "seconds").toObject().seconds
+        );
+
+        _log(undefined, "RE-STARTUP #relays: " + this.#relayPubkeys.size);
+
+        const pubkeys: string[] = [];
+        Array.from(this.#relayPubkeys.values()).forEach((x) => {
+            pubkeys.push(...Array.from(x));
+        });
+
+        _log(
+            undefined,
+            "RE-STARTUP #pubkeys: " + Array.from(new Set(pubkeys)).length
+        );
     }
 
     /**
