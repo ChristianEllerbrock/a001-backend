@@ -8,6 +8,8 @@ import { NostrConnector } from "../nostr-v4/nostrConnector";
 import { EmailClient } from "@azure/communication-email";
 import { EnvService } from "./env-service";
 import { AzureCommunicationService } from "./azure-communication-service";
+import { NostrRelayer } from "../nostr-v4/nostrRelayer";
+import { NostrPoolRelayer } from "../nostr-v4/nostrPoolRelayer";
 
 const paidRelays: string[] = [
     "wss://nostr.wine",
@@ -59,7 +61,6 @@ export class EmailOutboundService {
     // #endregion Singleton
 
     #relayPubkeys = new Map<string, Set<string>>();
-    #subscriptionId: string | undefined;
 
     // Store all event ids from DM that were processed or
     // are currently processed. Ignore any incoming event id that is
@@ -67,12 +68,17 @@ export class EmailOutboundService {
     #dmEventIds = new Map<string, Date>();
 
     #healthTimer: NodeJS.Timer | undefined;
+    #poolRelayer: NostrPoolRelayer;
+
+    constructor() {
+        this.#poolRelayer = new NostrPoolRelayer();
+    }
 
     async start() {
         this.stop();
-        const result = await this.#initialize();
-        this.#subscriptionId = result[0];
-        console.log(result[1]);
+        const relays = await this.#initialize();
+
+        console.log(relays.map((x) => x.url));
 
         this.#healthTimer = setInterval(() => {
             const wsStatus = new Map<number, string>([
@@ -81,7 +87,7 @@ export class EmailOutboundService {
                 [2, "CLOSING"],
                 [3, "CLOSED"],
             ]);
-            NostrRelayerService.instance.relayer.relays.forEach((x) => {
+            relays.forEach((x) => {
                 _log(
                     undefined,
                     `Relay Health Check for '${x.url}': ${wsStatus.get(
@@ -94,12 +100,12 @@ export class EmailOutboundService {
 
     stop() {
         clearInterval(this.#healthTimer);
-        if (!this.#subscriptionId) {
-            return;
-        }
-        NostrRelayerService.instance.relayer.multiKind4SubscribeOff(
-            this.#subscriptionId
-        );
+        // if (!this.#subscriptionId) {
+        //     return;
+        // }
+        // NostrRelayerService.instance.relayer.multiKind4SubscribeOff(
+        //     this.#subscriptionId
+        // );
     }
 
     async #onDMEvent(event: Event) {
@@ -194,11 +200,12 @@ export class EmailOutboundService {
         if (typeof checkResult === "undefined") {
             // The user's subscription does NOT cover EMAIL OUT
             // TODO: Answer DM
-
+            _log(
+                event,
+                `Respond with DM: The user's subscription does NOT cover EMAIL OUT.`
+            );
             let text =
-                "==\n" +
-                "== INFO FROM NIP05.social ==\n" +
-                "==\n\n" +
+                "== MESSAGE FROM NIP05.social\n\n" +
                 "Your current subscription does not include OUTBOUND EMAIL FORWARDING. " +
                 "Please subscribe to a higher plan on\n\n" +
                 "https://nip05.social";
@@ -213,11 +220,12 @@ export class EmailOutboundService {
             return;
         } else if (checkResult === 0) {
             // The user has exhausted his contingent in this 30-day-period.
-
+            _log(
+                event,
+                `Respond with DM: The user has exhausted his contingent for EMAIL OUT.`
+            );
             let text =
-                "==\n" +
-                "== INFO FROM NIP05.social ==\n" +
-                "==\n\n" +
+                "== MESSAGE FROM NIP05.social\n\n" +
                 `You have exhausted your maximum number of allowed outbound emails per 30 day period (${dbUser.subscription.maxNoOfOutboundEmailsPer30Days}). `;
 
             // 2 Situations: No more next period or more next period(s)
@@ -438,11 +446,11 @@ export class EmailOutboundService {
         text: string
     ) {
         // A) Fetch NIP-65 relay lists from the initial relays.
-        const relayLists =
-            await NostrRelayerService.instance.fetchRelayListForPubkey(
-                receiverPubkey,
-                Array.from(new Set(initialRelays))
-            );
+        const relayLists = await this.#poolRelayer.fetchNip65RelayLists(
+            receiverPubkey,
+            initialRelays
+        );
+
         const destinationRelays = Array.from(
             new Set<string>([
                 ...initialRelays,
@@ -460,10 +468,7 @@ export class EmailOutboundService {
         const event = await connector.generateDM(text, receiverPubkey);
 
         // C) Publish DM event to all relevant relays.
-        await NostrRelayerService.instance.relayer.publishEventAsync(
-            event,
-            destinationRelays
-        );
+        await this.#poolRelayer.publishEvent(event, destinationRelays);
     }
 
     async #initialize() {
@@ -498,12 +503,15 @@ export class EmailOutboundService {
             }
         }
 
-        const subscriptionId =
-            await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
-                this.#relayPubkeys,
-                this.#onDMEvent.bind(this),
-                300
-            );
+        const poolRelays = await this.#poolRelayer.tryAddRelays(
+            Array.from(this.#relayPubkeys.keys())
+        );
+
+        await this.#poolRelayer.kind4MonitorOn(
+            Array.from(new Set(pubkeys)),
+            this.#onDMEvent.bind(this),
+            300
+        );
 
         const end = DateTime.now();
         _log(undefined, "STARTUP finished: " + end.toJSDate().toISOString());
@@ -518,64 +526,64 @@ export class EmailOutboundService {
 
         _log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
 
-        return subscriptionId;
+        return poolRelays;
     }
 
-    async initializeNewRelay(relays: string[], pubkey: string) {
-        let addedSomething = false;
-        for (const relay of relays) {
-            const pubkeys = this.#relayPubkeys.get(relay);
-            if (typeof pubkeys === "undefined") {
-                addedSomething = true;
-                this.#relayPubkeys.set(relay, new Set<string>(pubkey));
-            } else {
-                if (!pubkeys.has(pubkey)) {
-                    addedSomething = true;
-                    pubkeys.add(pubkey);
-                }
-            }
-        }
+    // async initializeNewRelay(relays: string[], pubkey: string) {
+    //     let addedSomething = false;
+    //     for (const relay of relays) {
+    //         const pubkeys = this.#relayPubkeys.get(relay);
+    //         if (typeof pubkeys === "undefined") {
+    //             addedSomething = true;
+    //             this.#relayPubkeys.set(relay, new Set<string>(pubkey));
+    //         } else {
+    //             if (!pubkeys.has(pubkey)) {
+    //                 addedSomething = true;
+    //                 pubkeys.add(pubkey);
+    //             }
+    //         }
+    //     }
 
-        if (!addedSomething) {
-            return; // No changes were made.
-        }
+    //     if (!addedSomething) {
+    //         return; // No changes were made.
+    //     }
 
-        const start = DateTime.now();
-        _log(undefined, "RE-STARTUP start: " + start.toJSDate().toISOString());
+    //     const start = DateTime.now();
+    //     _log(undefined, "RE-STARTUP start: " + start.toJSDate().toISOString());
 
-        this.stop(); // Stop (unsubscribe) old subscription.
+    //     this.stop(); // Stop (unsubscribe) old subscription.
 
-        const result =
-            await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
-                this.#relayPubkeys,
-                this.#onDMEvent.bind(this),
-                10
-            );
+    //     const result =
+    //         await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
+    //             this.#relayPubkeys,
+    //             this.#onDMEvent.bind(this),
+    //             10
+    //         );
 
-        this.#subscriptionId = result[0];
-        console.log(result[1]);
+    //     this.#subscriptionId = result[0];
+    //     console.log(result[1]);
 
-        const end = DateTime.now();
-        _log(undefined, "RE-STARTUP finished: " + end.toJSDate().toISOString());
+    //     const end = DateTime.now();
+    //     _log(undefined, "RE-STARTUP finished: " + end.toJSDate().toISOString());
 
-        _log(
-            undefined,
-            "RE-STARTUP #duration (seconds): " +
-                end.diff(start, "seconds").toObject().seconds
-        );
+    //     _log(
+    //         undefined,
+    //         "RE-STARTUP #duration (seconds): " +
+    //             end.diff(start, "seconds").toObject().seconds
+    //     );
 
-        _log(undefined, "RE-STARTUP #relays: " + this.#relayPubkeys.size);
+    //     _log(undefined, "RE-STARTUP #relays: " + this.#relayPubkeys.size);
 
-        const pubkeys: string[] = [];
-        Array.from(this.#relayPubkeys.values()).forEach((x) => {
-            pubkeys.push(...Array.from(x));
-        });
+    //     const pubkeys: string[] = [];
+    //     Array.from(this.#relayPubkeys.values()).forEach((x) => {
+    //         pubkeys.push(...Array.from(x));
+    //     });
 
-        _log(
-            undefined,
-            "RE-STARTUP #pubkeys: " + Array.from(new Set(pubkeys)).length
-        );
-    }
+    //     _log(
+    //         undefined,
+    //         "RE-STARTUP #pubkeys: " + Array.from(new Set(pubkeys)).length
+    //     );
+    // }
 
     /**
      * Returns "undefined" if the user's subscription does NOT include EMAIL OUT.
