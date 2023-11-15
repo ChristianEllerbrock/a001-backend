@@ -87,7 +87,12 @@ export class NostrRelayer {
 
         for (const data of relayPubkeys) {
             const relay = this.#getRelay(data[0]);
-            await relay.connect();
+            try {
+                await relay.connect();
+            } catch (error) {
+                console.log(error);
+                continue;
+            }
             if (relay.status !== OPEN) {
                 continue;
             }
@@ -383,6 +388,9 @@ export class NostrRelayer {
         });
         relay.on("disconnect", () => {
             console.log(`Relay disconnect on '${relay?.url}'`);
+        });
+        relay.on("notice", (msg: string) => {
+            console.log(`Relay notice on '${relay?.url}': ${msg}`);
         });
         return relay;
     }
