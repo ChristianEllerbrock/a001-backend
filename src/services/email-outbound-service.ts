@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { PrismaService } from "./prisma-service";
 import { NostrRelayerService } from "./nostr-relayer.service";
-import { Event } from "nostr-tools";
+import { Event, Relay } from "nostr-tools";
 import { AzureSecretService } from "./azure-secret-service";
 import { EmailKeyvaultType } from "../common/keyvault-types/email-keyvault-type";
 import { NostrConnector } from "../nostr-v4/nostrConnector";
@@ -76,25 +76,48 @@ export class EmailOutboundService {
 
     async start() {
         this.stop();
-        const relays = await this.#initialize();
+        let relays = await this.#initialize();
 
         console.log(relays.map((x) => x.url));
 
-        this.#healthTimer = setInterval(() => {
+        this.#healthTimer = setInterval(async () => {
             const wsStatus = new Map<number, string>([
                 [0, "CONNECTING"],
                 [1, "OPEN"],
                 [2, "CLOSING"],
                 [3, "CLOSED"],
             ]);
-            relays.forEach((x) => {
+            const okRelays: Relay[] = [];
+            const notokRelays: Relay[] = [];
+            const fixedRelays: Relay[] = [];
+            for (const relay of relays) {
                 _log(
                     undefined,
-                    `Relay Health Check for '${x.url}': ${wsStatus.get(
-                        x.status
+                    `Relay Health Check for '${relay.url}': ${wsStatus.get(
+                        relay.status
                     )}`
                 );
-            });
+                if (relay.status === 3) {
+                    notokRelays.push(relay);
+                } else {
+                    okRelays.push(relay);
+                }
+
+                for (const notokRelay of notokRelays) {
+                    _log(
+                        undefined,
+                        `Relay Health Check fixing '${notokRelay.url}'.`
+                    );
+                    const fixedRelay = await this.#poolRelayer.ensureRelay(
+                        notokRelay.url
+                    );
+                    fixedRelays.push(fixedRelay);
+                }
+            }
+
+            if (notokRelays.length > 0) {
+                relays = [...okRelays, ...fixedRelays];
+            }
         }, 1000 * 60);
     }
 

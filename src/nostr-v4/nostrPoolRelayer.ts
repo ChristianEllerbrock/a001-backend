@@ -26,6 +26,12 @@ export class NostrPoolRelayer {
         return relays;
     }
 
+    async ensureRelay(relayUrl: string): Promise<Relay> {
+        const relay = await this.#pool.ensureRelay(relayUrl);
+        this.#relays.set(relay.url, relay);
+        return relay;
+    }
+
     async kind4MonitorOn(
         pubkeys: string[],
         onEvent: (event: Event) => Promise<void>,
