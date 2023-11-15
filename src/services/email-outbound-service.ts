@@ -102,17 +102,17 @@ export class EmailOutboundService {
                 } else {
                     okRelays.push(relay);
                 }
+            }
 
-                for (const notokRelay of notokRelays) {
-                    _log(
-                        undefined,
-                        `Relay Health Check fixing '${notokRelay.url}'.`
-                    );
-                    const fixedRelay = await this.#poolRelayer.ensureRelay(
-                        notokRelay.url
-                    );
-                    fixedRelays.push(fixedRelay);
-                }
+            for (const notokRelay of notokRelays) {
+                _log(
+                    undefined,
+                    `Relay Health Check fixing '${notokRelay.url}'.`
+                );
+                const fixedRelay = await this.#poolRelayer.ensureRelay(
+                    notokRelay.url
+                );
+                fixedRelays.push(fixedRelay);
             }
 
             if (notokRelays.length > 0) {
