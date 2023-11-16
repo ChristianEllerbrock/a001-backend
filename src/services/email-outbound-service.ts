@@ -87,9 +87,7 @@ export class EmailOutboundService {
                 [2, "CLOSING"],
                 [3, "CLOSED"],
             ]);
-            const okRelays: Relay[] = [];
             const notokRelays: Relay[] = [];
-            const fixedRelays: Relay[] = [];
             for (const relay of relays) {
                 _log(
                     undefined,
@@ -99,8 +97,6 @@ export class EmailOutboundService {
                 );
                 if (relay.status === 3) {
                     notokRelays.push(relay);
-                } else {
-                    okRelays.push(relay);
                 }
             }
 
@@ -109,14 +105,11 @@ export class EmailOutboundService {
                     undefined,
                     `Relay Health Check fixing '${notokRelay.url}'.`
                 );
-                const fixedRelay = await this.#poolRelayer.ensureRelay(
-                    notokRelay.url
-                );
-                fixedRelays.push(fixedRelay);
-            }
-
-            if (notokRelays.length > 0) {
-                relays = [...okRelays, ...fixedRelays];
+                try {
+                    await this.#poolRelayer.ensureRelay(notokRelay.url);
+                } catch (error) {
+                    _log(undefined, `Fixing Error: ${error}`);
+                }
             }
         }, 1000 * 60);
     }

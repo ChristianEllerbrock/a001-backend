@@ -17,10 +17,14 @@ export class NostrPoolRelayer {
                 continue;
             }
 
-            const relay = await this.#pool.ensureRelay(poolRelay);
-            relays.push(relay);
+            try {
+                const relay = await this.#pool.ensureRelay(poolRelay);
+                relays.push(relay);
 
-            this.#relays.set(relay.url, relay);
+                this.#relays.set(relay.url, relay);
+            } catch (error) {
+                console.log(error);
+            }
         }
 
         return relays;
