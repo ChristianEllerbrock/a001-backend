@@ -1,15 +1,13 @@
 import { DateTime } from "luxon";
 import { PrismaService } from "./prisma-service";
-import { NostrRelayerService } from "./nostr-relayer.service";
-import { Event, Relay } from "nostr-tools";
+import { Event } from "nostr-tools";
 import { AzureSecretService } from "./azure-secret-service";
 import { EmailKeyvaultType } from "../common/keyvault-types/email-keyvault-type";
 import { NostrConnector } from "../nostr-v4/nostrConnector";
 import { EmailClient } from "@azure/communication-email";
 import { EnvService } from "./env-service";
 import { AzureCommunicationService } from "./azure-communication-service";
-import { NostrRelayer } from "../nostr-v4/nostrRelayer";
-import { NostrPoolRelayer } from "../nostr-v4/nostrPoolRelayer";
+import { NostrDMWatcher } from "../nostr-v4/nostrDMWatcher";
 
 const paidRelays: string[] = [
     "wss://nostr.wine",
@@ -47,6 +45,7 @@ const _log = function (event: Event | undefined, text: string) {
 };
 
 export class EmailOutboundService {
+    // #region Singleton
     static #instance: EmailOutboundService;
 
     static get instance() {
@@ -61,61 +60,84 @@ export class EmailOutboundService {
     // #endregion Singleton
 
     #relayPubkeys = new Map<string, Set<string>>();
+    #dmWatcher: NostrDMWatcher;
 
-    // Store all event ids from DM that were processed or
-    // are currently processed. Ignore any incoming event id that is
-    // already included here.
+    /**
+     * Store all event ids from incoming DMs that were processed or
+     * are currently processed. Ignore any incoming event id that is
+     * already included here.
+     */
     #dmEventIds = new Map<string, Date>();
 
-    #healthTimer: NodeJS.Timer | undefined;
-    #poolRelayer: NostrPoolRelayer;
+    //#healthTimer: NodeJS.Timer | undefined;
 
     constructor() {
-        this.#poolRelayer = new NostrPoolRelayer();
+        this.#dmWatcher = new NostrDMWatcher();
     }
 
     async start() {
         this.stop();
-        let relays = await this.#initialize();
+        await this.#initialize();
+    }
 
-        console.log(relays.map((x) => x.url));
+    async #initialize() {
+        const start = DateTime.now();
+        _log(undefined, "STARTUP start: " + start.toJSDate().toISOString());
 
-        this.#healthTimer = setInterval(async () => {
-            const wsStatus = new Map<number, string>([
-                [0, "CONNECTING"],
-                [1, "OPEN"],
-                [2, "CLOSING"],
-                [3, "CLOSED"],
-            ]);
-            const notokRelays: Relay[] = [];
-            for (const relay of relays) {
-                _log(
-                    undefined,
-                    `Relay Health Check for '${relay.url}': ${wsStatus.get(
-                        relay.status
-                    )}`
-                );
-                if (relay.status === 3) {
-                    notokRelays.push(relay);
+        const pubkeys = new Set<string>();
+
+        const dbEmailNostrs =
+            await PrismaService.instance.db.emailNostr.findMany({
+                include: { emailNostrProfiles: true },
+            });
+
+        for (const dbEmailNostr of dbEmailNostrs) {
+            pubkeys.add(dbEmailNostr.pubkey);
+
+            for (const profile of dbEmailNostr.emailNostrProfiles) {
+                // Only add PUBLIC relays.
+                if (paidRelays.includes(profile.publishedRelay)) {
+                    continue;
+                }
+
+                const record = this.#relayPubkeys.get(profile.publishedRelay);
+                if (typeof record === "undefined") {
+                    this.#relayPubkeys.set(
+                        profile.publishedRelay,
+                        new Set([dbEmailNostr.pubkey])
+                    );
+                } else {
+                    record.add(dbEmailNostr.pubkey);
                 }
             }
+        }
 
-            for (const notokRelay of notokRelays) {
-                _log(
-                    undefined,
-                    `Relay Health Check fixing '${notokRelay.url}'.`
-                );
-                try {
-                    await this.#poolRelayer.ensureRelay(notokRelay.url);
-                } catch (error) {
-                    _log(undefined, `Fixing Error: ${error}`);
-                }
+        this.#dmWatcher.onDM(this.#onDMEvent.bind(this));
+
+        for (const data of this.#relayPubkeys) {
+            try {
+                await this.#dmWatcher.watch([data[0], data[1]]);
+            } catch (error) {
+                // TODO
             }
-        }, 1000 * 60);
+        }
+
+        const end = DateTime.now();
+        _log(undefined, "STARTUP finished: " + end.toJSDate().toISOString());
+
+        _log(
+            undefined,
+            "STARTUP #duration (seconds): " +
+                end.diff(start, "seconds").toObject().seconds
+        );
+
+        _log(undefined, "STARTUP #relays: " + this.#relayPubkeys.size);
+
+        _log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
     }
 
     stop() {
-        clearInterval(this.#healthTimer);
+        //clearInterval(this.#healthTimer);
         // if (!this.#subscriptionId) {
         //     return;
         // }
@@ -125,16 +147,14 @@ export class EmailOutboundService {
     }
 
     async #onDMEvent(event: Event) {
-        _log(event, "DM event received from pubkey " + event.pubkey);
+        // Check, if the event already is (or was) processed.
         if (this.#dmEventIds.has(event.id)) {
-            _log(
-                event,
-                "DM was already processed or is currently being processed. Do nothing."
-            );
             return;
         }
 
-        // New event id => Process
+        _log(event, "DM event received from pubkey " + event.pubkey);
+
+        // New event => Process
         this.#dmEventIds.set(event.id, new Date());
         this.#purgeOldDmEventIds();
 
@@ -149,10 +169,13 @@ export class EmailOutboundService {
             },
         });
         if (!dbUser) {
-            // Not user found in the database. Ignore.
-            _log(event, "Unknown pubkey " + event.pubkey);
+            // No user found in the database with the sender's pubkey. Ignore.
+            _log(event, "Unknown sender. Ignore.");
             return;
         }
+
+        // Get some data that will later be used.
+        // Data: The sender's initial relays (stored in the NIP05.social database)
         const senderInitialRelays: string[] = [];
         for (const dbRegistration of dbUser.registrations) {
             senderInitialRelays.push(
@@ -160,11 +183,7 @@ export class EmailOutboundService {
             );
         }
 
-        // The message comes from a registers NIP05.social user.
-        // Continue.
-
-        // Get some data that will later be used.
-
+        // Data: The receiver pubkey of the DM
         const receiverPubkey = this.#getReceiverPubkeyFromKind4Event(event);
         if (!receiverPubkey) {
             _log(
@@ -174,17 +193,19 @@ export class EmailOutboundService {
             return;
         }
 
+        // Data: The receiver database entries.
         const receiverDbEmailNostr = await this.#getReceiverDbEmailNostr(
             receiverPubkey
         );
         if (!receiverDbEmailNostr) {
             _log(
                 event,
-                "Could not fetch the emailNostr record from the database for the given receiver pubkey."
+                "Could not fetch the emailNostr record from the database for the given receiver pubkey. Do nothing"
             );
             return;
         }
 
+        // Data: The receiver's kevault entry (incl. privkey)
         const receiverKeyvault = await this.#getReceiverKeyvaultRecord(
             receiverDbEmailNostr.email.keyvaultKey
         );
@@ -195,12 +216,43 @@ export class EmailOutboundService {
             );
             return;
         }
+
+        // Data: The receiver's connector object
         const receiverConnector = new NostrConnector({
             pubkey: receiverKeyvault.pubkey,
             privkey: receiverKeyvault.privkey,
         });
 
+        // Data: the decrypted content of the DM
+        const message = await receiverConnector.decryptDM(event);
+
         // Continue with all relevant data at hand.
+
+        // Check, if the DM contains a COMMAND.
+        const command = this.#analyzeIntendedOutMessageForCommands(message);
+        if (command === "help") {
+            // Send help DM back. DO NOT CREATE EMAIL.
+            _log(
+                event,
+                `DM includes COMMAND '${command}'. Will respond with a corresponding DM.`
+            );
+            const relevantRelays = await this.#includeNip65Relays(
+                event.pubkey,
+                senderInitialRelays
+            );
+            await this.#sendDM(
+                receiverConnector,
+                event.pubkey,
+                relevantRelays,
+                this.#getCommandResponseText(command)
+            );
+            _log(event, "Done");
+            return;
+        }
+
+        // From a technical perspective everything looks good. We have all the
+        // necessary data and the sender has NOT send us a COMMAND.
+        // Continue.
 
         // Check if the user has a valid subscription
         // for OUTBOUND EMAIL FORWARDING.
@@ -216,9 +268,15 @@ export class EmailOutboundService {
         if (typeof checkResult === "undefined") {
             // The user's subscription does NOT cover EMAIL OUT
             // TODO: Answer DM
+            const relevantRelays = await this.#includeNip65Relays(
+                event.pubkey,
+                senderInitialRelays
+            );
             _log(
                 event,
-                `Respond with DM: The user's subscription does NOT cover EMAIL OUT.`
+                `Respond with DM: The user's subscription does NOT cover EMAIL OUT. Publish on ${relevantRelays.join(
+                    ", "
+                )}`
             );
             let text =
                 "== MESSAGE FROM NIP05.social\n\n" +
@@ -229,16 +287,23 @@ export class EmailOutboundService {
             await this.#sendDM(
                 receiverConnector,
                 event.pubkey,
-                senderInitialRelays,
+                relevantRelays,
                 text
             );
+            _log(event, "Done");
 
             return;
         } else if (checkResult === 0) {
             // The user has exhausted his contingent in this 30-day-period.
+            const relevantRelays = await this.#includeNip65Relays(
+                event.pubkey,
+                senderInitialRelays
+            );
             _log(
                 event,
-                `Respond with DM: The user has exhausted his contingent for EMAIL OUT.`
+                `Respond with DM: The user has exhausted his contingent for EMAIL OUT. Publish on ${relevantRelays.join(
+                    ", "
+                )}`
             );
             let text =
                 "== MESSAGE FROM NIP05.social\n\n" +
@@ -270,9 +335,12 @@ export class EmailOutboundService {
             await this.#sendDM(
                 receiverConnector,
                 event.pubkey,
-                senderInitialRelays,
+                relevantRelays,
                 text
             );
+
+            _log(event, "Done");
+
             return;
         }
 
@@ -297,10 +365,11 @@ export class EmailOutboundService {
         _log(event, `Will use email address as sender: ${senderEmail}`);
 
         // Everything is ok. We can send the email.
-        const emailNostrId = await this.#sendEmailOutOrDMResponse(
+        const emailNostrId = await this.#sendEmailOut(
             event,
             senderEmail,
-            dbFirstRegistration.registrationRelays.map((x) => x.address)
+            message,
+            receiverPubkey
         );
 
         if (emailNostrId) {
@@ -339,27 +408,12 @@ export class EmailOutboundService {
         }
     }
 
-    async #sendEmailOutOrDMResponse(
+    async #sendEmailOut(
         event: Event,
         senderEmail: string,
-        senderRegistrationRelays: string[]
+        senderMessage: string,
+        receiverPubkey: string
     ): Promise<number | undefined> {
-        // Determine the receiver pubkey.
-        let receiverPubkey: string | undefined;
-        for (const tag of event.tags) {
-            if (tag[0] !== "p") {
-                continue;
-            }
-
-            receiverPubkey = tag[1];
-            break;
-        }
-
-        if (!receiverPubkey) {
-            _log(event, "Could not get receiver pubkey from DM event.");
-            return;
-        }
-
         const dbEmailNostr =
             await PrismaService.instance.db.emailNostr.findFirst({
                 where: {
@@ -377,41 +431,6 @@ export class EmailOutboundService {
             return;
         }
 
-        const keyvaultResult =
-            await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
-                dbEmailNostr.email.keyvaultKey
-            );
-        if (!keyvaultResult) {
-            _log(
-                event,
-                "Could not retrieve data from Azure KeyVault for secret " +
-                    dbEmailNostr.email.keyvaultKey
-            );
-            return;
-        }
-
-        // Decrypt message.
-        const connector = new NostrConnector({
-            pubkey: keyvaultResult.pubkey,
-            privkey: keyvaultResult.privkey,
-        });
-        const message = await connector.decryptDM(event);
-
-        // Check if the message includes commands (like help)
-        const command = this.#analyzeIntendedOutMessageForCommands(message);
-        if (command === "help") {
-            // Send help DM back. DO NOT CREATE EMAIL.
-            _log(event, "HELP command received. Will respond with a DM.");
-            await this.#sendDM(
-                connector,
-                event.pubkey,
-                senderRegistrationRelays,
-                this.#getCommandResponseText(command)
-            );
-            _log(event, "Done.");
-            return;
-        }
-
         // Check if the intended email was already sent.
         if (
             dbEmailNostr.emailNostrDms.find(
@@ -422,7 +441,7 @@ export class EmailOutboundService {
             return;
         }
 
-        const splitMessage = this.#splitMessageInSubjectAndRest(message);
+        const splitMessage = this.#splitMessageInSubjectAndRest(senderMessage);
 
         // Make sure that the email exists in Azure as sender.
         await AzureCommunicationService.instance.addEmail(senderEmail);
@@ -458,148 +477,15 @@ export class EmailOutboundService {
     async #sendDM(
         connector: NostrConnector,
         receiverPubkey: string,
-        initialRelays: string[],
+        publishOnRelays: string[],
         text: string
     ) {
-        // A) Fetch NIP-65 relay lists from the initial relays.
-        const relayLists = await this.#poolRelayer.fetchNip65RelayLists(
-            receiverPubkey,
-            initialRelays
-        );
-
-        const destinationRelays = Array.from(
-            new Set<string>([
-                ...initialRelays,
-                ...relayLists
-                    .filter(
-                        (x) =>
-                            x.operation === "read" ||
-                            x.operation === "read+write"
-                    )
-                    .map((x) => x.url),
-            ])
-        );
-
-        // B) Generate DM event.
+        // A) Generate DM event.
         const event = await connector.generateDM(text, receiverPubkey);
 
-        // C) Publish DM event to all relevant relays.
-        await this.#poolRelayer.publishEvent(event, destinationRelays);
+        // B) Publish DM event to all relevant relays.
+        await this.#dmWatcher.publishEvent(event, publishOnRelays);
     }
-
-    async #initialize() {
-        const start = DateTime.now();
-        _log(undefined, "STARTUP start: " + start.toJSDate().toISOString());
-
-        const pubkeys = new Set<string>();
-
-        const dbEmailNostrs =
-            await PrismaService.instance.db.emailNostr.findMany({
-                include: { emailNostrProfiles: true },
-            });
-
-        for (const dbEmailNostr of dbEmailNostrs) {
-            pubkeys.add(dbEmailNostr.pubkey);
-
-            for (const profile of dbEmailNostr.emailNostrProfiles) {
-                // Only add PUBLIC relays.
-                if (paidRelays.includes(profile.publishedRelay)) {
-                    continue;
-                }
-
-                const record = this.#relayPubkeys.get(profile.publishedRelay);
-                if (typeof record === "undefined") {
-                    this.#relayPubkeys.set(
-                        profile.publishedRelay,
-                        new Set([dbEmailNostr.pubkey])
-                    );
-                } else {
-                    record.add(dbEmailNostr.pubkey);
-                }
-            }
-        }
-
-        const poolRelays = await this.#poolRelayer.tryAddRelays(
-            Array.from(this.#relayPubkeys.keys())
-        );
-
-        await this.#poolRelayer.kind4MonitorOn(
-            Array.from(new Set(pubkeys)),
-            this.#onDMEvent.bind(this),
-            300
-        );
-
-        const end = DateTime.now();
-        _log(undefined, "STARTUP finished: " + end.toJSDate().toISOString());
-
-        _log(
-            undefined,
-            "STARTUP #duration (seconds): " +
-                end.diff(start, "seconds").toObject().seconds
-        );
-
-        _log(undefined, "STARTUP #relays: " + this.#relayPubkeys.size);
-
-        _log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
-
-        return poolRelays;
-    }
-
-    // async initializeNewRelay(relays: string[], pubkey: string) {
-    //     let addedSomething = false;
-    //     for (const relay of relays) {
-    //         const pubkeys = this.#relayPubkeys.get(relay);
-    //         if (typeof pubkeys === "undefined") {
-    //             addedSomething = true;
-    //             this.#relayPubkeys.set(relay, new Set<string>(pubkey));
-    //         } else {
-    //             if (!pubkeys.has(pubkey)) {
-    //                 addedSomething = true;
-    //                 pubkeys.add(pubkey);
-    //             }
-    //         }
-    //     }
-
-    //     if (!addedSomething) {
-    //         return; // No changes were made.
-    //     }
-
-    //     const start = DateTime.now();
-    //     _log(undefined, "RE-STARTUP start: " + start.toJSDate().toISOString());
-
-    //     this.stop(); // Stop (unsubscribe) old subscription.
-
-    //     const result =
-    //         await NostrRelayerService.instance.relayer.multiKind4SubscribeOn(
-    //             this.#relayPubkeys,
-    //             this.#onDMEvent.bind(this),
-    //             10
-    //         );
-
-    //     this.#subscriptionId = result[0];
-    //     console.log(result[1]);
-
-    //     const end = DateTime.now();
-    //     _log(undefined, "RE-STARTUP finished: " + end.toJSDate().toISOString());
-
-    //     _log(
-    //         undefined,
-    //         "RE-STARTUP #duration (seconds): " +
-    //             end.diff(start, "seconds").toObject().seconds
-    //     );
-
-    //     _log(undefined, "RE-STARTUP #relays: " + this.#relayPubkeys.size);
-
-    //     const pubkeys: string[] = [];
-    //     Array.from(this.#relayPubkeys.values()).forEach((x) => {
-    //         pubkeys.push(...Array.from(x));
-    //     });
-
-    //     _log(
-    //         undefined,
-    //         "RE-STARTUP #pubkeys: " + Array.from(new Set(pubkeys)).length
-    //     );
-    // }
 
     /**
      * Returns "undefined" if the user's subscription does NOT include EMAIL OUT.
@@ -829,6 +715,30 @@ export class EmailOutboundService {
         }
 
         return nextPeriodStart;
+    }
+
+    async #includeNip65Relays(
+        pubkey: string,
+        initialRelays: string[]
+    ): Promise<string[]> {
+        const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
+            pubkey,
+            initialRelays
+        );
+
+        const destinationRelays = Array.from(
+            new Set<string>([
+                ...initialRelays,
+                ...relayLists
+                    .filter(
+                        (x) =>
+                            x.operation === "read" ||
+                            x.operation === "read+write"
+                    )
+                    .map((x) => x.url),
+            ])
+        );
+        return destinationRelays;
     }
 }
 
