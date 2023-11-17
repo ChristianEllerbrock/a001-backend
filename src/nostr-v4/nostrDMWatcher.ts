@@ -219,7 +219,9 @@ export class NostrDMWatcher {
                 this.#log(
                     `DISCONNECT received on relay '${relay.url}'. Cure relay.`
                 );
-                this.#doctor.cure(relay);
+                this.#doctor.cure(relay, () => {
+                    this.#subscribeOnRelay(relay);
+                });
             };
             relay.on("disconnect", disconnectCb);
             this.#relayCallbacksDISCONNECT.set(relay.url, disconnectCb);
@@ -273,6 +275,9 @@ export class NostrDMWatcher {
             since: Math.floor(new Date().getTime() / 1000) - 150,
         };
 
+        this.#log(
+            `Subscribe to DMs for ${pubkeys.size} pubkeys on relay '${relay.url}'`
+        );
         const sub = relay.sub([filter]);
 
         this.#relaySubscription.set(relay.url, sub);

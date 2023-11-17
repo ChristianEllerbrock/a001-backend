@@ -4,14 +4,25 @@ import { OPEN } from "ws";
 class RelayPatient {
     hospitalized: Date[] = [];
     recovered: Date[] = [];
-    noOfTherapies = 0;
+    overallNoOfTherapies = 0;
+    noOfTherapiesInARow = 0;
 
     #therapyTimeout: NodeJS.Timeout | undefined;
     #debug: boolean;
+    #curedCallback: (() => void) | undefined;
 
-    constructor(public relay: Relay, debug: boolean | undefined = false) {
+    constructor(
+        public relay: Relay,
+        curedCallback: () => void,
+        debug: boolean | undefined = false
+    ) {
         this.hospitalized.push(new Date());
         this.#debug = debug;
+        this.#curedCallback = curedCallback;
+    }
+
+    setCuredCallback(cb: () => void) {
+        this.#curedCallback = cb;
     }
 
     async startTherapy() {
@@ -20,10 +31,11 @@ class RelayPatient {
             return;
         }
 
-        this.noOfTherapies++;
+        this.overallNoOfTherapies++;
+        this.noOfTherapiesInARow++;
 
         this.#log(
-            `Doctor is starting ${this.noOfTherapies} therapy on patient '${this.relay.url}'`
+            `Doctor is starting ${this.overallNoOfTherapies}. therapy (${this.noOfTherapiesInARow} in a row) on patient '${this.relay.url}'`
         );
 
         this.#therapyTimeout = setTimeout(async () => {
@@ -31,7 +43,11 @@ class RelayPatient {
             if (this.relay.status === OPEN) {
                 this.recovered.push(new Date());
                 this.#therapyTimeout = undefined;
+                this.noOfTherapiesInARow = 0;
                 this.#log(`Patient '${this.relay.url}' has recovered.`);
+                if (this.#curedCallback) {
+                    this.#curedCallback();
+                }
                 return;
             }
 
@@ -44,9 +60,13 @@ class RelayPatient {
             if (this.relay.status === OPEN) {
                 this.recovered.push(new Date());
                 this.#therapyTimeout = undefined;
+                this.noOfTherapiesInARow = 0;
                 this.#log(
                     `Success for therapy on patient '${this.relay.url}'.`
                 );
+                if (this.#curedCallback) {
+                    this.#curedCallback();
+                }
                 return;
             }
 
@@ -66,11 +86,11 @@ class RelayPatient {
     #calculateTherapyTimeout(): number {
         // First 100 every 10s
         // After that every 5 minutes
-        if (this.noOfTherapies <= 100) {
+        if (this.noOfTherapiesInARow <= 100) {
             return 10 * 1000;
         }
 
-        return 5 * 60 * 1000;
+        return 2 * 60 * 1000;
     }
 
     #log(text: string) {
@@ -90,7 +110,7 @@ export class NostrDMWatcherDoctor {
         this.#debug = debug;
     }
 
-    cure(relay: Relay) {
+    cure(relay: Relay, curedCallback: () => void) {
         if (relay.status === OPEN) {
             // Nothing to cure. "Patient" is well.
             return;
@@ -98,8 +118,10 @@ export class NostrDMWatcherDoctor {
 
         let relayPatient = this.#relayPatients.get(relay.url);
         if (!relayPatient) {
-            relayPatient = new RelayPatient(relay, this.#debug);
+            relayPatient = new RelayPatient(relay, curedCallback, this.#debug);
             this.#relayPatients.set(relay.url, relayPatient);
+        } else {
+            relayPatient.setCuredCallback(curedCallback);
         }
 
         relayPatient.startTherapy();
