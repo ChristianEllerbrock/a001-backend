@@ -76,8 +76,11 @@ export class EmailOutboundService {
     }
 
     async start() {
-        this.stop();
         await this.#initialize();
+    }
+
+    killRandomRelayConnection() {
+        this.#dmWatcher.killRandomRelayConnection();
     }
 
     async #initialize() {
@@ -232,14 +235,18 @@ export class EmailOutboundService {
         const command = this.#analyzeIntendedOutMessageForCommands(message);
         if (command === "help") {
             // Send help DM back. DO NOT CREATE EMAIL.
-            _log(
-                event,
-                `DM includes COMMAND '${command}'. Will respond with a corresponding DM.`
-            );
             const relevantRelays = await this.#includeNip65Relays(
                 event.pubkey,
                 senderInitialRelays
             );
+
+            _log(
+                event,
+                `DM includes COMMAND '${command}'. Will respond with a corresponding DM on ${relevantRelays.join(
+                    ", "
+                )}.`
+            );
+
             await this.#sendDM(
                 receiverConnector,
                 event.pubkey,

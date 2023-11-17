@@ -1,5 +1,8 @@
 import { Event, Filter, Relay, Sub, relayInit } from "nostr-tools";
-import { Nip65RelayList } from "./type-defs";
+import { Nip65RelayList, RelayEvent } from "./type-defs";
+import { NostrDMWatcherDoctor } from "./nostrDMWatcherDoctor";
+import { OPEN } from "ws";
+import { RelayClientEvent } from "../nostr/agents/relay-client";
 
 // class RelayHealth {
 //     startedAt = new Date();
@@ -20,6 +23,10 @@ export class NostrDMWatcher {
     #isOnDMCbSet = false;
     #relayCallbacksDISCONNECT = new Map<string, () => void>();
     #relayCallbacksERROR = new Map<string, () => void>();
+    #relayCallbacksCONNECT = new Map<string, () => void>();
+    #relayCallbacksNOTICE = new Map<string, (msg: string) => void>();
+
+    #doctor = new NostrDMWatcherDoctor(this.#isDebugOn);
 
     onDM(cb: (event: Event) => void | Promise<void>) {
         this.#onDMCb = cb;
@@ -28,6 +35,34 @@ export class NostrDMWatcher {
 
     debug(on: boolean) {
         this.#isDebugOn = on;
+        this.#doctor.setDebug(on);
+    }
+
+    /** For testing purposes only. */
+    killRandomRelayConnection() {
+        this.#log(
+            `Testing: Trying to find a random OPEN relay (of the current ${
+                this.#relays.size
+            } relays) and kill it. `
+        );
+        const relays = Array.from(this.#relays.values()).filter(
+            (x) => x.status === OPEN
+        );
+
+        if (relays.length === 0) {
+            // No relay is only. Nothing to kill here.
+            this.#log(`Testing: Found no OPEN relay.`);
+            return;
+        }
+
+        // Returns a random integer from 0 to 100:
+        const killIndex = Math.floor(Math.random() * relays.length);
+        this.#log(`Testing: Will try to kill '${relays[killIndex].url}'`);
+
+        // Sending close WILL NOT WORK as this removes all listeners.
+        // Have to think about another way.
+        //relays[killIndex].close();
+        //this.#doctor.cure(relays[killIndex]);
     }
 
     /**
@@ -181,7 +216,10 @@ export class NostrDMWatcher {
         const oldDisconnectCb = this.#relayCallbacksDISCONNECT.get(relay.url);
         if (!oldDisconnectCb) {
             const disconnectCb = () => {
-                this.#log(`DISCONNECT received on relay '${relay.url}'`);
+                this.#log(
+                    `DISCONNECT received on relay '${relay.url}'. Cure relay.`
+                );
+                this.#doctor.cure(relay);
             };
             relay.on("disconnect", disconnectCb);
             this.#relayCallbacksDISCONNECT.set(relay.url, disconnectCb);
@@ -194,6 +232,24 @@ export class NostrDMWatcher {
             };
             relay.on("error", errorCb);
             this.#relayCallbacksERROR.set(relay.url, errorCb);
+        }
+
+        const oldConnectCb = this.#relayCallbacksCONNECT.get(relay.url);
+        if (!oldConnectCb) {
+            const connectCb = () => {
+                this.#log(`CONNECT received on relay '${relay.url}'`);
+            };
+            relay.on("connect", connectCb);
+            this.#relayCallbacksCONNECT.set(relay.url, connectCb);
+        }
+
+        const oldNoticeCb = this.#relayCallbacksNOTICE.get(relay.url);
+        if (!oldNoticeCb) {
+            const noticeCb = (msg: string) => {
+                this.#log(`NOTICE received on relay '${relay.url}': ${msg}`);
+            };
+            relay.on("notice", noticeCb);
+            this.#relayCallbacksNOTICE.set(relay.url, noticeCb);
         }
     }
 
