@@ -22,7 +22,7 @@ const seed = async function (prisma: PrismaClient) {
 
         await AzureSecretService.instance.trySetValue(
             keyvaultKey,
-            JSON.stringify(keyvaultData)
+            keyvaultData
         );
 
         const name = "NIP05.social Email Out [Bot]";
