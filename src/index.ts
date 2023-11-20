@@ -25,6 +25,7 @@ import multer from "multer";
 import { EmailOutboundService } from "./services/email-outbound-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { emailOutKillRandomRelayController } from "./controllers/admin/email-out-kill-random-relay";
+import { publishSystemUserController } from "./controllers/admin/publish-system-user";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -91,6 +92,7 @@ app.get(
     "/admin/email-out-kill-random-relay",
     emailOutKillRandomRelayController
 );
+app.get("/admin/publish-system-user/:id", publishSystemUserController);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);
