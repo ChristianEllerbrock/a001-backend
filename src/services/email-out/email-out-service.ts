@@ -1,13 +1,13 @@
 import { DateTime } from "luxon";
-import { PrismaService } from "./prisma-service";
+import { PrismaService } from "../prisma-service";
 import { Event } from "nostr-tools";
-import { AzureSecretService } from "./azure-secret-service";
-import { EmailKeyvaultType } from "../common/keyvault-types/email-keyvault-type";
-import { NostrConnector } from "../nostr-v4/nostrConnector";
+import { AzureSecretService } from "../azure-secret-service";
+import { EmailKeyvaultType } from "../../common/keyvault-types/email-keyvault-type";
+import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { EmailClient } from "@azure/communication-email";
-import { EnvService } from "./env-service";
-import { AzureCommunicationService } from "./azure-communication-service";
-import { NostrDMWatcher } from "../nostr-v4/nostrDMWatcher";
+import { EnvService } from "../env-service";
+import { AzureCommunicationService } from "../azure-communication-service";
+import { NostrDMWatcher } from "../../nostr-v4/nostrDMWatcher";
 
 const paidRelays: string[] = [
     "wss://nostr.wine",
@@ -44,16 +44,16 @@ const _log = function (event: Event | undefined, text: string) {
     console.log(`EMAIL OUT - [${id}] - ${text}`);
 };
 
-export class EmailOutboundService {
+export class EmailOutService {
     // #region Singleton
-    static #instance: EmailOutboundService;
+    static #instance: EmailOutService;
 
     static get instance() {
         if (this.#instance) {
             return this.#instance;
         }
 
-        this.#instance = new EmailOutboundService();
+        this.#instance = new EmailOutService();
         return this.#instance;
     }
 
