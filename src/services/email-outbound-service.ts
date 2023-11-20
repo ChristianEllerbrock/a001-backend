@@ -89,11 +89,11 @@ export class EmailOutboundService {
 
         const pubkeys = new Set<string>();
 
+        // First go through all the emailNostr records in the database.
         const dbEmailNostrs =
             await PrismaService.instance.db.emailNostr.findMany({
                 include: { emailNostrProfiles: true },
             });
-
         for (const dbEmailNostr of dbEmailNostrs) {
             pubkeys.add(dbEmailNostr.pubkey);
 
@@ -111,6 +111,27 @@ export class EmailOutboundService {
                     );
                 } else {
                     record.add(dbEmailNostr.pubkey);
+                }
+            }
+        }
+
+        // Now also include the systemUser records in the database.
+        const dbSystemUsers =
+            await PrismaService.instance.db.systemUser.findMany({
+                include: { systemUserRelays: true },
+            });
+        for (const dbSystemUser of dbSystemUsers) {
+            pubkeys.add(dbSystemUser.pubkey);
+
+            for (const dbSystemUserRelay of dbSystemUser.systemUserRelays) {
+                const record = this.#relayPubkeys.get(dbSystemUserRelay.url);
+                if (typeof record === "undefined") {
+                    this.#relayPubkeys.set(
+                        dbSystemUserRelay.url,
+                        new Set([dbSystemUser.pubkey])
+                    );
+                } else {
+                    record.add(dbSystemUser.pubkey);
                 }
             }
         }
