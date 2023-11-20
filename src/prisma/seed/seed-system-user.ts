@@ -63,6 +63,15 @@ const seed = async function (prisma: PrismaClient) {
         });
     } else {
         // Update Case. Do nothing atm.
+        await prisma.systemUser.update({
+            where: { id: 1 },
+            data: {
+                about:
+                    `I handle outgoing emails for users on https://nip05.social\n\n` +
+                    `Send me a DM with the text "help", and I will answer with instructions about what I can do. ` +
+                    `Please note that I will answer to registered users only.`,
+            },
+        });
     }
 };
 
