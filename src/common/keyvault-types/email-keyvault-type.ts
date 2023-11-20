@@ -10,3 +10,10 @@ export type EmailKeyvaultType = {
     privkey: string;
 };
 
+export type SystemUserKeyvaultType = {
+    id: number;
+    nip05: string;
+    pubkey: string;
+    privkey: string;
+};
+

@@ -211,6 +211,28 @@ model UserLoginNip46Code {
     @@unique([userId, deviceId])
 }
 
+model SystemUser {
+    id               Int               @id
+    pubkey           String
+    keyvaultKey      String
+    nip05            String
+    name             String?
+    about            String?
+    picture          String?
+    banner           String?
+    lookups          Int
+    lastLookupDate   DateTime?
+    systemUserRelays SystemUserRelay[]
+}
+
+model SystemUserRelay {
+    id           Int    @id
+    systemUserId Int
+    url          String
+
+    systemUser SystemUser @relation(fields: [systemUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
 model SystemConfig {
     id    Int    @id
     name  String
