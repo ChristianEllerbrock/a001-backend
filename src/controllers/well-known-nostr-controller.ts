@@ -4,6 +4,8 @@ import { PrismaService } from "../services/prisma-service";
 import { Nip05CacheService } from "../services/nip05-cache-service";
 import { DateTime } from "luxon";
 import { EmailCacheService, EmailNip05 } from "../services/email-cache-service";
+import { SystemUserCacheService } from "../services/system-user-cache-service";
+import { Nip05 } from "../nostr/type-defs";
 
 interface Query {
     name?: string;
@@ -43,10 +45,38 @@ export async function wellKnownNostrController(
 
         console.log(`CHECK '${identifier}@${domain}'`);
 
+        const fullIdentifier = `${identifier}@${domain}`.toLowerCase();
+
+        // Just make sure that all system users are available.
+        SystemUserCacheService.instance.initialize();
+
+        // Check: The request is for a system user
+        const dbSystemUser = SystemUserCacheService.instance.systemUsers?.find(
+            (x) => x.nip05 === fullIdentifier
+        );
+        if (dbSystemUser) {
+            const nip05: Nip05 = {
+                names: {},
+            };
+
+            nip05.names[identifier] = dbSystemUser.pubkey;
+
+            // Update stats.
+            await PrismaService.instance.db.systemUser.update({
+                where: { id: dbSystemUser.id },
+                data: {
+                    lookups: { increment: 1 },
+                    lastLookupDate: new Date(),
+                },
+            });
+
+            res.json(nip05);
+            return;
+        }
+
         // 0 Check: The request is for an email account.
         // If so, it will be handled differently.
         if (identifier.startsWith("email_")) {
-            const fullIdentifier = `${identifier}@${domain}`.toLowerCase();
             let emailNip05 =
                 EmailCacheService.instance.cache.get(fullIdentifier);
             if (!emailNip05) {
@@ -62,7 +92,7 @@ export async function wellKnownNostrController(
                         names: {},
                     });
                     return;
-                }
+                } //
 
                 emailNip05 = {
                     emailNostrId: dbEmailNostr.id,

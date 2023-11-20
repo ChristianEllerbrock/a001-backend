@@ -10,8 +10,8 @@ export class HelperIdentifier {
         const cleanIdentifier = identifier.trim().toLowerCase();
 
         // 0st check:
-        // email identifier (starting with "email_")
-        if (cleanIdentifier.startsWith("email_")) {
+        // email identifier (starting with "email")
+        if (cleanIdentifier.startsWith("email")) {
             return {
                 name: cleanIdentifier,
                 canBeRegistered: false,
