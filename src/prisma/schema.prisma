@@ -223,6 +223,15 @@ model SystemUser {
     lookups          Int
     lastLookupDate   DateTime?
     systemUserRelays SystemUserRelay[]
+    systemUserDms    SystemUserDm[]
+}
+
+model SystemUserDm {
+    id           Int    @id @default(autoincrement())
+    systemUserId Int
+    eventId      String @unique
+
+    systemUser SystemUser @relation(fields: [systemUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model SystemUserRelay {

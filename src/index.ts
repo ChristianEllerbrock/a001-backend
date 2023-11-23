@@ -22,7 +22,7 @@ import { Context as WsContext } from "graphql-ws";
 import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
-import { EmailOutboundService } from "./services/email-outbound-service";
+import { EmailOutService } from "./services/email-out/email-out-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { emailOutKillRandomRelayController } from "./controllers/admin/email-out-kill-random-relay";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
@@ -159,7 +159,7 @@ async function bootstrap() {
         );
     });
 
-    EmailOutboundService.instance.start();
+    EmailOutService.instance.start();
 }
 
 bootstrap();

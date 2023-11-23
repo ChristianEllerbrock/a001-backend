@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { EnvService } from "../../services/env-service";
-import { EmailOutboundService } from "../../services/email-outbound-service";
+import { EmailOutService } from "../../services/email-out/email-out-service";
 
 export async function emailOutKillRandomRelayController(
     req: Request,
@@ -16,6 +16,7 @@ export async function emailOutKillRandomRelayController(
         return;
     }
 
-    EmailOutboundService.instance.killRandomRelayConnection();
+    EmailOutService.instance.killRandomRelayConnection();
     res.json("OK");
 }
+
