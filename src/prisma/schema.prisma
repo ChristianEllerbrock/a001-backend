@@ -99,17 +99,16 @@ model Registration {
     lightningAddress  String?
     emailForwardingOn Boolean?
 
-    user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    registrationCode             RegistrationCode?
-    registrationRelays           RegistrationRelay[]
-    systemDomain                 SystemDomain                  @relation(fields: [systemDomainId], references: [id])
-    registrationLookups          RegistrationLookup[]
-    lightningAddressLookups      LightningAddressLookup[]
-    registrationNip07Code        RegistrationNip07Code?
-    registrationNip46Code        RegistrationNip46Code?
-    registrationEmailForwardings RegistrationEmailForwarding[]
-    registrationEmailOuts        RegistrationEmailOut[]
-    registrationEmailIns         RegistrationEmailIn[]
+    user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    registrationCode        RegistrationCode?
+    registrationRelays      RegistrationRelay[]
+    systemDomain            SystemDomain             @relation(fields: [systemDomainId], references: [id])
+    registrationLookups     RegistrationLookup[]
+    lightningAddressLookups LightningAddressLookup[]
+    registrationNip07Code   RegistrationNip07Code?
+    registrationNip46Code   RegistrationNip46Code?
+    registrationEmailOuts   RegistrationEmailOut[]
+    registrationEmailIns    RegistrationEmailIn[]
 
     @@unique([identifier, systemDomainId])
 }
@@ -320,16 +319,6 @@ model NostrEvent {
 }
 
 // EMAIL
-
-model RegistrationEmailForwarding {
-    id             Int          @id @default(autoincrement())
-    registrationId String
-    date           DateTime
-    total          Int
-    registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-    @@unique([registrationId, date])
-}
 
 model RegistrationEmailIn {
     id             Int          @id @default(autoincrement())
