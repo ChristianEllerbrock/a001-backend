@@ -224,7 +224,7 @@ const handleEmail = async function (req: Request) {
 
     // Update Stats
     const today = DateTime.now().startOf("day");
-    await PrismaService.instance.db.registrationEmailForwarding.upsert({
+    await PrismaService.instance.db.registrationEmailIn.upsert({
         where: {
             registrationId_date: {
                 registrationId: dbRegistration.id,
