@@ -25,6 +25,8 @@ const paidRelays: string[] = [
     "wss://relay.nostr.com.au",
 ];
 
+const relaysWithoutKind4Support: string[] = ["wss://purplepag.es"];
+
 export class EmailOutService {
     // #region Singleton
     static #instance: EmailOutService;
@@ -79,6 +81,13 @@ export class EmailOutService {
             for (const profile of dbEmailNostr.emailNostrProfiles) {
                 // Only add PUBLIC relays.
                 if (paidRelays.includes(profile.publishedRelay)) {
+                    continue;
+                }
+
+                // Only add relays where Kind4 is possible
+                if (
+                    relaysWithoutKind4Support.includes(profile.publishedRelay)
+                ) {
                     continue;
                 }
 
