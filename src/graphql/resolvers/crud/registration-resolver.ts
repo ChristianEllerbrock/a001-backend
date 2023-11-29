@@ -976,6 +976,8 @@ Your nip05.social Team`;
             data: {
                 lightningAddress: cleanedLightningAddress,
                 emailForwardingOn: args.data.emailForwardingOn,
+                emailOut: args.data.emailOut,
+                emailOutSubject: args.data.emailOutSubject,
             },
         });
 
