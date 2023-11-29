@@ -30,7 +30,7 @@ const handleEmail = async function (req: Request) {
 
     if (!body.from || !body.envelope || !body.text) {
         log(`Trigger without TEXT, FROM or TO (via ENVELOPE)`);
-        log(body);
+        log(JSON.stringify(body));
         return;
     }
 
