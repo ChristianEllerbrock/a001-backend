@@ -25,7 +25,10 @@ const paidRelays: string[] = [
     "wss://relay.nostr.com.au",
 ];
 
-const relaysWithoutKind4Support: string[] = ["wss://purplepag.es"];
+const relaysWithoutKind4Support: string[] = [
+    "wss://purplepag.es",
+    "wss://nostr.coinfundit.com/",
+];
 
 export class EmailOutService {
     // #region Singleton
