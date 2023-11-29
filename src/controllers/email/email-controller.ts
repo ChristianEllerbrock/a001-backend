@@ -13,6 +13,8 @@ import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
 import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { SendGridEmailEnvelope } from "./type-defs";
 import { DateTime } from "luxon";
+import { EmailOutService } from "../../services/email-out/email-out-service";
+import { log } from "./common";
 
 export async function emailController(
     req: Request,
@@ -197,6 +199,17 @@ const handleEmail = async function (req: Request) {
                 });
             }
         }
+
+        // Now, make sure that the new entries are watched for EMAIL OUT.
+        log(
+            `Start watching for DMs to '${
+                connector.conf.pubkey
+            }' on ${missingRelaysForMetadata.join(", ")}`
+        );
+        EmailOutService.instance.watchForDMs(
+            connector.conf.pubkey,
+            missingRelaysForMetadata
+        );
     }
 
     // Finally, generate the DM and publish to all targetRelays.
