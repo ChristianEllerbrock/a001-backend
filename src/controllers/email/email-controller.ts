@@ -28,8 +28,11 @@ export async function emailController(
 const handleEmail = async function (req: Request) {
     const body = req.body;
 
-    if (!body.from || !body.envelope || !body.text) {
-        log(`Trigger without TEXT, FROM or TO (via ENVELOPE)`);
+    // Some emails only contain HTML and no TEXT.
+    const bodyTextOrHtml = body.text ?? body.html;
+
+    if (!body.from || !body.envelope || !bodyTextOrHtml) {
+        log(`Trigger without TEXT/HTML, FROM or TO (via ENVELOPE)`);
         log(JSON.stringify(body));
         return;
     }
@@ -221,7 +224,7 @@ const handleEmail = async function (req: Request) {
     if ((body.attachments as number) > 0) {
         message += `ATTACHMENTS: ${body.attachments}\n`;
     }
-    message += "---\n\n" + body.text;
+    message += "---\n\n" + bodyTextOrHtml;
 
     const kind4Event = await connector.generateDM(
         message,
