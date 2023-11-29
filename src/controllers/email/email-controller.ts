@@ -29,14 +29,15 @@ const handleEmail = async function (req: Request) {
     const body = req.body;
 
     if (!body.from || !body.envelope || !body.text) {
-        console.log(`EMAIL: Trigger without TEXT, FROM or TO (via ENVELOPE)`);
+        log(`Trigger without TEXT, FROM or TO (via ENVELOPE)`);
+        log(body);
         return;
     }
 
     const envelope: SendGridEmailEnvelope = JSON.parse(body.envelope);
     const to = envelope.to[0];
 
-    console.log(`EMAIL: ${to} < ${body.from}`);
+    log(`${to} < ${body.from}`);
 
     // 1. Check if the intended TO domain exists in the database.
     const receiverDomainId = systemDomainIds.get(
