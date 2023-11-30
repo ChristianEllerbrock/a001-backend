@@ -65,7 +65,7 @@ export class EmailOutService {
 
     async watchForDMs(toPubkey: string, onRelays: string[]) {
         for (const relay of onRelays) {
-            await this.#dmWatcher.watch([relay, new Set<string>(toPubkey)]);
+            await this.#dmWatcher.watch([relay, new Set<string>([toPubkey])]);
         }
     }
 
