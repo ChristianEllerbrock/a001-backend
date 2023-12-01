@@ -7,6 +7,12 @@ export class RegistrationInputUpdate {
 
     @Field((type) => Boolean, { nullable: true })
     emailForwardingOn?: boolean | null;
+
+    @Field((type) => Boolean)
+    emailOut!: boolean;
+
+    @Field((type) => String)
+    emailOutSubject!: string;
 }
 
 @ArgsType()
