@@ -39,6 +39,12 @@ export class RegistrationOutput {
     @Field((type) => Boolean, { nullable: true })
     emailForwardingOn!: boolean | null;
 
+    @Field((type) => Boolean)
+    emailOut!: boolean;
+
+    @Field((type) => String)
+    emailOutSubject!: string;
+
     // Model Relations
     @Field((type) => UserOutput)
     user?: UserOutput;
