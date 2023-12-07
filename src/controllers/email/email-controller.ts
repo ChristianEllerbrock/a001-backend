@@ -15,6 +15,7 @@ import { SendGridEmailEnvelope } from "./type-defs";
 import { DateTime } from "luxon";
 import { EmailOutService } from "../../services/email-out/email-out-service";
 import { log } from "./common";
+import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-related";
 
 export async function emailController(
     req: Request,
@@ -43,9 +44,13 @@ const handleEmail = async function (req: Request) {
     log(`${to} < ${body.from}`);
 
     // 1. Check if the intended TO domain exists in the database.
-    const receiverDomainId = systemDomainIds.get(
-        to.split("@")[1].toLowerCase()
-    );
+    let receiverDomainId = systemDomainIds.get(to.split("@")[1].toLowerCase());
+
+    // SPECIAL DEBUG HACK !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if (!receiverDomainId && to.split("@")[1].toLowerCase() === "pubkey.info") {
+        receiverDomainId = 1; // Map to nip05.social
+    }
+
     if (!receiverDomainId) {
         // This will most likely not happen since sendgrid will be configured to
         // only forward requests for the system domains.
@@ -60,8 +65,11 @@ const handleEmail = async function (req: Request) {
                 identifier: to.split("@")[0].toLowerCase(),
             },
             include: {
-                user: true,
+                user: {
+                    include: { subscription: true },
+                },
                 registrationRelays: true,
+                registrationEmailIns: true,
             },
         });
     if (!dbRegistration) {
@@ -87,7 +95,8 @@ const handleEmail = async function (req: Request) {
 
     // The receiver (aka the registration) exists in the database
     // and has at least one relay configured.
-    // We will try to deliver the email as Nostr DM.
+
+    // We will try to deliver the email as Nostr DM (after a subscription check).
 
     const fromEmailString = body.from.toLowerCase();
     let fromEmail = fromEmailString;
@@ -109,26 +118,29 @@ const handleEmail = async function (req: Request) {
         );
     }
 
-    const destinationRelays = dbRegistration.registrationRelays.map(
-        (x) => x.address
+    const connector = new NostrConnector({
+        pubkey: emailKeyvault.pubkey,
+        privkey: emailKeyvault.privkey,
+    });
+
+    // Check if the subscription covers EMAIL IN
+    const ok = await checkEmailInSubscriptionAndRespondIfNecessary(
+        dbRegistration.user.subscription.maxNoOfInboundEmailsPer30Days,
+        dbRegistration.registrationEmailIns,
+        connector,
+        dbRegistration.user.pubkey,
+        dbRegistration.registrationRelays.map((x) => x.address)
     );
 
-    const relayList =
-        await NostrRelayerService.instance.fetchRelayListForPubkey(
-            dbRegistration.user.pubkey,
-            destinationRelays
-        );
+    if (!ok) {
+        return;
+    }
 
-    const targetRelays = Array.from(
-        new Set<string>([
-            ...destinationRelays,
-            ...relayList
-                .filter(
-                    (x) =>
-                        x.operation === "read" || x.operation === "read+write"
-                )
-                .map((x) => x.url.toLowerCase()),
-        ])
+    // The user has an appropriate subscription. Deliver email as DM.
+
+    const targetRelays = await EmailOutService.instance.includeNip65Relays(
+        dbRegistration.user.pubkey,
+        dbRegistration.registrationRelays.map((x) => x.address)
     );
 
     // The targetRelays define the relays where the email should be published to.
@@ -145,11 +157,6 @@ const handleEmail = async function (req: Request) {
             missingRelaysForMetadata.push(targetRelay);
         }
     }
-
-    const connector = new NostrConnector({
-        pubkey: emailKeyvault.pubkey,
-        privkey: emailKeyvault.privkey,
-    });
 
     if (missingRelaysForMetadata.length > 0) {
         // Publish the profile to these relays.
@@ -176,6 +183,8 @@ const handleEmail = async function (req: Request) {
         //console.log(kind0Event);
 
         // Publish event.
+        //await EmailOutService.instance.publishEvent(kind0Event, missingRelaysForMetadata);
+
         const publishedRelayEvents =
             await NostrRelayerService.instance.relayer.publishEventAsync(
                 kind0Event,
@@ -226,17 +235,12 @@ const handleEmail = async function (req: Request) {
     }
     message += "---\n\n" + bodyTextOrHtml;
 
-    const kind4Event = await connector.generateDM(
-        message,
-        dbRegistration.user.pubkey
-    );
-    console.log(
-        `${to} - Sending DM event to the relays ${targetRelays.join(", ")}`
-    );
-
-    await NostrRelayerService.instance.relayer.publishEventAsync(
-        kind4Event,
-        targetRelays
+    log(`${to} - Sending DM event to the relays ${targetRelays.join(", ")}`);
+    await EmailOutService.instance.sendDM(
+        connector,
+        dbRegistration.user.pubkey,
+        targetRelays,
+        message
     );
 
     // Update Stats
@@ -329,7 +333,8 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
     // Create database record(s).
     const about =
         `I was created to mirror the email ${fromEmail} and handle email forwarding on https://nip05.social\n\n` +
-        `Send me a DM with the text "help", and I will answer with instructions about what I can do.`;
+        `Send me a DM with the text "help", and I will answer with instructions about what I can do. ` +
+        `Please note that I will answer to registered users only.`;
 
     dbEmail = await PrismaService.instance.db.email.create({
         data: {
