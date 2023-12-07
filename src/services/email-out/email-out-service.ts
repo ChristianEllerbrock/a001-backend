@@ -86,8 +86,8 @@ export class EmailOutService {
         await this.#dmWatcher.publishEvent(event, publishOnRelays);
     }
 
-    async publishEvent(event: Event, toRelays: string[]) {
-        await this.#dmWatcher.publishEvent(event, toRelays);
+    async publishEvent(event: Event, toRelays: string[]): Promise<string[]> {
+        return await this.#dmWatcher.publishEvent(event, toRelays);
     }
 
     async includeNip65Relays(
