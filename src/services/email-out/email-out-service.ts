@@ -73,6 +73,47 @@ export class EmailOutService {
         this.#dmWatcher.killRandomRelayConnection();
     }
 
+    async sendDM(
+        connector: NostrConnector,
+        receiverPubkey: string,
+        publishOnRelays: string[],
+        text: string
+    ) {
+        // A) Generate DM event.
+        const event = await connector.generateDM(text, receiverPubkey);
+
+        // B) Publish DM event to all relevant relays.
+        await this.#dmWatcher.publishEvent(event, publishOnRelays);
+    }
+
+    async publishEvent(event: Event, toRelays: string[]) {
+        await this.#dmWatcher.publishEvent(event, toRelays);
+    }
+
+    async includeNip65Relays(
+        pubkey: string,
+        initialRelays: string[]
+    ): Promise<string[]> {
+        const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
+            pubkey,
+            initialRelays
+        );
+
+        const destinationRelays = Array.from(
+            new Set<string>([
+                ...initialRelays,
+                ...relayLists
+                    .filter(
+                        (x) =>
+                            x.operation === "read" ||
+                            x.operation === "read+write"
+                    )
+                    .map((x) => x.url),
+            ])
+        );
+        return destinationRelays;
+    }
+
     async #initialize() {
         const start = DateTime.now();
         log(undefined, "STARTUP start: " + start.toJSDate().toISOString());
@@ -382,19 +423,6 @@ export class EmailOutService {
         );
     }
 
-    async sendDM(
-        connector: NostrConnector,
-        receiverPubkey: string,
-        publishOnRelays: string[],
-        text: string
-    ) {
-        // A) Generate DM event.
-        const event = await connector.generateDM(text, receiverPubkey);
-
-        // B) Publish DM event to all relevant relays.
-        await this.#dmWatcher.publishEvent(event, publishOnRelays);
-    }
-
     /**
      *  Remove all entries that are older than 7 days.
      */
@@ -417,30 +445,6 @@ export class EmailOutService {
         keysToDelete.forEach((x) => {
             this.#dmEventIds.delete(x);
         });
-    }
-
-    async includeNip65Relays(
-        pubkey: string,
-        initialRelays: string[]
-    ): Promise<string[]> {
-        const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
-            pubkey,
-            initialRelays
-        );
-
-        const destinationRelays = Array.from(
-            new Set<string>([
-                ...initialRelays,
-                ...relayLists
-                    .filter(
-                        (x) =>
-                            x.operation === "read" ||
-                            x.operation === "read+write"
-                    )
-                    .map((x) => x.url),
-            ])
-        );
-        return destinationRelays;
     }
 }
 
