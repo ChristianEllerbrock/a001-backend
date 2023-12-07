@@ -90,7 +90,7 @@ export class NostrDMWatcher {
         this.#subscribeOnRelay(relay);
     }
 
-    async publishEvent(event: Event, onRelays?: string[]) {
+    async publishEvent(event: Event, onRelays?: string[]): Promise<string[]> {
         const relevantRelays =
             typeof onRelays === "undefined"
                 ? Array.from(this.#relays.keys())
@@ -107,8 +107,30 @@ export class NostrDMWatcher {
             }
         }
 
-        const pubs = relays.map((x) => x.publish(event));
-        await Promise.all(pubs);
+        const pubs = relays.map((x) => this.#publish(x, event));
+        const promiseResults = await Promise.allSettled(pubs);
+        const publishedOn: string[] = [];
+
+        for (const result of promiseResults) {
+            if (result.status === "fulfilled") {
+                publishedOn.push(result.value);
+            }
+        }
+
+        return publishedOn;
+    }
+
+    #publish(relay: Relay, event: Event): Promise<string> {
+        return new Promise((resolve, reject) => {
+            relay
+                .publish(event)
+                .then(() => {
+                    resolve(relay.url);
+                })
+                .catch((error) => {
+                    reject(error);
+                });
+        });
     }
 
     async fetchNip65RelayLists(

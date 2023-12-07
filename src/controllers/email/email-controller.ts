@@ -180,20 +180,13 @@ const handleEmail = async function (req: Request) {
                 ", "
             )}`
         );
-        //console.log(kind0Event);
 
         // Publish event.
-        //await EmailOutService.instance.publishEvent(kind0Event, missingRelaysForMetadata);
-
-        const publishedRelayEvents =
-            await NostrRelayerService.instance.relayer.publishEventAsync(
-                kind0Event,
-                missingRelaysForMetadata
-            );
-
-        const publishedRelays = Array.from(
-            new Set<string>(publishedRelayEvents.map((x) => x.url))
+        const publishedRelays = await EmailOutService.instance.publishEvent(
+            kind0Event,
+            missingRelaysForMetadata
         );
+
         console.log(
             `${to} - Successfully published metadata to the relays ${publishedRelays.join(
                 ", "
