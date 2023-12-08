@@ -87,7 +87,7 @@ app.get(`/${EnvService.instance.env.EMAIL_ENDPOINT}/`, (req, res) => {
 });
 
 // Admin controllers
-app.get("/admin/update-email-about", adminUpdateEmailAboutController);
+app.get("/admin/update-email-about/:email", adminUpdateEmailAboutController);
 app.get(
     "/admin/email-out-kill-random-relay",
     emailOutKillRandomRelayController

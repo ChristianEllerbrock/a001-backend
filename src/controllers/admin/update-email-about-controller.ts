@@ -7,6 +7,8 @@ import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { EventTemplate } from "nostr-tools";
 import { EnvService } from "../../services/env-service";
 import { STATUS_CODES } from "http";
+import { EmailOutService } from "../../services/email-out/email-out-service";
+import { sleep } from "../../helpers/sleep";
 
 const _log = function (text: string) {
     console.log("ADMIN - Update Email About - " + text);
@@ -26,21 +28,34 @@ export async function adminUpdateEmailAboutController(
         return;
     }
 
-    const dbEmails = await PrismaService.instance.db.email.findMany({
+    const email = req.params.email;
+
+    const dbEmail = await PrismaService.instance.db.email.findFirst({
+        where: {
+            address: email.toLowerCase(),
+        },
         include: {
-            emailNostr: { include: { emailNostrProfiles: true } },
+            emailNostr: {
+                include: { emailNostrProfiles: true },
+            },
         },
     });
 
-    for (const dbEmail of dbEmails) {
-        _log(`Trying to update '${dbEmail.address}'`);
+    if (!dbEmail) {
+        res.json("Database record not found.");
+        return;
+    }
+
+    for (const dbItem of [dbEmail]) {
+        _log(`Trying to update '${dbItem.address}'`);
         const about =
-            `I was created to mirror the email ${dbEmail.address} and handle email forwarding on https://nip05.social\n\n` +
-            `Send me a DM with the text "help", and I will answer with instructions about what I can do.`;
+            `I was created to mirror the email ${dbItem.address} and handle email forwarding on https://nip05.social\n\n` +
+            `Send me a DM with the text "help", and I will answer with instructions about what I can do. ` +
+            `Please note that I will answer to registered users only.`;
 
         const keyvaultData =
             await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
-                dbEmail.keyvaultKey
+                dbItem.keyvaultKey
             );
         if (!keyvaultData) {
             _log("Error: Could not get Azure keyvault data.");
@@ -56,26 +71,26 @@ export async function adminUpdateEmailAboutController(
             kind: 0,
             created_at: Math.floor(Date.now() / 1000),
             content: JSON.stringify({
-                name: dbEmail.emailNostr?.name,
-                nip05: dbEmail.emailNostr?.nip05,
+                name: dbItem.emailNostr?.name,
+                nip05: dbItem.emailNostr?.nip05,
                 about,
-                banner: dbEmail.emailNostr?.banner,
-                picture: dbEmail.emailNostr?.picture,
+                banner: dbItem.emailNostr?.banner,
+                picture: dbItem.emailNostr?.picture,
             }),
             tags: [],
         };
 
         const kind0Event = connector.signEvent(eventTemplate);
 
-        const result =
-            await NostrRelayerService.instance.relayer.publishEventAsync(
-                kind0Event,
-                dbEmail.emailNostr?.emailNostrProfiles.map(
-                    (x) => x.publishedRelay
-                ) ?? []
-            );
+        const result = await EmailOutService.instance.publishEvent(
+            kind0Event,
+            dbItem.emailNostr?.emailNostrProfiles.map(
+                (x) => x.publishedRelay
+            ) ?? []
+        );
 
         _log(`Done on ${result.length} relays`);
+        sleep(1000);
     }
 
     res.json("OK");
