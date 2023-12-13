@@ -1,5 +1,6 @@
-import { Field, ObjectType } from "type-graphql";
+import { Field, Int, ObjectType } from "type-graphql";
 import { RegistrationOutput } from "./registration-output";
+import { SubscriptionOutput } from "./subscriptionOutput";
 
 @ObjectType()
 export class UserOutput {
@@ -15,6 +16,9 @@ export class UserOutput {
     @Field((type) => Boolean, { nullable: true })
     isSystemUser?: boolean | null;
 
+    @Field((type) => Int)
+    subscriptionId!: number;
+
     // Model Relations
 
     @Field((type) => [RegistrationOutput], { nullable: true })
@@ -22,5 +26,7 @@ export class UserOutput {
 
     @Field((type) => String)
     npub?: string;
+
+    subscription?: SubscriptionOutput;
 }
 
