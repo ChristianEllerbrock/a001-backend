@@ -14,6 +14,8 @@ import { JobSubResolver } from "./subscriptions/resolvers/job-sub-resolver";
 import { NostrEventResolver } from "./resolvers/crud/nostr-event-resolver";
 import { NostrEventSubscriptionResolver } from "./subscriptions/resolvers/nostr-event-subscription-resolver";
 import { DirectoryResolver } from "./resolvers/crud/directory-resolver";
+import { SubscriptionResolver } from "./resolvers/crud/subscription-resolver";
+import { SubscriptionCalcResolver } from "./resolvers/crud/subscription-calc-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -35,6 +37,9 @@ export const schemaOptions: BuildSchemaOptions = {
 
         // Nostr
         NostrEventResolver,
+
+        SubscriptionResolver,
+        SubscriptionCalcResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },
