@@ -3,7 +3,10 @@ import { PrismaClient } from "@prisma/client";
 const seed = async function (prisma: PrismaClient) {
     await prisma.subscription.upsert({
         where: { id: 1 },
-        update: {},
+        update: {
+            name: "BASIC",
+            maxNoOfInboundEmailsPer30Days: 15,
+        },
         create: {
             id: 1,
             name: "Free",
@@ -16,7 +19,9 @@ const seed = async function (prisma: PrismaClient) {
 
     await prisma.subscription.upsert({
         where: { id: 2 },
-        update: {},
+        update: {
+            name: "PRO",
+        },
         create: {
             id: 2,
             name: "Basic",
@@ -29,7 +34,9 @@ const seed = async function (prisma: PrismaClient) {
 
     await prisma.subscription.upsert({
         where: { id: 3 },
-        update: {},
+        update: {
+            name: "ADVANCED",
+        },
         create: {
             id: 3,
             name: "Pro",

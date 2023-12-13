@@ -3,6 +3,7 @@ import { RegistrationOutput } from "../outputs/registration-output";
 import { UserOutput } from "../outputs/user-output";
 import { GraphqlContext } from "../type-defs";
 import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
+import { SubscriptionOutput } from "../outputs/subscriptionOutput";
 
 @Resolver((of) => UserOutput)
 export class UserResolverRelations {
@@ -28,6 +29,27 @@ export class UserResolverRelations {
         });
 
         return (await dbRegistrations).sortBy((x) => x.identifier);
+    }
+
+    @Authorized()
+    @FieldResolver((returns) => SubscriptionOutput)
+    async subscription(
+        @Root() user: UserOutput,
+        @Ctx() context: GraphqlContext
+    ): Promise<SubscriptionOutput> {
+        const dbSubscription = await context.db.user
+            .findUnique({
+                where: {
+                    id: user.id,
+                },
+            })
+            .subscription();
+
+        if (!dbSubscription) {
+            throw new Error("Could not found subscription for user.");
+        }
+
+        return dbSubscription;
     }
 }
 
