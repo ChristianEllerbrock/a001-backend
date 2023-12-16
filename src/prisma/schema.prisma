@@ -50,8 +50,8 @@ model UserSubscriptionInvoice {
     userSubscriptionId             Int                             @unique
     createdAt                      DateTime
     amount                         Int
-    description                    String
-    expiresAt                      DateTime
+    description                    String?
+    expiredAt                      DateTime
     paymentHash                    String                          @unique
     paymentRequest                 String
     userSubscription               UserSubscription                @relation(fields: [userSubscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
