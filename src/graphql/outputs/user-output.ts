@@ -16,6 +16,9 @@ export class UserOutput {
     @Field((type) => Boolean, { nullable: true })
     isSystemUser?: boolean | null;
 
+    @Field((type) => Date, { nullable: true })
+    subscriptionEnd?: Date | null;
+
     @Field((type) => Int)
     subscriptionId!: number;
 

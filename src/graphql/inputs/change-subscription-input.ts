@@ -1,7 +1,7 @@
 import { ArgsType, Field, Int } from "type-graphql";
 
 @ArgsType()
-export class SubscriptionCalcInput {
+export class ChangeSubscriptionInput {
     @Field((type) => Int)
     subscriptionId!: number;
 

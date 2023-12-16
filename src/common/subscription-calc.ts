@@ -49,8 +49,9 @@ export class SubscriptionCalc {
                 Math.round(days / 30) * dbUser.subscription.satsPer30Days;
 
             return {
-                subscriptionEnd: newSubscriptionEndDate.endOf("day").toJSDate(),
+                subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
+                subscriptionId,
                 invoiceAmount,
             };
         }
@@ -114,7 +115,8 @@ export class SubscriptionCalc {
             }
 
             return {
-                subscriptionEnd: newSubscriptionEndDate.endOf("day").toJSDate(),
+                subscriptionId,
+                subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
                 invoiceAmount: newSubscriptionInvoiceAmount,
             };
@@ -144,7 +146,8 @@ export class SubscriptionCalc {
                 Math.round(days / 30) * newSubscription.satsPer30Days;
 
             return {
-                subscriptionEnd: newSubscriptionEndDate.endOf("day").toJSDate(),
+                subscriptionId,
+                subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
                 invoiceAmount,
             };
@@ -176,7 +179,7 @@ export class SubscriptionCalc {
             30 *
             86400;
 
-        let newSubscriptionEndDate = currentSubscriptionEndDate.plus({
+        let newSubscriptionEndDate = now.plus({
             seconds: remainingNewSubscriptionTimeInSeconds,
         });
         let newSubscriptionInvoiceAmount = 0;
@@ -194,7 +197,8 @@ export class SubscriptionCalc {
         }
 
         return {
-            subscriptionEnd: newSubscriptionEndDate.endOf("day").toJSDate(),
+            subscriptionId,
+            subscriptionEnd: newSubscriptionEndDate.toJSDate(),
             days,
             invoiceAmount: newSubscriptionInvoiceAmount,
         };
