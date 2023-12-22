@@ -3,9 +3,9 @@ import { PrismaService } from "../prisma-service";
 import { Event } from "nostr-tools";
 import { AzureSecretService } from "../azure-secret-service";
 import {
-    EmailKeyvaultType,
-    SystemUserKeyvaultType,
-} from "../../common/keyvault-types/email-keyvault-type";
+    KeyVaultType_Email,
+    KeyVaultType_SystemUser,
+} from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { NostrDMWatcher } from "../../nostr-v4/nostrDMWatcher";
 import {
@@ -266,7 +266,7 @@ export class EmailOutService {
         let receiverConnector: NostrConnector | undefined;
         if (receiverDbSystemUser) {
             const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<SystemUserKeyvaultType>(
+                await AzureSecretService.instance.tryGetValue<KeyVaultType_SystemUser>(
                     receiverDbSystemUser.keyvaultKey
                 );
             if (keyvaulData) {
@@ -277,7 +277,7 @@ export class EmailOutService {
             }
         } else if (receiverDbEmailNostr) {
             const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+                await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
                     receiverDbEmailNostr.email.keyvaultKey
                 );
             if (keyvaulData) {

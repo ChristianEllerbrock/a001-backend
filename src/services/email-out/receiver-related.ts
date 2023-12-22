@@ -1,9 +1,9 @@
 import { Event } from "nostr-tools";
 import { PrismaService } from "../prisma-service";
 import {
-    EmailKeyvaultType,
-    SystemUserKeyvaultType,
-} from "../../common/keyvault-types/email-keyvault-type";
+    KeyVaultType_Email,
+    KeyVaultType_SystemUser,
+} from "../../common/key-vault";
 import { AzureSecretService } from "../azure-secret-service";
 
 export const getReceiverDbEmailNostr = async function (

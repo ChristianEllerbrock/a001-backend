@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../../services/prisma-service";
 import { AzureSecretService } from "../../services/azure-secret-service";
-import { EmailKeyvaultType } from "../../common/keyvault-types/email-keyvault-type";
+import { KeyVaultType_Email } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { EventTemplate } from "nostr-tools";
@@ -54,7 +54,7 @@ export async function adminUpdateEmailAboutController(
             `Please note that I will answer to registered users only.`;
 
         const keyvaultData =
-            await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+            await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
                 dbItem.keyvaultKey
             );
         if (!keyvaultData) {

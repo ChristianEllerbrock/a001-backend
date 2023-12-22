@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { generatePrivateKey, getPublicKey } from "nostr-tools";
-import { SystemUserKeyvaultType } from "../../common/keyvault-types/email-keyvault-type";
+import { KeyVaultType_SystemUser } from "../../common/key-vault";
 import { AzureSecretService } from "../../services/azure-secret-service";
 
 const seed = async function (prisma: PrismaClient) {
@@ -13,7 +13,7 @@ const seed = async function (prisma: PrismaClient) {
         const pubkey = getPublicKey(privkey);
         const nip05 = "email_out@nip05.social";
         const keyvaultKey = "system-user--email--out--nip05--social";
-        const keyvaultData: SystemUserKeyvaultType = {
+        const keyvaultData: KeyVaultType_SystemUser = {
             id: 1,
             nip05,
             pubkey,

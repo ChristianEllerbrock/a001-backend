@@ -29,6 +29,10 @@ export async function checkSubscriptions(
     res.json("OK");
 }
 
+const message_DowngradedToBasic =
+    "Your paid subscription has expired and your account was downgraded to the free BASIC plan. " +
+    "You can upgrade your plan at any time on https://nip05.social";
+
 const runCheckSubscriptions = async function () {
     const now = new Date();
 

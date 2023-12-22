@@ -4,9 +4,9 @@ import { systemDomainIds } from "../../common/enums/system-domain";
 import { AzureSecretService } from "../../services/azure-secret-service";
 import { EventTemplate, generatePrivateKey, getPublicKey } from "nostr-tools";
 import {
-    EmailKeyvaultType,
+    KeyVaultType_Email,
     emailKeyvaultTypeKeyPrefix,
-} from "../../common/keyvault-types/email-keyvault-type";
+} from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { v4 } from "uuid";
 import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
@@ -109,7 +109,7 @@ const handleEmail = async function (req: Request) {
 
     // Get the privkey/pubkey info from the Azure keyvault.
     const emailKeyvault =
-        await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+        await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
             dbEmail.keyvaultKey
         );
     if (!emailKeyvault) {
@@ -310,7 +310,7 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
         /@|\./g,
         "--"
     )}`;
-    const emailKeyvault: EmailKeyvaultType = {
+    const emailKeyvault: KeyVaultType_Email = {
         email: fromEmail,
         pubkey,
         privkey,
