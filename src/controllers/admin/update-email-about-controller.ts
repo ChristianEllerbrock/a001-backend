@@ -3,10 +3,8 @@ import { PrismaService } from "../../services/prisma-service";
 import { AzureSecretService } from "../../services/azure-secret-service";
 import { KeyVaultType_Email } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
-import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { EventTemplate } from "nostr-tools";
 import { EnvService } from "../../services/env-service";
-import { STATUS_CODES } from "http";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { sleep } from "../../helpers/sleep";
 

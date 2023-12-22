@@ -9,8 +9,6 @@ import {
 } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { v4 } from "uuid";
-import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
-import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { SendGridEmailEnvelope } from "./type-defs";
 import { DateTime } from "luxon";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
