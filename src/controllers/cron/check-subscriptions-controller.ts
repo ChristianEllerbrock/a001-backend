@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { EnvService } from "../../services/env-service";
 import { PrismaService } from "../../services/prisma-service";
+import { EmailOutService } from "../../services/email-out/email-out-service";
+import { sleep } from "../../helpers/sleep";
 
 const log = function (text: string | object) {
     console.log(`CHECK SUBSCRIPTIONS - [controller] - ${JSON.stringify(text)}`);
@@ -30,8 +32,8 @@ export async function checkSubscriptions(
 }
 
 const message_DowngradedToBasic =
-    "Your paid subscription has expired and your account was downgraded to the free BASIC plan. " +
-    "You can upgrade your plan at any time on https://nip05.social";
+    "Your paid subscription has expired and your account was downgraded to the free BASIC plan." +
+    " You can upgrade your plan at any time on https://nip05.social";
 
 const runCheckSubscriptions = async function () {
     const now = new Date();
@@ -43,11 +45,12 @@ const runCheckSubscriptions = async function () {
     const dbUsersWithExpiredSubscription =
         await PrismaService.instance.db.user.findMany({
             where: {
-                subscriptionEnd: { gte: now },
+                subscriptionEnd: { lte: now },
             },
         });
 
     for (const user of dbUsersWithExpiredSubscription) {
+        log(`Downgrade account '${user.pubkey}' to the free plan.`);
         const oldSubscriptionId = user.subscriptionId;
         const newSubscriptionId = 1;
 
@@ -71,7 +74,32 @@ const runCheckSubscriptions = async function () {
         });
 
         // Notify user about expiration.
-        // todo
+        const relevantUserRelays = await determineRelevantRelays(user.id);
+        await EmailOutService.instance.sendDMFromBot(
+            user.pubkey,
+            relevantUserRelays,
+            message_DowngradedToBasic
+        );
+        await sleep(1000); // Just to be sure to not stress the relays.
     }
+};
+
+const determineRelevantRelays = async function (
+    userId: string
+): Promise<string[]> {
+    const relays = new Set<string>();
+
+    const dbData = await PrismaService.instance.db.registration.findMany({
+        where: { userId },
+        select: { registrationRelays: true },
+    });
+
+    for (const data of dbData) {
+        data.registrationRelays
+            .map((x) => x.address)
+            .forEach((y) => relays.add(y));
+    }
+
+    return Array.from(relays);
 };
 

@@ -5,6 +5,8 @@ import { AzureSecretService } from "../azure-secret-service";
 import {
     KeyVaultType_Email,
     KeyVaultType_SystemUser,
+    KeyVault_Bots_SecretName,
+    KeyVault_Bots_Type,
 } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { NostrDMWatcher } from "../../nostr-v4/nostrDMWatcher";
@@ -73,6 +75,29 @@ export class EmailOutService {
         this.#dmWatcher.killRandomRelayConnection();
     }
 
+    async sendDMFromBot(
+        receiverPubkey: string,
+        publishOnRelays: string[],
+        text: string
+    ) {
+        // Get the bot pubkey and privkey for the connector.
+        const bots =
+            await AzureSecretService.instance.tryGetValue<KeyVault_Bots_Type>(
+                KeyVault_Bots_SecretName
+            );
+        const bot = bots?.find((x) => x.id === 1);
+        if (typeof bot === "undefined") {
+            throw new Error("Could not get bot data from Azure Key Vault.");
+        }
+
+        const connector = new NostrConnector({
+            pubkey: bot.pubkey,
+            privkey: bot.privkey,
+        });
+
+        await this.sendDM(connector, receiverPubkey, publishOnRelays, text);
+    }
+
     async sendDM(
         connector: NostrConnector,
         receiverPubkey: string,
@@ -94,6 +119,10 @@ export class EmailOutService {
         pubkey: string,
         initialRelays: string[]
     ): Promise<string[]> {
+        if (initialRelays.length === 0) {
+            return [];
+        }
+
         const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
             pubkey,
             initialRelays
