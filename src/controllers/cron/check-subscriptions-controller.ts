@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { EnvService } from "../../services/env-service";
 import { PrismaService } from "../../services/prisma-service";
-import { EmailOutService } from "../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { sleep } from "../../helpers/sleep";
 
 const log = function (text: string | object) {
@@ -75,7 +75,7 @@ const runCheckSubscriptions = async function () {
 
         // Notify user about expiration.
         const relevantUserRelays = await determineRelevantRelays(user.id);
-        await EmailOutService.instance.sendDMFromBot(
+        await Nip05NostrService.instance.sendDMFromBot(
             user.pubkey,
             relevantUserRelays,
             message_DowngradedToBasic

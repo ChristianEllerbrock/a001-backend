@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { EnvService } from "../../services/env-service";
-import { EmailOutService } from "../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 
 export async function emailOutKillRandomRelayController(
     req: Request,
@@ -16,7 +16,7 @@ export async function emailOutKillRandomRelayController(
         return;
     }
 
-    EmailOutService.instance.killRandomRelayConnection();
+    Nip05NostrService.instance.killRandomRelayConnection();
     res.json("OK");
 }
 

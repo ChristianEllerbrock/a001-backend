@@ -13,7 +13,7 @@ import { ChangeSubscriptionInput } from "../../inputs/change-subscription-input"
 import { SubscriptionCalc } from "../../../common/subscription-calc";
 import { UserOutput } from "../../outputs/user-output";
 import { UserSubscriptionOutput } from "../../outputs/user-subscription-output";
-import { EmailOutService } from "../../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 import { Subscription } from "@prisma/client";
 import { DateTime } from "luxon";
 
@@ -121,7 +121,7 @@ export class SubscriptionResolver {
                 .forEach((y) => initialRelays.add(y));
         }
         const relevantRelays =
-            await EmailOutService.instance.includeNip65Relays(
+            await Nip05NostrService.instance.includeNip65Relays(
                 dbUser.pubkey,
                 Array.from(initialRelays)
             );
@@ -142,7 +142,7 @@ export class SubscriptionResolver {
                     updatedDbUser.subscriptionEnd
                 ).toFormat("yyyy-MM-dd HH:mm")}.`;
 
-            EmailOutService.instance.sendDMFromBot(
+            Nip05NostrService.instance.sendDMFromBot(
                 dbUser.pubkey,
                 relevantRelays,
                 message

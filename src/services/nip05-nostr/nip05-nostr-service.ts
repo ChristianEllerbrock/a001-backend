@@ -32,16 +32,16 @@ const relaysWithoutKind4Support: string[] = [
     "wss://nostr.coinfundit.com/",
 ];
 
-export class EmailOutService {
+export class Nip05NostrService {
     // #region Singleton
-    static #instance: EmailOutService;
+    static #instance: Nip05NostrService;
 
     static get instance() {
         if (this.#instance) {
             return this.#instance;
         }
 
-        this.#instance = new EmailOutService();
+        this.#instance = new Nip05NostrService();
         return this.#instance;
     }
 

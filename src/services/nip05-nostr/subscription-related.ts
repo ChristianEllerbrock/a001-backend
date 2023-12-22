@@ -1,12 +1,12 @@
 import { DateTime } from "luxon";
-import { EmailOutService } from "./email-out-service";
+import { Nip05NostrService } from "./nip05-nostr-service";
 import { PrismaService } from "../prisma-service";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { Event } from "nostr-tools";
 import { determineNextPeriodStart, log } from "./common";
 
 export const checkSubscriptionAndRespondIfNecessary = async function (
-    this: EmailOutService,
+    this: Nip05NostrService,
     event: Event,
     dbUser: DbUser,
     receiverConnector: NostrConnector,
