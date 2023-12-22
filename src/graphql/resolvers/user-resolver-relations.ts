@@ -4,6 +4,7 @@ import { UserOutput } from "../outputs/user-output";
 import { GraphqlContext } from "../type-defs";
 import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
 import { SubscriptionOutput } from "../outputs/subscriptionOutput";
+import { UserSubscriptionOutput } from "../outputs/user-subscription-output";
 
 @Resolver((of) => UserOutput)
 export class UserResolverRelations {
@@ -50,6 +51,18 @@ export class UserResolverRelations {
         }
 
         return dbSubscription;
+    }
+
+    @Authorized()
+    @FieldResolver((returns) => [UserSubscriptionOutput])
+    async userSubscriptions(
+        @Root() user: UserOutput,
+        @Ctx() context: GraphqlContext
+    ): Promise<UserSubscriptionOutput[]> {
+        return await context.db.userSubscription.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+        });
     }
 }
 

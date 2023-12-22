@@ -26,6 +26,7 @@ import { EmailOutService } from "./services/email-out/email-out-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { emailOutKillRandomRelayController } from "./controllers/admin/email-out-kill-random-relay";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
+import { checkSubscriptions } from "./controllers/cron/check-subscriptions-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -93,6 +94,7 @@ app.get(
     emailOutKillRandomRelayController
 );
 app.get("/admin/publish-system-user/:id", publishSystemUserController);
+app.get("/cron/check-subscriptions", checkSubscriptions);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);

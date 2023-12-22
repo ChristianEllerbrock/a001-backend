@@ -12,6 +12,7 @@ import { GraphqlContext } from "../../type-defs";
 import { ChangeSubscriptionInput } from "../../inputs/change-subscription-input";
 import { SubscriptionCalc } from "../../../common/subscription-calc";
 import { UserOutput } from "../../outputs/user-output";
+import { UserSubscriptionOutput } from "../../outputs/user-subscription-output";
 
 @Resolver()
 export class SubscriptionResolver {
