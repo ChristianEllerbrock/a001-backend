@@ -31,7 +31,7 @@ export class SubscriptionCalc {
             // Stay on the same plan but add some days.
             if (!dbUser.subscriptionEnd) {
                 throw new Error(
-                    "The user's subscription currently has no end date. It cannot be prolonged."
+                    "Your subscription currently has no end date. It cannot be prolonged."
                 );
             }
 

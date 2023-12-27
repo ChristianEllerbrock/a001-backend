@@ -3,7 +3,7 @@ import { EnvService } from "../../services/env-service";
 import { PrismaService } from "../../services/prisma-service";
 import { EventTemplate, SimplePool } from "nostr-tools";
 import { AzureSecretService } from "../../services/azure-secret-service";
-import { SystemUserKeyvaultType } from "../../common/keyvault-types/email-keyvault-type";
+import { KeyVaultType_SystemUser } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 
 export async function publishSystemUserController(
@@ -33,7 +33,7 @@ export async function publishSystemUserController(
     }
 
     const keyvaultData =
-        await AzureSecretService.instance.tryGetValue<SystemUserKeyvaultType>(
+        await AzureSecretService.instance.tryGetValue<KeyVaultType_SystemUser>(
             dbSystemUser.keyvaultKey
         );
     if (!keyvaultData) {

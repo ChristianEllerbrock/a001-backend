@@ -1,7 +1,7 @@
 import { RegistrationEmailIn } from "@prisma/client";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { log } from "./common";
-import { EmailOutService } from "../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 
 export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
     maxNoOfEmailInPerMonth: number,
@@ -19,7 +19,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
     if (maxNoOfEmailInPerMonth === 0) {
         // The user's subscription does not cover EMAIL IN at all.
         const relevantRelays =
-            await EmailOutService.instance.includeNip65Relays(
+            await Nip05NostrService.instance.includeNip65Relays(
                 receiverPubkey,
                 receiverInitialRelays
             );
@@ -33,7 +33,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
             "Please subscribe to a higher plan on\n\n" +
             "https://nip05.social";
 
-        await EmailOutService.instance.sendDM(
+        await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
             relevantRelays,
@@ -60,7 +60,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         // The user has spent his contingent for this month.
 
         const relevantRelays =
-            await EmailOutService.instance.includeNip65Relays(
+            await Nip05NostrService.instance.includeNip65Relays(
                 receiverPubkey,
                 receiverInitialRelays
             );
@@ -75,7 +75,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
             "You can receive inbound emails again starting next month. You can also subscribe to a higher plan on\n\n" +
             "https://nip05.social";
 
-        await EmailOutService.instance.sendDM(
+        await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
             relevantRelays,

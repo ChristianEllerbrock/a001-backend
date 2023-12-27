@@ -4,7 +4,7 @@ import { SubscriptionOutput } from "./subscriptionOutput";
 import { UserSubscriptionInvoiceOutput } from "./user-subscription-invoice-output";
 
 @ObjectType()
-export class UserSubscription {
+export class UserSubscriptionOutput {
     @Field((type) => Int)
     id!: number;
 
@@ -12,7 +12,7 @@ export class UserSubscription {
     userId!: string;
 
     @Field((type) => Date)
-    createAt!: Date;
+    createdAt!: Date;
 
     @Field((type) => Boolean)
     pending!: boolean;

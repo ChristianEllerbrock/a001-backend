@@ -22,10 +22,10 @@ import { Context as WsContext } from "graphql-ws";
 import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
-import { EmailOutService } from "./services/email-out/email-out-service";
+import { Nip05NostrService } from "./services/nip05-nostr/nip05-nostr-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
-import { emailOutKillRandomRelayController } from "./controllers/admin/email-out-kill-random-relay";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
+import { checkSubscriptions } from "./controllers/cron/check-subscriptions-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -88,11 +88,10 @@ app.get(`/${EnvService.instance.env.EMAIL_ENDPOINT}/`, (req, res) => {
 
 // Admin controllers
 app.get("/admin/update-email-about/:email", adminUpdateEmailAboutController);
-app.get(
-    "/admin/email-out-kill-random-relay",
-    emailOutKillRandomRelayController
-);
 app.get("/admin/publish-system-user/:id", publishSystemUserController);
+
+// Cron controllers
+app.get("/cron/check-subscriptions", checkSubscriptions);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);
@@ -159,7 +158,7 @@ async function bootstrap() {
         );
     });
 
-    EmailOutService.instance.start();
+    Nip05NostrService.instance.start();
 }
 
 bootstrap();

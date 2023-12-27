@@ -1,5 +1,5 @@
 import { Field, Int, ObjectType } from "type-graphql";
-import { UserSubscription } from "./user-subscription-output";
+import { UserSubscriptionOutput } from "./user-subscription-output";
 import { UserSubscriptionInvoicePaymentOutput } from "./user-subscription-invoice-payment-output";
 
 @ObjectType()
@@ -16,8 +16,8 @@ export class UserSubscriptionInvoiceOutput {
     @Field((type) => Int)
     amount!: number;
 
-    @Field((type) => String)
-    description!: string;
+    @Field((type) => String, { nullable: true })
+    description!: string | null;
 
     @Field((type) => Date)
     expiredAt!: Date;
@@ -30,10 +30,10 @@ export class UserSubscriptionInvoiceOutput {
 
     // Relations
 
-    @Field((type) => UserSubscription)
-    userSubscription?: UserSubscription;
+    @Field((type) => UserSubscriptionOutput)
+    userSubscription?: UserSubscriptionOutput;
 
     @Field((type) => UserSubscriptionInvoicePaymentOutput)
-    userSubscriptionInvoicePayment!: UserSubscriptionInvoicePaymentOutput;
+    userSubscriptionInvoicePayment?: UserSubscriptionInvoicePaymentOutput;
 }
 
