@@ -4,16 +4,14 @@ import { systemDomainIds } from "../../common/enums/system-domain";
 import { AzureSecretService } from "../../services/azure-secret-service";
 import { EventTemplate, generatePrivateKey, getPublicKey } from "nostr-tools";
 import {
-    EmailKeyvaultType,
+    KeyVaultType_Email,
     emailKeyvaultTypeKeyPrefix,
-} from "../../common/keyvault-types/email-keyvault-type";
+} from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { v4 } from "uuid";
-import { Nip65RelayList, RelayEvent } from "../../nostr-v4/type-defs";
-import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { SendGridEmailEnvelope } from "./type-defs";
 import { DateTime } from "luxon";
-import { EmailOutService } from "../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { log } from "./common";
 import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-related";
 
@@ -109,7 +107,7 @@ const handleEmail = async function (req: Request) {
 
     // Get the privkey/pubkey info from the Azure keyvault.
     const emailKeyvault =
-        await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+        await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
             dbEmail.keyvaultKey
         );
     if (!emailKeyvault) {
@@ -138,7 +136,7 @@ const handleEmail = async function (req: Request) {
 
     // The user has an appropriate subscription. Deliver email as DM.
 
-    const targetRelays = await EmailOutService.instance.includeNip65Relays(
+    const targetRelays = await Nip05NostrService.instance.includeNip65Relays(
         dbRegistration.user.pubkey,
         dbRegistration.registrationRelays.map((x) => x.address)
     );
@@ -182,7 +180,7 @@ const handleEmail = async function (req: Request) {
         );
 
         // Publish event.
-        const publishedRelays = await EmailOutService.instance.publishEvent(
+        const publishedRelays = await Nip05NostrService.instance.publishEvent(
             kind0Event,
             missingRelaysForMetadata
         );
@@ -212,7 +210,7 @@ const handleEmail = async function (req: Request) {
                 connector.conf.pubkey
             }' on ${missingRelaysForMetadata.join(", ")}`
         );
-        EmailOutService.instance.watchForDMs(
+        Nip05NostrService.instance.watchForDMs(
             connector.conf.pubkey,
             missingRelaysForMetadata
         );
@@ -229,7 +227,7 @@ const handleEmail = async function (req: Request) {
     message += "---\n\n" + bodyTextOrHtml;
 
     log(`${to} - Sending DM event to the relays ${targetRelays.join(", ")}`);
-    await EmailOutService.instance.sendDM(
+    await Nip05NostrService.instance.sendDM(
         connector,
         dbRegistration.user.pubkey,
         targetRelays,
@@ -310,7 +308,7 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
         /@|\./g,
         "--"
     )}`;
-    const emailKeyvault: EmailKeyvaultType = {
+    const emailKeyvault: KeyVaultType_Email = {
         email: fromEmail,
         pubkey,
         privkey,

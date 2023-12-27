@@ -3,9 +3,11 @@ import { PrismaService } from "../prisma-service";
 import { Event } from "nostr-tools";
 import { AzureSecretService } from "../azure-secret-service";
 import {
-    EmailKeyvaultType,
-    SystemUserKeyvaultType,
-} from "../../common/keyvault-types/email-keyvault-type";
+    KeyVaultType_Email,
+    KeyVaultType_SystemUser,
+    KeyVault_Bots_SecretName,
+    KeyVault_Bots_Type,
+} from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { NostrDMWatcher } from "../../nostr-v4/nostrDMWatcher";
 import {
@@ -30,16 +32,16 @@ const relaysWithoutKind4Support: string[] = [
     "wss://nostr.coinfundit.com/",
 ];
 
-export class EmailOutService {
+export class Nip05NostrService {
     // #region Singleton
-    static #instance: EmailOutService;
+    static #instance: Nip05NostrService;
 
     static get instance() {
         if (this.#instance) {
             return this.#instance;
         }
 
-        this.#instance = new EmailOutService();
+        this.#instance = new Nip05NostrService();
         return this.#instance;
     }
 
@@ -73,6 +75,29 @@ export class EmailOutService {
         this.#dmWatcher.killRandomRelayConnection();
     }
 
+    async sendDMFromBot(
+        receiverPubkey: string,
+        publishOnRelays: string[],
+        text: string
+    ) {
+        // Get the bot pubkey and privkey for the connector.
+        const bots =
+            await AzureSecretService.instance.tryGetValue<KeyVault_Bots_Type>(
+                KeyVault_Bots_SecretName
+            );
+        const bot = bots?.find((x) => x.id === 1);
+        if (typeof bot === "undefined") {
+            throw new Error("Could not get bot data from Azure Key Vault.");
+        }
+
+        const connector = new NostrConnector({
+            pubkey: bot.pubkey,
+            privkey: bot.privkey,
+        });
+
+        await this.sendDM(connector, receiverPubkey, publishOnRelays, text);
+    }
+
     async sendDM(
         connector: NostrConnector,
         receiverPubkey: string,
@@ -94,6 +119,10 @@ export class EmailOutService {
         pubkey: string,
         initialRelays: string[]
     ): Promise<string[]> {
+        if (initialRelays.length === 0) {
+            return [];
+        }
+
         const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
             pubkey,
             initialRelays
@@ -266,7 +295,7 @@ export class EmailOutService {
         let receiverConnector: NostrConnector | undefined;
         if (receiverDbSystemUser) {
             const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<SystemUserKeyvaultType>(
+                await AzureSecretService.instance.tryGetValue<KeyVaultType_SystemUser>(
                     receiverDbSystemUser.keyvaultKey
                 );
             if (keyvaulData) {
@@ -277,7 +306,7 @@ export class EmailOutService {
             }
         } else if (receiverDbEmailNostr) {
             const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+                await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
                     receiverDbEmailNostr.email.keyvaultKey
                 );
             if (keyvaulData) {

@@ -1,13 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../../services/prisma-service";
 import { AzureSecretService } from "../../services/azure-secret-service";
-import { EmailKeyvaultType } from "../../common/keyvault-types/email-keyvault-type";
+import { KeyVaultType_Email } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
-import { NostrRelayerService } from "../../services/nostr-relayer.service";
 import { EventTemplate } from "nostr-tools";
 import { EnvService } from "../../services/env-service";
-import { STATUS_CODES } from "http";
-import { EmailOutService } from "../../services/email-out/email-out-service";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { sleep } from "../../helpers/sleep";
 
 const _log = function (text: string) {
@@ -54,7 +52,7 @@ export async function adminUpdateEmailAboutController(
             `Please note that I will answer to registered users only.`;
 
         const keyvaultData =
-            await AzureSecretService.instance.tryGetValue<EmailKeyvaultType>(
+            await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
                 dbItem.keyvaultKey
             );
         if (!keyvaultData) {
@@ -82,7 +80,7 @@ export async function adminUpdateEmailAboutController(
 
         const kind0Event = connector.signEvent(eventTemplate);
 
-        const result = await EmailOutService.instance.publishEvent(
+        const result = await Nip05NostrService.instance.publishEvent(
             kind0Event,
             dbItem.emailNostr?.emailNostrProfiles.map(
                 (x) => x.publishedRelay

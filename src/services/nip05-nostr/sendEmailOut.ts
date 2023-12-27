@@ -1,12 +1,12 @@
 import { Event } from "nostr-tools";
-import { EmailOutService } from "./email-out-service";
+import { Nip05NostrService } from "./nip05-nostr-service";
 import { log } from "./common";
 import { AzureCommunicationService } from "../azure-communication-service";
 import { EmailClient } from "@azure/communication-email";
 import { EnvService } from "../env-service";
 
 export const sendEmailOut = async function (
-    this: EmailOutService,
+    this: Nip05NostrService,
     event: Event,
     senderEmail: string,
     senderMessage: string,
@@ -51,7 +51,7 @@ export const sendEmailOut = async function (
 };
 
 const sendEmailOutViaEmailMirror = async function (
-    this: EmailOutService,
+    this: Nip05NostrService,
     event: Event,
     senderEmail: string,
     senderMessage: string,
@@ -93,7 +93,7 @@ const sendEmailOutViaEmailMirror = async function (
 };
 
 const sendEmailOutViaEmailHub = async function (
-    this: EmailOutService,
+    this: Nip05NostrService,
     event: Event,
     senderEmail: string,
     senderMessage: string,

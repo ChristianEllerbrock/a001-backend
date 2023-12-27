@@ -12,6 +12,10 @@ import { GraphqlContext } from "../../type-defs";
 import { ChangeSubscriptionInput } from "../../inputs/change-subscription-input";
 import { SubscriptionCalc } from "../../../common/subscription-calc";
 import { UserOutput } from "../../outputs/user-output";
+import { UserSubscriptionOutput } from "../../outputs/user-subscription-output";
+import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
+import { Subscription } from "@prisma/client";
+import { DateTime } from "luxon";
 
 @Resolver()
 export class SubscriptionResolver {
@@ -67,6 +71,8 @@ export class SubscriptionResolver {
                 "Could not find you and your subscription in the database. Please try again later."
             );
         }
+        const initialSubscriptionId = dbUser.subscriptionId;
+        const initialSubscriptionName = dbUser.subscription.name;
 
         // Check, if the current plan and the current end date is the same as the
         // new plan and new end date.
@@ -100,9 +106,65 @@ export class SubscriptionResolver {
                 subscriptionId: calculation.subscriptionId,
                 subscriptionEnd: calculation.subscriptionEnd,
             },
+            include: { subscription: true },
         });
 
+        // 3. Inform user about subscription change via Nostr.
+        const dbData = await context.db.registration.findMany({
+            where: { userId: dbUser.id },
+            select: { registrationRelays: true },
+        });
+        const initialRelays = new Set<string>();
+        for (const data of dbData) {
+            data.registrationRelays
+                .map((x) => x.address)
+                .forEach((y) => initialRelays.add(y));
+        }
+        const relevantRelays =
+            await Nip05NostrService.instance.includeNip65Relays(
+                dbUser.pubkey,
+                Array.from(initialRelays)
+            );
+        if (
+            relevantRelays.length > 0 &&
+            updatedDbUser.subscriptionEnd != null
+        ) {
+            // DON'T wait for the async function.
+
+            const change = this.#determineSubscriptionChange(
+                dbUser.subscription,
+                updatedDbUser.subscription
+            );
+
+            const message =
+                `You changed your subscription plan from ${dbUser.subscription.name} to ${updatedDbUser.subscription.name}.` +
+                ` Your updated subscription now ends at ${DateTime.fromJSDate(
+                    updatedDbUser.subscriptionEnd
+                ).toFormat("yyyy-MM-dd HH:mm")}.`;
+
+            Nip05NostrService.instance.sendDMFromBot(
+                dbUser.pubkey,
+                relevantRelays,
+                message
+            );
+        }
+
         return updatedDbUser;
+    }
+
+    #determineSubscriptionChange(
+        oldSubscription: Subscription,
+        newSubscription: Subscription
+    ): "upgrade" | "downgrade" | "prolong" {
+        if (oldSubscription.id === newSubscription.id) {
+            return "prolong";
+        }
+
+        if (newSubscription.id > oldSubscription.id) {
+            return "upgrade";
+        }
+
+        return "downgrade";
     }
 }
 

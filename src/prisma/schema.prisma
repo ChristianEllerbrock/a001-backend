@@ -31,14 +31,19 @@ model User {
 }
 
 model UserSubscription {
-    id                      Int                      @id @default(autoincrement())
-    userId                  String
-    createdAt               DateTime
-    pending                 Boolean
-    cancelled               Boolean
-    oldSubscriptionId       Int
-    newSubscriptionId       Int
-    newSubscriptionEnd      DateTime?
+    id                   Int       @id @default(autoincrement())
+    userId               String
+    createdAt            DateTime
+    pending              Boolean
+    cancelled            Boolean
+    oldSubscriptionId    Int
+    newSubscriptionId    Int
+    newSubscriptionEnd   DateTime?
+    expirationReminder14 DateTime?
+    expirationReminder7  DateTime?
+    expirationReminder3  DateTime?
+    expirationReminder1  DateTime?
+
     userSubscriptionInvoice UserSubscriptionInvoice?
     user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
     oldSubscription         Subscription             @relation(name: "old", fields: [oldSubscriptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)

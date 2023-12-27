@@ -1,5 +1,5 @@
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
-import { EmailOutService } from "./email-out-service";
+import { Nip05NostrService } from "./nip05-nostr-service";
 
 export enum SystemUserCommand {
     EmailOutHub_HELP = "email-out-hub_help",
@@ -48,7 +48,7 @@ export const findCommandInOutMessageForEmailMirror = function (
 };
 
 export const respondToCommand = async function (
-    this: EmailOutService,
+    this: Nip05NostrService,
     command: SystemUserCommand | EmailMirrorCommand,
     senderPubkey: string,
     receiverConnector: NostrConnector,
