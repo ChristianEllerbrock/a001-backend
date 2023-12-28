@@ -59,6 +59,8 @@ model UserSubscriptionInvoice {
     expiresAt                      DateTime
     paymentHash                    String                          @unique
     paymentRequest                 String
+    qrCodePng                      String
+    qrCodeSvg                      String
     userSubscription               UserSubscription                @relation(fields: [userSubscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
     userSubscriptionInvoicePayment UserSubscriptionInvoicePayment?
 }
