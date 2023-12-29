@@ -121,7 +121,11 @@ const runCheckSubscriptions = async function () {
                 },
             },
             include: {
-                userSubscriptions: { orderBy: { createdAt: "desc" }, take: 1 },
+                userSubscriptions: {
+                    where: { pending: false, cancelled: false },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                },
             },
         });
 
@@ -131,7 +135,6 @@ const runCheckSubscriptions = async function () {
         }
 
         const latestUserSubscription = user.userSubscriptions[0];
-        console.log(latestUserSubscription);
         if (
             latestUserSubscription.newSubscriptionEnd?.getTime() !=
                 user.subscriptionEnd?.getTime() ||
@@ -211,11 +214,13 @@ const runCheckSubscriptions = async function () {
 
             log(`Notify account '${user.pubkey}': 3 days remaining.`);
             const relevantUserRelays = await determineRelevantRelays(user.id);
-            await Nip05NostrService.instance.sendDMFromBot(
-                user.pubkey,
-                relevantUserRelays,
-                message_3DaysLeft
-            );
+            const publishedRelays =
+                await Nip05NostrService.instance.sendDMFromBot(
+                    user.pubkey,
+                    relevantUserRelays,
+                    message_3DaysLeft
+                );
+            log(`Notified on relays: ${publishedRelays.join(", ")}`);
             await PrismaService.instance.db.userSubscription.update({
                 where: { id: latestUserSubscription.id },
                 data: { expirationReminder3: now },

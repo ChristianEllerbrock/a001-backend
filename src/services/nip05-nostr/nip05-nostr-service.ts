@@ -79,7 +79,7 @@ export class Nip05NostrService {
         receiverPubkey: string,
         publishOnRelays: string[],
         text: string
-    ) {
+    ): Promise<string[]> {
         // Get the bot pubkey and privkey for the connector.
         const bots =
             await AzureSecretService.instance.tryGetValue<KeyVault_Bots_Type>(
@@ -95,7 +95,12 @@ export class Nip05NostrService {
             privkey: bot.privkey,
         });
 
-        await this.sendDM(connector, receiverPubkey, publishOnRelays, text);
+        return await this.sendDM(
+            connector,
+            receiverPubkey,
+            publishOnRelays,
+            text
+        );
     }
 
     async sendDM(
@@ -103,12 +108,12 @@ export class Nip05NostrService {
         receiverPubkey: string,
         publishOnRelays: string[],
         text: string
-    ) {
+    ): Promise<string[]> {
         // A) Generate DM event.
         const event = await connector.generateDM(text, receiverPubkey);
 
         // B) Publish DM event to all relevant relays.
-        await this.#dmWatcher.publishEvent(event, publishOnRelays);
+        return await this.#dmWatcher.publishEvent(event, publishOnRelays);
     }
 
     async publishEvent(event: Event, toRelays: string[]): Promise<string[]> {
