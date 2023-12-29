@@ -20,13 +20,19 @@ export class UserSubscriptionInvoiceOutput {
     description!: string | null;
 
     @Field((type) => Date)
-    expiredAt!: Date;
+    expiresAt!: Date;
 
     @Field((type) => String)
     paymentHash!: string;
 
     @Field((type) => String)
     paymentRequest!: string;
+
+    @Field((type) => String)
+    qrCodePng!: string;
+
+    @Field((type) => String)
+    qrCodeSvg!: string;
 
     // Relations
 

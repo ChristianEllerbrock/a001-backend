@@ -29,6 +29,8 @@ export class EnvServiceEnv {
     COMMUNICATION_SERVICES_RESOURCE_GROUP_NAME!: string;
     COMMUNICATION_SERVICES_EMAIL_SERVICE_NAME!: string;
     API_ADMIN_KEY!: string;
+    ALBY_ACCESS_TOKEN!: string;
+    ENVIRONMENT!: "dev" | "pro";
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);
