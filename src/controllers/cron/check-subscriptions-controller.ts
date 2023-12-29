@@ -214,13 +214,18 @@ const runCheckSubscriptions = async function () {
 
             log(`Notify account '${user.pubkey}': 3 days remaining.`);
             const relevantUserRelays = await determineRelevantRelays(user.id);
-            const publishedRelays =
-                await Nip05NostrService.instance.sendDMFromBot(
-                    user.pubkey,
-                    relevantUserRelays,
-                    message_3DaysLeft
-                );
-            log(`Notified on relays: ${publishedRelays.join(", ")}`);
+
+            try {
+                const publishedRelays =
+                    await Nip05NostrService.instance.sendDMFromBot(
+                        user.pubkey,
+                        relevantUserRelays,
+                        message_3DaysLeft
+                    );
+                log(`Notified on relays: ${publishedRelays.join(", ")}`);
+            } catch (error) {
+                log(JSON.stringify(error));
+            }
             await PrismaService.instance.db.userSubscription.update({
                 where: { id: latestUserSubscription.id },
                 data: { expirationReminder3: now },
