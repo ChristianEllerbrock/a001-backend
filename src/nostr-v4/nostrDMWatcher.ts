@@ -1,17 +1,14 @@
 import { Event, Filter, Relay, Sub, relayInit } from "nostr-tools";
 import { Nip65RelayList, RelayEvent } from "./type-defs";
 import { NostrDMWatcherDoctor } from "./nostrDMWatcherDoctor";
-import { OPEN } from "ws";
+import { OPEN, WebSocket } from "ws";
 import { RelayClientEvent } from "../nostr/agents/relay-client";
 
-// class RelayHealth {
-//     startedAt = new Date();
-//     connects :Date[] = []
-//     disconnects: Date[] = [];
-//     failedConnects:
-
-//     constructor(public relayUrl: string){}
-// }
+export type NostrDMWatcherRelayInfo = {
+    url: string;
+    status: string;
+    watchedPubkeys: string[];
+};
 
 export class NostrDMWatcher {
     #onDMCb!: (event: Event) => void | Promise<void>;
@@ -36,6 +33,25 @@ export class NostrDMWatcher {
     debug(on: boolean) {
         this.#isDebugOn = on;
         this.#doctor.setDebug(on);
+    }
+
+    getRelayInfos(): NostrDMWatcherRelayInfo[] {
+        const infos: NostrDMWatcherRelayInfo[] = [];
+
+        for (const relay of this.#relays) {
+            const watchedPubkeys = this.#relayPubkeys.get(relay[0]);
+            const status = this.#getRelayStatus(relay[1]);
+            infos.push({
+                url: relay[0],
+                status,
+                watchedPubkeys:
+                    typeof watchedPubkeys === "undefined"
+                        ? []
+                        : Array.from(watchedPubkeys),
+            });
+        }
+
+        return infos;
     }
 
     /** For testing purposes only. */
@@ -344,6 +360,25 @@ export class NostrDMWatcher {
             return;
         }
         console.log(`NostrDMWatcher : ${text}`);
+    }
+
+    #getRelayStatus(relay: Relay): string {
+        switch (relay.status) {
+            case WebSocket.CONNECTING:
+                return "CONNECTING";
+
+            case WebSocket.OPEN:
+                return "OPEN";
+
+            case WebSocket.CLOSING:
+                return "CLOSING";
+
+            case WebSocket.CLOSED:
+                return "CLOSED";
+
+            default:
+                return "UNKNOWN";
+        }
     }
 }
 

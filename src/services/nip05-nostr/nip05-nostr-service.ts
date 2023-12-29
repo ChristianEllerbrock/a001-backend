@@ -48,7 +48,7 @@ export class Nip05NostrService {
     // #endregion Singleton
 
     #relayPubkeys = new Map<string, Set<string>>();
-    #dmWatcher: NostrDMWatcher;
+    public dmWatcher: NostrDMWatcher;
 
     /**
      * Store all event ids from incoming DMs that were processed or
@@ -58,7 +58,7 @@ export class Nip05NostrService {
     #dmEventIds = new Map<string, Date>();
 
     constructor() {
-        this.#dmWatcher = new NostrDMWatcher();
+        this.dmWatcher = new NostrDMWatcher();
     }
 
     async start() {
@@ -67,12 +67,12 @@ export class Nip05NostrService {
 
     async watchForDMs(toPubkey: string, onRelays: string[]) {
         for (const relay of onRelays) {
-            await this.#dmWatcher.watch([relay, new Set<string>([toPubkey])]);
+            await this.dmWatcher.watch([relay, new Set<string>([toPubkey])]);
         }
     }
 
     killRandomRelayConnection() {
-        this.#dmWatcher.killRandomRelayConnection();
+        this.dmWatcher.killRandomRelayConnection();
     }
 
     async sendDMFromBot(
@@ -113,11 +113,11 @@ export class Nip05NostrService {
         const event = await connector.generateDM(text, receiverPubkey);
 
         // B) Publish DM event to all relevant relays.
-        return await this.#dmWatcher.publishEvent(event, publishOnRelays);
+        return await this.dmWatcher.publishEvent(event, publishOnRelays);
     }
 
     async publishEvent(event: Event, toRelays: string[]): Promise<string[]> {
-        return await this.#dmWatcher.publishEvent(event, toRelays);
+        return await this.dmWatcher.publishEvent(event, toRelays);
     }
 
     async includeNip65Relays(
@@ -128,7 +128,7 @@ export class Nip05NostrService {
             return [];
         }
 
-        const relayLists = await this.#dmWatcher.fetchNip65RelayLists(
+        const relayLists = await this.dmWatcher.fetchNip65RelayLists(
             pubkey,
             initialRelays
         );
@@ -208,11 +208,11 @@ export class Nip05NostrService {
             }
         }
 
-        this.#dmWatcher.onDM(this.#onDMEvent.bind(this));
+        this.dmWatcher.onDM(this.#onDMEvent.bind(this));
 
         for (const data of this.#relayPubkeys) {
             try {
-                await this.#dmWatcher.watch([data[0], data[1]]);
+                await this.dmWatcher.watch([data[0], data[1]]);
             } catch (error) {
                 // TODO
             }
