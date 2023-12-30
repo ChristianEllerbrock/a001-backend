@@ -3,11 +3,16 @@ import { Nip65RelayList, RelayEvent } from "./type-defs";
 import { NostrDMWatcherDoctor } from "./nostrDMWatcherDoctor";
 import { OPEN, WebSocket } from "ws";
 import { RelayClientEvent } from "../nostr/agents/relay-client";
+import { DateTime } from "luxon";
+import "../nostr-v4/arrayExtensions";
 
 export type NostrDMWatcherRelayInfo = {
     url: string;
     status: string;
     watchedPubkeys: string[];
+    noOfDisconnects: number;
+    averageTimeBetweenDisconnects: string;
+    averageUptime: string;
 };
 
 export class NostrDMWatcher {
@@ -23,7 +28,7 @@ export class NostrDMWatcher {
     #relayCallbacksCONNECT = new Map<string, () => void>();
     #relayCallbacksNOTICE = new Map<string, (msg: string) => void>();
 
-    #doctor = new NostrDMWatcherDoctor(this.#isDebugOn);
+    public doctor = new NostrDMWatcherDoctor(this.#isDebugOn);
 
     onDM(cb: (event: Event) => void | Promise<void>) {
         this.#onDMCb = cb;
@@ -32,15 +37,31 @@ export class NostrDMWatcher {
 
     debug(on: boolean) {
         this.#isDebugOn = on;
-        this.#doctor.setDebug(on);
+        this.doctor.setDebug(on);
     }
 
     getRelayInfos(): NostrDMWatcherRelayInfo[] {
         const infos: NostrDMWatcherRelayInfo[] = [];
 
+        const relayPatients = this.doctor.getPatientInfos();
+
         for (const relay of this.#relays) {
             const watchedPubkeys = this.#relayPubkeys.get(relay[0]);
             const status = this.#getRelayStatus(relay[1]);
+            let averageTimeBetweenDisconnects = "-";
+            let averageUptime = "-";
+            const relayPatient = relayPatients.get(relay[0]);
+            if (relayPatient) {
+                // Calculate averageTimeBetweenDisconnects
+                averageTimeBetweenDisconnects =
+                    this.#calculateAverageTimeBetween(
+                        relayPatient.timesBetweenDisconnects
+                    );
+                averageUptime = this.#calculateAverageTime(
+                    relayPatient.uptimesInSeconds
+                );
+            }
+
             infos.push({
                 url: relay[0],
                 status,
@@ -48,6 +69,9 @@ export class NostrDMWatcher {
                     typeof watchedPubkeys === "undefined"
                         ? []
                         : Array.from(watchedPubkeys),
+                noOfDisconnects: relayPatient?.noOfDisconnects ?? 0,
+                averageTimeBetweenDisconnects,
+                averageUptime,
             });
         }
 
@@ -257,7 +281,7 @@ export class NostrDMWatcher {
                 this.#log(
                     `DISCONNECT received on relay '${relay.url}'. Cure relay.`
                 );
-                this.#doctor.cure(relay, () => {
+                this.doctor.cure(relay, () => {
                     this.#subscribeOnRelay(relay);
                 });
             };
@@ -379,6 +403,50 @@ export class NostrDMWatcher {
             default:
                 return "UNKNOWN";
         }
+    }
+
+    #calculateAverageTimeBetween(times: Date[]): string {
+        if (times.length < 2) {
+            return "-";
+        }
+
+        const sortedTimes = times.sortBy((x) => x.getTime(), "asc");
+        const timeBetweenInSeconds: number[] = [];
+
+        let lastTime: Date | undefined;
+        for (const time of sortedTimes) {
+            if (typeof lastTime === "undefined") {
+                lastTime = time;
+                continue;
+            }
+
+            const diff = DateTime.fromJSDate(time)
+                .diff(DateTime.fromJSDate(lastTime), "seconds")
+                .toObject().seconds;
+            if (diff) {
+                timeBetweenInSeconds.push(diff);
+            }
+        }
+
+        return this.#calculateAverageTime(timeBetweenInSeconds);
+    }
+
+    #calculateAverageTime(seconds: number[]): string {
+        const averageTimeInSeconds = seconds.sum((x) => x) / seconds.length;
+
+        if (averageTimeInSeconds <= 60) {
+            return averageTimeInSeconds.toFixed(2) + " seconds";
+        }
+
+        if (averageTimeInSeconds <= 60 * 60) {
+            return (averageTimeInSeconds / 60).toFixed(2) + " minutes";
+        }
+
+        if (averageTimeInSeconds <= 60 * 60 * 24) {
+            return (averageTimeInSeconds / (60 * 60)).toFixed(2) + " hours";
+        }
+
+        return (averageTimeInSeconds / (60 * 60 * 24)).toFixed(2) + " days";
     }
 }
 

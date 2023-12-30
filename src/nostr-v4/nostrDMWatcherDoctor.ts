@@ -1,9 +1,11 @@
+import { DateTime } from "luxon";
 import { Relay } from "nostr-tools";
 import { OPEN } from "ws";
 
 class RelayPatient {
     hospitalized: Date[] = [];
     recovered: Date[] = [];
+    uptimeInSeconds: number[] = [];
     overallNoOfTherapies = 0;
     noOfTherapiesInARow = 0;
 
@@ -16,7 +18,6 @@ class RelayPatient {
         curedCallback: () => void,
         debug: boolean | undefined = false
     ) {
-        this.hospitalized.push(new Date());
         this.#debug = debug;
         this.#curedCallback = curedCallback;
     }
@@ -33,6 +34,20 @@ class RelayPatient {
 
         this.overallNoOfTherapies++;
         this.noOfTherapiesInARow++;
+
+        const now = new Date();
+        this.hospitalized.push(now);
+        const lastRecovered = this.recovered
+            .sortBy((x) => x.getTime(), "desc")
+            .find((x) => x.getTime() < now.getTime());
+        if (lastRecovered) {
+            const uptimeInSeconds = DateTime.fromJSDate(now)
+                .diff(DateTime.fromJSDate(lastRecovered), "seconds")
+                .toObject().seconds;
+            if (uptimeInSeconds) {
+                this.uptimeInSeconds.push(uptimeInSeconds);
+            }
+        }
 
         this.#log(
             `Doctor is starting ${this.overallNoOfTherapies}. therapy (${this.noOfTherapiesInARow} in a row) on patient '${this.relay.url}'`
@@ -101,6 +116,12 @@ class RelayPatient {
     }
 }
 
+export type NostrDMWatcherDoctorPatientInfo = {
+    noOfDisconnects: number;
+    timesBetweenDisconnects: Date[];
+    uptimesInSeconds: number[];
+};
+
 export class NostrDMWatcherDoctor {
     #relayPatients = new Map<string, RelayPatient>();
 
@@ -125,6 +146,18 @@ export class NostrDMWatcherDoctor {
         }
 
         relayPatient.startTherapy();
+    }
+
+    getPatientInfos(): Map<string, NostrDMWatcherDoctorPatientInfo> {
+        const infos = new Map<string, NostrDMWatcherDoctorPatientInfo>();
+        for (const patient of this.#relayPatients.values()) {
+            infos.set(patient.relay.url, {
+                noOfDisconnects: patient.overallNoOfTherapies,
+                timesBetweenDisconnects: patient.hospitalized,
+                uptimesInSeconds: patient.uptimeInSeconds,
+            });
+        }
+        return infos;
     }
 
     setDebug(debug: boolean) {
