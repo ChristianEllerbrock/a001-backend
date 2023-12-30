@@ -195,6 +195,12 @@ export class Nip05NostrService {
         for (const dbSystemUser of dbSystemUsers) {
             pubkeys.add(dbSystemUser.pubkey);
 
+            // Add to all already set up relays.
+            for (const relayPubkeys of this.#relayPubkeys.values()) {
+                relayPubkeys.add(dbSystemUser.pubkey);
+            }
+
+            // Add to all configured relays in the database (might be some new).
             for (const dbSystemUserRelay of dbSystemUser.systemUserRelays) {
                 const record = this.#relayPubkeys.get(dbSystemUserRelay.url);
                 if (typeof record === "undefined") {

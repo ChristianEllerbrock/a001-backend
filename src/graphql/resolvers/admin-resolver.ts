@@ -55,7 +55,17 @@ export class AdminResolver {
             throw new Error("Unauthorized.");
         }
 
-        return Nip05NostrService.instance.dmWatcher.getRelayInfos();
+        const relayInfos = Nip05NostrService.instance.dmWatcher.getRelayInfos();
+        return relayInfos.map((x) => {
+            return {
+                url: x.url,
+                status: x.status,
+                noOfWatchedPubkeys: x.watchedPubkeys.length,
+                noOfDisconnects: x.noOfDisconnects,
+                averageTimeBetweenDisconnects: x.averageTimeBetweenDisconnects,
+                averageUptime: x.averageUptime,
+            };
+        });
     }
 }
 
