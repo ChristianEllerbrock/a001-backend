@@ -6,10 +6,10 @@ import { sleep } from "../../helpers/sleep";
 import { DateTime } from "luxon";
 
 const log = function (text: string | object) {
-    console.log(`CHECK SUBSCRIPTIONS - [controller] - ${JSON.stringify(text)}`);
+    console.log(`[controller] - CHECK SUBSCRIPTIONS - ${JSON.stringify(text)}`);
 };
 
-export async function checkSubscriptions(
+export async function checkSubscriptionsController(
     req: Request,
     res: Response,
     next: NextFunction
@@ -92,7 +92,10 @@ const runCheckSubscriptions = async function () {
         });
 
         // Notify user about expiration.
-        const relevantUserRelays = await determineRelevantRelays(user.id);
+        const relevantUserRelays = await determineRelevantRelays(
+            user.id,
+            user.pubkey
+        );
         await Nip05NostrService.instance.sendDMFromBot(
             user.pubkey,
             relevantUserRelays,
@@ -164,7 +167,10 @@ const runCheckSubscriptions = async function () {
             }
 
             log(`Notify account '${user.pubkey}': 14 days remaining.`);
-            const relevantUserRelays = await determineRelevantRelays(user.id);
+            const relevantUserRelays = await determineRelevantRelays(
+                user.id,
+                user.pubkey
+            );
             await Nip05NostrService.instance.sendDMFromBot(
                 user.pubkey,
                 relevantUserRelays,
@@ -189,7 +195,10 @@ const runCheckSubscriptions = async function () {
             }
 
             log(`Notify account '${user.pubkey}': 7 days remaining.`);
-            const relevantUserRelays = await determineRelevantRelays(user.id);
+            const relevantUserRelays = await determineRelevantRelays(
+                user.id,
+                user.pubkey
+            );
             await Nip05NostrService.instance.sendDMFromBot(
                 user.pubkey,
                 relevantUserRelays,
@@ -213,7 +222,10 @@ const runCheckSubscriptions = async function () {
             }
 
             log(`Notify account '${user.pubkey}': 3 days remaining.`);
-            const relevantUserRelays = await determineRelevantRelays(user.id);
+            const relevantUserRelays = await determineRelevantRelays(
+                user.id,
+                user.pubkey
+            );
 
             try {
                 const publishedRelays =
@@ -239,7 +251,10 @@ const runCheckSubscriptions = async function () {
             }
 
             log(`Notify account '${user.pubkey}': 1 day remaining.`);
-            const relevantUserRelays = await determineRelevantRelays(user.id);
+            const relevantUserRelays = await determineRelevantRelays(
+                user.id,
+                user.pubkey
+            );
 
             try {
                 const publishedRelays =
@@ -264,7 +279,8 @@ const runCheckSubscriptions = async function () {
 };
 
 const determineRelevantRelays = async function (
-    userId: string
+    userId: string,
+    pubkey: string
 ): Promise<string[]> {
     const relays = new Set<string>();
 
@@ -279,6 +295,9 @@ const determineRelevantRelays = async function (
             .forEach((y) => relays.add(y));
     }
 
-    return Array.from(relays);
+    return await Nip05NostrService.instance.includeNip65Relays(
+        pubkey,
+        Array.from(relays)
+    );
 };
 

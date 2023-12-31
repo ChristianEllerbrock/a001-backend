@@ -14,7 +14,6 @@ export class UserResolverRelations {
         return NostrHelperV2.pubkey2npub(user.pubkey);
     }
 
-    @Authorized()
     @FieldResolver((returns) => [RegistrationOutput])
     async registrations(
         @Root() user: UserOutput,

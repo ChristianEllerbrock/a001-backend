@@ -25,7 +25,9 @@ import multer from "multer";
 import { Nip05NostrService } from "./services/nip05-nostr/nip05-nostr-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
-import { checkSubscriptions } from "./controllers/cron/check-subscriptions-controller";
+import { checkSubscriptionsController } from "./controllers/cron/check-subscriptions-controller";
+import { paymentInController } from "./controllers/alby/payment-in-controller";
+import { checkUnsettledInvoicesController } from "./controllers/cron/check-unsettled-invoices-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -91,7 +93,11 @@ app.get("/admin/update-email-about/:email", adminUpdateEmailAboutController);
 app.get("/admin/publish-system-user/:id", publishSystemUserController);
 
 // Cron controllers
-app.get("/cron/check-subscriptions", checkSubscriptions);
+app.get("/cron/check-subscriptions", checkSubscriptionsController);
+app.get("/cron/check-unsettled-invoices", checkUnsettledInvoicesController);
+
+// Alby controllers
+app.post("/alby/payment-in", paymentInController);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);

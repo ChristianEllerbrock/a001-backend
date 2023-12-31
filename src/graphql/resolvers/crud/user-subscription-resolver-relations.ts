@@ -7,29 +7,15 @@ import { GraphqlContext } from "../../type-defs";
 
 @Resolver((of) => UserSubscriptionOutput)
 export class UserSubscriptionResolverRelations {
-    //@Authorized()
-    // @FieldResolver((returns) => UserOutput)
-    // async user(
-    //     @Root() userSubscription: UserSubscriptionOutput,
-    //     @Ctx() context: GraphqlContext
-    // ): Promise<UserOutput> {
-    //     const dbObject = await context.db.user.findUnique({
-    //         where: { id: userSubscription.userId },
-    //     });
-
-    //     if (!dbObject) {
-    //         throw new Error("Could not find user relations.");
-    //     }
-
-    //     return dbObject;
-    // }
-
-    //@Authorized()
     @FieldResolver((returns) => SubscriptionOutput)
     async oldSubscription(
         @Root() userSubscription: UserSubscriptionOutput,
         @Ctx() context: GraphqlContext
     ): Promise<SubscriptionOutput> {
+        if (userSubscription.userId !== context.user?.userId) {
+            throw new Error("Unauthorized.");
+        }
+
         const dbObject = await context.db.subscription.findUnique({
             where: { id: userSubscription.oldSubscriptionId },
         });
@@ -41,12 +27,15 @@ export class UserSubscriptionResolverRelations {
         return dbObject;
     }
 
-    //@Authorized()
     @FieldResolver((returns) => SubscriptionOutput)
     async newSubscription(
         @Root() userSubscription: UserSubscriptionOutput,
         @Ctx() context: GraphqlContext
     ): Promise<SubscriptionOutput> {
+        if (userSubscription.userId !== context.user?.userId) {
+            throw new Error("Unauthorized.");
+        }
+
         const dbObject = await context.db.subscription.findUnique({
             where: { id: userSubscription.newSubscriptionId },
         });
@@ -58,7 +47,6 @@ export class UserSubscriptionResolverRelations {
         return dbObject;
     }
 
-    @Authorized()
     @FieldResolver((returns) => UserSubscriptionInvoiceOutput, {
         nullable: true,
     })
@@ -66,6 +54,10 @@ export class UserSubscriptionResolverRelations {
         @Root() userSubscription: UserSubscriptionOutput,
         @Ctx() context: GraphqlContext
     ): Promise<UserSubscriptionInvoiceOutput | null> {
+        if (userSubscription.userId !== context.user?.userId) {
+            throw new Error("Unauthorized.");
+        }
+
         return await context.db.userSubscriptionInvoice.findUnique({
             where: { userSubscriptionId: userSubscription.id },
         });

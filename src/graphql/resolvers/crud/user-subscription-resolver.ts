@@ -247,7 +247,7 @@ export class UserSubscriptionResolver {
                     );
 
                     // 2. Create the Alby invoice.
-                    const invoiceDescription = "NIP05.social subscription";
+                    const invoiceDescription = "NIP05.social Subscription";
                     const albyInvoice =
                         await AlbyService.instance.createInvoice(
                             dbUserSubscription.id,
