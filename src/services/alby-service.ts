@@ -15,6 +15,16 @@ type AlbyCreateInvoiceBody = {
     metadata: AlbyInvoiceMetadata;
 };
 
+export type AlbyWebhookPaymentIn = {
+    amount: number;
+    payment_hash: string;
+    payment_request: string;
+    metadata: AlbyInvoiceMetadata | null;
+    settled: boolean | null;
+    state: string;
+    settled_at: string | null;
+};
+
 type AlbyInvoiceMetadata = {
     userSubscriptionId: number;
     environment: "dev" | "pro";
@@ -49,8 +59,6 @@ export class AlbyService {
             body.description = description;
         }
 
-        // TODO
-
         const result = await axios.post<AlbyCreateInvoice>(url, body, {
             headers: {
                 Authorization:
@@ -58,7 +66,22 @@ export class AlbyService {
             },
         });
 
-        console.log(result.data);
+        if (result.data) {
+            return result.data;
+        }
+
+        throw new Error(result.statusText);
+    }
+
+    async queryInvoice(paymentHash: string): Promise<AlbyWebhookPaymentIn> {
+        const url = "https://api.getalby.com/invoices/" + paymentHash;
+
+        const result = await axios.get<AlbyWebhookPaymentIn>(url, {
+            headers: {
+                Authorization:
+                    "Bearer " + EnvService.instance.env.ALBY_ACCESS_TOKEN,
+            },
+        });
 
         if (result.data) {
             return result.data;

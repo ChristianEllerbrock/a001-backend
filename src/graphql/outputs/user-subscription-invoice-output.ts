@@ -39,7 +39,7 @@ export class UserSubscriptionInvoiceOutput {
     @Field((type) => UserSubscriptionOutput)
     userSubscription?: UserSubscriptionOutput;
 
-    @Field((type) => UserSubscriptionInvoicePaymentOutput)
-    userSubscriptionInvoicePayment?: UserSubscriptionInvoicePaymentOutput;
+    @Field((type) => UserSubscriptionInvoicePaymentOutput, { nullable: true })
+    userSubscriptionInvoicePayment?: UserSubscriptionInvoicePaymentOutput | null;
 }
 
