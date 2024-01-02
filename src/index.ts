@@ -54,28 +54,16 @@ app.get("/", (req, res, next) => {
     // req.hostname could be:
     // www.nip05.social
     // nip05.social
-    // dev.nip05.social
     // www.protonostr.com
     // protonostr.com
-    // dev.protonostr.com
     // localhost
     // ...
-    if (req.hostname.includes("wwww.")) {
-        appUrl = `${req.protocol}://${req.hostname.replace("wwww.", "app.")}`;
-    } else if (req.hostname.includes("dev.")) {
-        appUrl = `${req.protocol}://${req.hostname.replace(
-            "dev.",
-            "dev.app."
-        )}`;
-    } else if (req.hostname.includes("localhost")) {
+    if (req.hostname.includes("localhost")) {
         res.send("You are on localhost. No forwarding to any app location.");
         return;
-    } else {
-        appUrl = `${req.protocol}://${"app." + req.hostname}`;
     }
-    console.log(appUrl);
 
-    res.redirect(appUrl);
+    res.redirect("https://app.nip05.social");
 });
 app.get("/report-fraud/:userId/:fraudId", reportFraudController);
 app.get("/confirm-fraud/:userId/:fraudId", confirmFraudController);

@@ -20,7 +20,7 @@ const seed = async function (prisma: PrismaClient) {
     await prisma.subscription.upsert({
         where: { id: 2 },
         update: {
-            name: "PRO",
+            name: "ADVANCED",
         },
         create: {
             id: 2,
@@ -35,7 +35,7 @@ const seed = async function (prisma: PrismaClient) {
     await prisma.subscription.upsert({
         where: { id: 3 },
         update: {
-            name: "ADVANCED",
+            name: "PRO",
         },
         create: {
             id: 3,
