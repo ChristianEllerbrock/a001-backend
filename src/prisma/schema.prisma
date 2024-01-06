@@ -406,3 +406,11 @@ model Subscription {
     userOldSubscriptions           UserSubscription[] @relation(name: "old")
     userNewSubscriptions           UserSubscription[] @relation(name: "new")
 }
+
+model PublicRelay {
+    id        Int      @id @default(autoincrement())
+    url       String
+    isActive  Boolean
+    createdAt DateTime
+    notes     String?
+}
