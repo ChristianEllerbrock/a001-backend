@@ -29,6 +29,9 @@ export class UserSubscriptionOutput {
     @Field((type) => Date, { nullable: true })
     newSubscriptionEnd!: Date | null;
 
+    @Field((type) => String, { nullable: true })
+    info!: string | null;
+
     // Relations
     @Field((type) => UserOutput)
     user?: UserOutput;
