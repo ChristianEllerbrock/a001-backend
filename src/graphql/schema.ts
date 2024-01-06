@@ -19,6 +19,7 @@ import { SubscriptionCalcResolver } from "./resolvers/crud/subscription-calc-res
 import { UserSubscriptionResolver } from "./resolvers/crud/user-subscription-resolver";
 import { UserSubscriptionResolverRelations } from "./resolvers/crud/user-subscription-resolver-relations";
 import { UserSubscriptionInvoiceResolverRelations } from "./resolvers/crud/user-subscription-invoice-resolver-relations";
+import { PublicRelayResolver } from "./resolvers/crud/public-relay-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -46,6 +47,7 @@ export const schemaOptions: BuildSchemaOptions = {
         UserSubscriptionResolver,
         UserSubscriptionResolverRelations,
         UserSubscriptionInvoiceResolverRelations,
+        PublicRelayResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },

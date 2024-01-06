@@ -8,6 +8,10 @@ import { SystemConfigId } from "../prisma/assortments";
 import { UserTokenOutput } from "./outputs/user-token-output";
 import { Request } from "express";
 
+export enum Role {
+    Admin = "Admin",
+}
+
 export interface GraphqlContext {
     db: PrismaClient;
     req: {
@@ -125,12 +129,22 @@ export const customAuthChecker: AuthChecker<GraphqlContext> = async (
     { root, args, context, info },
     roles
 ) => {
-    // Currently, only check if the context user object has a valid token.
+    // Check if the context user object has a valid token.
     if (!context.user) {
         return false;
     }
 
-    return await context.user.hasValidTokenAsync();
+    const hasValidToken = await context.user.hasValidTokenAsync();
+    if (!hasValidToken) {
+        return false;
+    }
+
+    if (roles.empty()) {
+        return true;
+    }
+
+    // We have roles. Currently only Role.Admin (i.e. SystemUser in the database).
+    return await context.user.isSystemUser();
 };
 
 export const getOrCreateUserInDatabaseAsync = async (
