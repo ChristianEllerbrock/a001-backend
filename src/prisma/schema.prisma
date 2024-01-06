@@ -43,6 +43,7 @@ model UserSubscription {
     expirationReminder7  DateTime?
     expirationReminder3  DateTime?
     expirationReminder1  DateTime?
+    info                 String?
 
     userSubscriptionInvoice UserSubscriptionInvoice?
     user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
