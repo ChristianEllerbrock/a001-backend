@@ -414,3 +414,24 @@ model PublicRelay {
     createdAt DateTime
     notes     String?
 }
+
+model BotMetadata {
+    id        Int      @id @default(autoincrement())
+    createdAt DateTime
+    nip05     String
+    name      String
+    about     String?
+    picture   String?
+    banner    String?
+
+    botMetadataRelays BotMetadataRelay[]
+}
+
+model BotMetadataRelay {
+    id            Int      @id @default(autoincrement())
+    botMetadataId Int
+    publishedAt   DateTime
+    url           String
+
+    botMetadata BotMetadata @relation(fields: [botMetadataId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
