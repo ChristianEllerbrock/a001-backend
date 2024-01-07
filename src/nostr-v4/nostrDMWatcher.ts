@@ -154,6 +154,8 @@ export class NostrDMWatcher {
         for (const result of promiseResults) {
             if (result.status === "fulfilled") {
                 publishedOn.push(result.value);
+            } else {
+                console.log(result.reason);
             }
         }
 
@@ -168,7 +170,9 @@ export class NostrDMWatcher {
                     resolve(relay.url);
                 })
                 .catch((error) => {
-                    reject(error);
+                    reject(
+                        `[NostrDMWatcher] - Publish Error (Kind ${event.kind}) : ${relay.url} - ${error}`
+                    );
                 });
         });
     }

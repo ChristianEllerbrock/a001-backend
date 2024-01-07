@@ -44,6 +44,7 @@ import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrat
 import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
 import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
 import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46RedeemInputArgs";
+import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -142,7 +143,7 @@ export class RegistrationResolver {
         const dbRegistration =
             await PrismaService.instance.db.registration.findFirst({
                 where: { id: args.registrationId, userId: args.userId },
-                include: { registrationCode: true },
+                include: { registrationCode: true, user: true },
             });
 
         if (!dbRegistration) {
@@ -157,12 +158,14 @@ export class RegistrationResolver {
 
         // Code matches. Finalize registration.
         const now = DateTime.now();
-        await PrismaService.instance.db.registration.update({
-            where: { id: dbRegistration.id },
-            data: {
-                verifiedAt: now.toJSDate(),
-            },
-        });
+        const updatedDbRegistration =
+            await PrismaService.instance.db.registration.update({
+                where: { id: dbRegistration.id },
+                data: {
+                    verifiedAt: now.toJSDate(),
+                },
+                include: { systemDomain: true },
+            });
 
         await PrismaService.instance.db.registrationCode.delete({
             where: { id: dbRegistration.registrationCode.id },
@@ -199,6 +202,26 @@ export class RegistrationResolver {
                     .plus({ minute: userTokenValidityInMinutes })
                     .toJSDate(),
             },
+        });
+
+        // Notify user about successful registration.
+        new Promise(async (resolve, reject) => {
+            const nip05 = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const message =
+                `Thank you for registering ${nip05} as Nostr address.` +
+                " \n\nVisit your account section to enable Lightning Address and Email Forwarding" +
+                " or just to see some statistics about your Nostr address usage." +
+                " \n\nhttps://nip05.social";
+
+            const relays =
+                await Nip05NostrService.instance.getRelevantAccountRelays(
+                    dbRegistration.user.pubkey
+                );
+            await Nip05NostrService.instance
+                .sendDMFromBot(dbRegistration.user.pubkey, relays, message)
+                .then((relays) => {
+                    console.log(relays);
+                });
         });
 
         return dbUserToken;
@@ -575,12 +598,14 @@ export class RegistrationResolver {
         }
 
         // Everything checks out. Finalize registration.
-        await PrismaService.instance.db.registration.update({
-            where: { id: dbRegistration.id },
-            data: {
-                verifiedAt: now.toJSDate(),
-            },
-        });
+        const updatedDbRegistration =
+            await PrismaService.instance.db.registration.update({
+                where: { id: dbRegistration.id },
+                data: {
+                    verifiedAt: now.toJSDate(),
+                },
+                include: { systemDomain: true },
+            });
 
         await PrismaService.instance.db.registrationNip07Code.delete({
             where: { id: dbRegistration.registrationNip07Code.id },
@@ -617,6 +642,26 @@ export class RegistrationResolver {
                     .plus({ minute: userTokenValidityInMinutes })
                     .toJSDate(),
             },
+        });
+
+        // Notify user about successful registration.
+        new Promise(async (resolve, reject) => {
+            const nip05 = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const message =
+                `Thank you for registering ${nip05} as Nostr address.` +
+                " \n\nVisit your account section to enable Lightning Address and Email Forwarding" +
+                " or just to see some statistics about your Nostr address usage." +
+                " \n\nhttps://nip05.social";
+
+            const relays =
+                await Nip05NostrService.instance.getRelevantAccountRelays(
+                    dbRegistration.user.pubkey
+                );
+            await Nip05NostrService.instance
+                .sendDMFromBot(dbRegistration.user.pubkey, relays, message)
+                .then((relays) => {
+                    console.log(relays);
+                });
         });
 
         return dbUserToken;

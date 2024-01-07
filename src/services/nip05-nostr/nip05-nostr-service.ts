@@ -120,6 +120,45 @@ export class Nip05NostrService {
         return await this.dmWatcher.publishEvent(event, toRelays);
     }
 
+    /**
+     * This methods returns all relays that the user has configured for any
+     * of his registrations plus all public relays configured in the database
+     * plus all user configured NIP65 relays on any of these.
+     */
+    async getRelevantAccountRelays(pubkey: string): Promise<string[]> {
+        const dbUser = await PrismaService.instance.db.user.findFirst({
+            where: { pubkey },
+            include: {
+                registrations: {
+                    include: { registrationRelays: true },
+                },
+            },
+        });
+
+        if (!dbUser) {
+            return []; // No user account available.
+        }
+
+        const registrationRelays = dbUser.registrations
+            .map((x) => x.registrationRelays.map((y) => y.address))
+            .flat();
+        const dbPublicRelays = (
+            await PrismaService.instance.db.publicRelay.findMany({
+                where: { isActive: true },
+                select: { url: true },
+            })
+        ).map((x) => x.url);
+
+        const databaseRelays = Array.from(
+            new Set<string>([...registrationRelays, ...dbPublicRelays])
+        );
+        const relevantRelays = await this.includeNip65Relays(
+            pubkey,
+            databaseRelays
+        );
+        return relevantRelays;
+    }
+
     async includeNip65Relays(
         pubkey: string,
         initialRelays: string[]
