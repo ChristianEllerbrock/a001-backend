@@ -1,13 +1,13 @@
 import { Authorized, Ctx, FieldResolver, Resolver, Root } from "type-graphql";
-import { RegistrationOutput } from "../outputs/registration-output";
-import { UserOutput } from "../outputs/user-output";
-import { GraphqlContext } from "../type-defs";
-import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
-import { SubscriptionOutput } from "../outputs/subscriptionOutput";
-import { UserSubscriptionOutput } from "../outputs/user-subscription-output";
+import { RegistrationOutput } from "../../outputs/registration-output";
+import { UserOutput } from "../../outputs/user-output";
+import { GraphqlContext } from "../../type-defs";
+import { NostrHelperV2 } from "../../../nostr/nostr-helper-2";
+import { SubscriptionOutput } from "../../outputs/subscriptionOutput";
+import { UserSubscriptionOutput } from "../../outputs/user-subscription-output";
 
 @Resolver((of) => UserOutput)
-export class UserResolverRelations {
+export class UserRelationResolver {
     @Authorized()
     @FieldResolver((returns) => String)
     npub(@Root() user: UserOutput): string {

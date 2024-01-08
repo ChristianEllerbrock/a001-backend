@@ -63,6 +63,38 @@ const cleanupExpiredRegistrationsAsync = async () => {
 export class RegistrationResolver {
     // #region Queries
 
+    // @Authorized() // IMPORTANT: MUST NOT HAVE @Authorized attribute
+    @Query((returns) => [RegistrationOutput], { nullable: true })
+    async myRegistrations(
+        @Ctx() context: GraphqlContext
+    ): Promise<RegistrationOutput[] | null> {
+        if (!context.user) {
+            return null;
+        }
+
+        const isAuthenticated = await context.user.hasValidTokenAsync();
+
+        if (!isAuthenticated) {
+            return null;
+        }
+
+        const dbRegistrations = await context.db.registration.findMany({
+            where: {
+                userId: context.user.userId,
+                verifiedAt: {
+                    not: null,
+                },
+            },
+            include: {
+                systemDomain: true,
+            },
+        });
+
+        return dbRegistrations.sortBy(
+            (x) => x.systemDomain.name + x.identifier
+        );
+    }
+
     @Query((returns) => IdentifierRegisterCheckOutput)
     async isRegistrationAvailable(
         @Ctx() context: GraphqlContext,

@@ -5,8 +5,8 @@ import { LoginResolver } from "./resolvers/crud/login-resolver";
 import { RegistrationRelayResolver } from "./resolvers/crud/registration-relay-resolver";
 import { RegistrationResolver } from "./resolvers/crud/registration-resolver";
 import { RegistrationResolverRelations } from "./resolvers/registration-resolver-relations";
-import { UserRelatedResolver } from "./resolvers/user-related-resolver";
-import { UserResolverRelations } from "./resolvers/user-resolver-relations";
+import { UserResolver } from "./resolvers/crud/user-resolver";
+import { UserRelationResolver } from "./resolvers/crud/user-relation-resolver";
 import { customAuthChecker } from "./type-defs";
 import { SystemResolver } from "./resolvers/crud/system-resolver";
 import { StatisticsResolver } from "./resolvers/crud/statistics-resolver";
@@ -28,8 +28,8 @@ export const schemaOptions: BuildSchemaOptions = {
         AdminResolver,
         AuthResolver,
         LoginResolver,
-        UserResolverRelations,
-        UserRelatedResolver,
+        UserRelationResolver,
+        UserResolver,
         RegistrationResolver,
         RegistrationResolverRelations,
         RegistrationRelayResolver,
