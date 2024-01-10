@@ -29,6 +29,7 @@ import { checkSubscriptionsController } from "./controllers/cron/check-subscript
 import { paymentInController } from "./controllers/alby/payment-in-controller";
 import { checkUnsettledInvoicesController } from "./controllers/cron/check-unsettled-invoices-controller";
 import { genKeyPairController } from "./controllers/tools/gen-key-pair";
+import { checkLastSeenNip05Controller } from "./controllers/cron/check-last-seen-nip05-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -84,6 +85,7 @@ app.get("/admin/publish-system-user/:id", publishSystemUserController);
 // Cron controllers
 app.get("/cron/check-subscriptions", checkSubscriptionsController);
 app.get("/cron/check-unsettled-invoices", checkUnsettledInvoicesController);
+app.get("/cron/check-last-seen-nip05", checkLastSeenNip05Controller);
 
 app.get("/tools/gen-key-pair", genKeyPairController);
 
