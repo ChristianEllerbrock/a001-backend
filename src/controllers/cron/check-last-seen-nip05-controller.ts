@@ -42,8 +42,9 @@ const checkLastSeenNip05 = async function () {
         },
     });
 
+    let i = 1;
     for (const dbUser of dbUsers) {
-        sleep(2000); // To not stress the relays
+        sleep(1000); // To not stress the relays
         const lastSeenString =
             dbUser.lastSeenNip05 && dbUser.lastSeenNip05At
                 ? `, last seen as ${
@@ -51,14 +52,24 @@ const checkLastSeenNip05 = async function () {
                   } at ${dbUser.lastSeenNip05At.toISOString()}`
                 : ``;
 
-        log(`Checking '${dbUser.pubkey}'${lastSeenString}`);
+        log(
+            `Checking ${i++}/${dbUsers.length} '${
+                dbUser.pubkey
+            }'${lastSeenString}`
+        );
 
         try {
-            const relevantRelays =
+            let relevantRelays =
                 await Nip05NostrService.instance.getRelevantAccountRelays(
                     dbUser.pubkey
                 );
             log(`On ${relevantRelays.length} relays`);
+
+            if (relevantRelays.length > 30) {
+                log(`Limiting relays to 30`);
+                relevantRelays = relevantRelays.slice(0, 30);
+            }
+
             const event =
                 await Nip05NostrService.instance.dmWatcher.fetchReplaceableEvent(
                     dbUser.pubkey,
@@ -91,6 +102,7 @@ const checkLastSeenNip05 = async function () {
                     data: {
                         lastSeenNip05: nip05,
                         lastSeenNip05At: new Date(event.created_at * 1000),
+                        lastSeenNip05Event: JSON.stringify(event),
                     },
                 });
             } else {
