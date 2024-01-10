@@ -17,6 +17,8 @@ model User {
     isSystemAgent   Boolean   @default(false)
     subscriptionId  Int       @default(1)
     subscriptionEnd DateTime?
+    lastSeenNip05   String?
+    lastSeenNip05At DateTime?
 
     registrations    Registration[]
     userTokens       UserToken[]
