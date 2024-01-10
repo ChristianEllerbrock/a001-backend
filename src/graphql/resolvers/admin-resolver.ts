@@ -1,8 +1,17 @@
-import { Authorized, Ctx, Query, Resolver } from "type-graphql";
+import { Arg, Authorized, Ctx, Query, Resolver } from "type-graphql";
 import { StatOutput } from "../outputs/stat-output";
 import { GraphqlContext } from "../type-defs";
 import { RelayInfoOutput } from "../outputs/admin/relay-info-output";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
+import { AzureSecretService } from "../../services/azure-secret-service";
+import {
+    KeyPair,
+    KeyVault_Admin_SecretName,
+    KeyVault_Admin_Type,
+    KeyVault_Chris_SecretName,
+    KeyVault_Chris_Type,
+} from "../../common/key-vault";
+import { NostrConnector } from "../../nostr-v4/nostrConnector";
 
 @Resolver()
 export class AdminResolver {
@@ -66,6 +75,52 @@ export class AdminResolver {
                 averageUptime: x.averageUptime,
             };
         });
+    }
+
+    @Authorized()
+    @Query((returns) => [String])
+    async admSendDM(
+        @Ctx() context: GraphqlContext,
+        @Arg("toPubkey") toPubkey: string,
+        @Arg("text") text: string,
+        @Arg("from") from: "admin" | "chris"
+    ): Promise<string[]> {
+        const relevantRelays =
+            await Nip05NostrService.instance.getRelevantAccountRelays(toPubkey);
+        if (relevantRelays.empty()) {
+            return [];
+        }
+
+        let keyPair: KeyPair | undefined;
+
+        if (from === "admin") {
+            keyPair =
+                await AzureSecretService.instance.tryGetValue<KeyVault_Admin_Type>(
+                    KeyVault_Admin_SecretName
+                );
+        } else if (from === "chris") {
+            keyPair =
+                await AzureSecretService.instance.tryGetValue<KeyVault_Chris_Type>(
+                    KeyVault_Chris_SecretName
+                );
+        } else {
+            return [];
+        }
+
+        if (!keyPair) {
+            return [];
+        }
+
+        const connector = new NostrConnector({
+            pubkey: keyPair.pubkey,
+            privkey: keyPair.privkey,
+        });
+        return await Nip05NostrService.instance.sendDM(
+            connector,
+            toPubkey,
+            relevantRelays,
+            text
+        );
     }
 }
 
