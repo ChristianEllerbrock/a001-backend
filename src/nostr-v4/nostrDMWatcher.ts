@@ -260,21 +260,41 @@ export class NostrDMWatcher {
             : latestRegularEvent;
     }
 
-    async #ensureRelay(url: string): Promise<Relay> {
-        let relay = this.#relays.get(url);
-        let isNewRelay = false;
-        if (!relay) {
-            relay = relayInit(url);
-            isNewRelay = true;
-        }
+    #ensureRelay(
+        url: string,
+        timeout: number | undefined = 2500
+    ): Promise<Relay> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject("Timeout");
+            }, timeout);
 
-        await relay.connect();
+            let relay = this.#relays.get(url);
+            let isNewRelay = false;
+            if (!relay) {
+                relay = relayInit(url);
+                isNewRelay = true;
+            }
 
-        if (isNewRelay) {
-            // Only add relay if it is new AND the connection was successful.
-            this.#relays.set(url, relay);
-        }
-        return relay;
+            relay
+                .connect()
+                .then(() => {
+                    clearTimeout(timer);
+
+                    if (isNewRelay) {
+                        // Only add relay if it is new AND the connection was successful.
+                        this.#relays.set(url, relay as Relay);
+                    }
+
+                    resolve(relay as Relay);
+                    return;
+                })
+                .catch((error) => {
+                    clearTimeout(timer);
+                    reject("Could not connect to relay");
+                    return;
+                });
+        });
     }
 
     #enableKeepAlive(relay: Relay) {
@@ -354,34 +374,113 @@ export class NostrDMWatcher {
         filters: Filter[],
         onRelays?: string[]
     ): Promise<Event[]> {
-        const relevantRelays =
-            typeof onRelays === "undefined"
-                ? Array.from(this.#relays.keys())
-                : onRelays;
-
-        const relays: Relay[] = [];
-        for (const url of relevantRelays) {
-            try {
-                const relay = await this.#ensureRelay(url);
-                relays.push(relay);
-            } catch (error) {
-                // Continue
-                this.#log(
-                    `Error trying to fetch relay event on relay '${url}'`
-                );
-            }
+        if (typeof onRelays === "undefined") {
+            return [];
         }
 
-        const lists = relays.map((x) => x.list(filters));
-        const relayEventsArray = await Promise.all(lists);
+        const debug = false;
 
+        const promises = onRelays.map((x) => {
+            return new Promise<Event[]>((resolve, reject) => {
+                const start = DateTime.now();
+                this.#ensureRelay(x)
+                    .then((relay) => {
+                        const diff = start
+                            .diffNow("seconds")
+                            .toObject()
+                            .seconds?.toFixed(1);
+
+                        if (debug) {
+                            this.#log(`ok: ${diff} seconds`);
+                        }
+
+                        relay
+                            .list(filters)
+                            .then((events) => {
+                                resolve(events);
+                                return;
+                            })
+                            .catch((error) => {
+                                reject(`${x} - ${error}`);
+                                return;
+                            });
+                    })
+                    .catch((error) => {
+                        const diff = start
+                            .diffNow("seconds")
+                            .toObject()
+                            .seconds?.toFixed(1);
+
+                        if (debug) {
+                            this.#log(`notok: ${diff} seconds`);
+                        }
+
+                        reject(`${x} - ${error}`);
+                        return;
+                    });
+            });
+        });
+
+        // for (const url of relevantRelays) {
+        //     try {
+        //         const relay = await this.#ensureRelay(url);
+        //         relays.push(relay);
+        //     } catch (error) {
+        //         // Continue
+        //         this.#log(
+        //             `Error trying to fetch relay event on relay '${url}'`
+        //         );
+        //     }
+        // }
+
+        //const lists = relays.map((x) => x.list(filters));
         const events = new Map<string, Event>();
-        for (const relayEvents of relayEventsArray) {
-            relayEvents.forEach((x) => events.set(x.id, x));
+
+        const relayEventsArray = await Promise.allSettled(promises);
+
+        for (const promiseResult of relayEventsArray) {
+            if (promiseResult.status === "fulfilled") {
+                promiseResult.value.forEach((x) => events.set(x.id, x));
+            } else {
+                this.#log(`${promiseResult.reason}`);
+            }
         }
 
         return Array.from(events.values());
     }
+
+    // async #fetchRelayEvents(
+    //     filters: Filter[],
+    //     onRelays?: string[]
+    // ): Promise<Event[]> {
+    //     const relevantRelays =
+    //         typeof onRelays === "undefined"
+    //             ? Array.from(this.#relays.keys())
+    //             : onRelays;
+
+    //     const relays: Relay[] = [];
+    //     for (const url of relevantRelays) {
+    //         try {
+    //             const relay = await this.#ensureRelay(url);
+    //             relays.push(relay);
+    //         } catch (error) {
+    //             // Continue
+    //             this.#log(
+    //                 `Error trying to fetch relay event on relay '${url}'`
+    //             );
+    //         }
+    //     }
+
+    //     const lists = relays.map((x) => x.list(filters));
+    //     const relayEventsArray = await Promise.all(lists);
+
+    //     const events = new Map<string, Event>();
+    //     for (const relayEvents of relayEventsArray) {
+    //         relayEvents.forEach((x) => events.set(x.id, x));
+    //     }
+
+    //     return Array.from(events.values());
+    // }
 
     #log(text: string) {
         if (!this.#isDebugOn) {
