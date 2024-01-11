@@ -19,7 +19,7 @@ model User {
     subscriptionEnd    DateTime?
     lastSeenNip05      String?
     lastSeenNip05At    DateTime?
-    lastSeenNip05Event String?
+    lastSeenNip05Event String?   @db.NVarChar(max)
 
     registrations    Registration[]
     userTokens       UserToken[]
