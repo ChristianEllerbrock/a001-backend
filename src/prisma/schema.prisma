@@ -442,11 +442,21 @@ model BotMetadataRelay {
 // RELAY RELATED MODEL
 
 model RelayEvent {
-    id         String @id
-    pubkey     String
-    kind       Int
-    created_at Int
-    content    String
-    tags       String
-    signature  String
+    id             String          @id
+    pubkey         String
+    kind           Int
+    created_at     Int
+    content        String
+    tags           String
+    sig            String
+    relayEventTags RelayEventTag[]
+}
+
+model RelayEventTag {
+    id           Int    @id @default(autoincrement())
+    relayEventId String
+    name         String @db.VarChar(1)
+    value        String
+
+    relayEvent RelayEvent @relation(fields: [relayEventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
