@@ -48,6 +48,7 @@
     "graphql": "^15.8.0",
     "graphql-scalars": "^1.20.1",
     "graphql-ws": "^5.11.2",
+    "joi": "^17.11.1",
     "luxon": "^3.2.1",
     "multer": "^1.4.5-lts.1",
     "node-cache": "^5.1.2",
