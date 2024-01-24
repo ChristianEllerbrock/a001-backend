@@ -30,6 +30,10 @@ import { paymentInController } from "./controllers/alby/payment-in-controller";
 import { checkUnsettledInvoicesController } from "./controllers/cron/check-unsettled-invoices-controller";
 import { genKeyPairController } from "./controllers/tools/gen-key-pair";
 import { checkLastSeenNip05Controller } from "./controllers/cron/check-last-seen-nip05-controller";
+import { RelayWebSocketServerAdapter } from "./relay/adapters/web-socket-server-adapter";
+import { PortMock } from "graphql-scalars";
+import { PrismaService } from "./services/prisma-service";
+import { RelayAllowedService } from "./relay/services/relay-allowed-service";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -52,14 +56,23 @@ app.get("/.well-known/nostr.json", wellKnownNostrController);
 app.get("/.well-known/lnurlp/:username", wellKnownLightningController);
 app.get("/hex", hexController);
 app.get("/", (req, res, next) => {
-    let appUrl = "";
-    // req.hostname could be:
-    // www.nip05.social
-    // nip05.social
-    // www.protonostr.com
-    // protonostr.com
-    // localhost
-    // ...
+    if (req.headers.accept === "application/nostr+json") {
+        res.json({
+            name: "relay.nip05.social",
+            description: "A relay for NIP05.social users.",
+            pubkey: "ae064aa171e0d49799252c1034e24b88cdf4fae2328f1736339a41d43567a754",
+            contact: "chris@nip05.social",
+            supported_nips: [1, 2, 4, 9, 11, 23, 28, 42],
+            software: "https://nip05.social/relay",
+            version: "0.0.1",
+            icon: "https://nip05assets.blob.core.windows.net/public/hive.svg",
+            limitation: {
+                auth_required: true,
+            },
+        });
+        return;
+    }
+
     if (req.hostname.includes("localhost")) {
         res.send("You are on localhost. No forwarding to any app location.");
         return;
@@ -109,55 +122,89 @@ async function bootstrap() {
     const server = app.listen(port, () => {
         console.log(`⚡️[server]: Running at http://localhost:${port}`);
         console.log(`⚡️[server]: GraphQL endpoint is '${GRAPHQL_ENDPOINT}'`);
-        console.log(`⚡️[server]: WS endpoint is '${WS_ENDPOINT}'`);
 
-        // Start the Web Socket Server on the same port
         const wsServer = new WebSocketServer({
             server,
-            path: WS_ENDPOINT,
+            maxPayload: 131072, // 128KB
+            perMessageDeflate: {
+                zlibDeflateOptions: {
+                    chunkSize: 1024,
+                    memLevel: 7,
+                    level: 3,
+                },
+                zlibInflateOptions: {
+                    chunkSize: 10 * 1024,
+                },
+                clientNoContextTakeover: true, // Defaults to negotiated value.
+                serverNoContextTakeover: true, // Defaults to negotiated value.
+                serverMaxWindowBits: 10, // Defaults to negotiated value.
+                // Below options specified as default values.
+                concurrencyLimit: 10, // Limits zlib concurrency for perf.
+                threshold: 1024, // Size (in bytes) below which messages
+                // should not be compressed if context takeover is disabled.
+            },
         });
 
+        PrismaService.instance.db.user
+            .findMany({
+                select: { pubkey: true },
+            })
+            .then((result): void => {
+                const pubkeys = result.map((x) => x.pubkey);
+                RelayAllowedService.instance.addPubkeys(pubkeys, "auth");
+            });
+
+        const adapter = new RelayWebSocketServerAdapter(wsServer, {
+            url: EnvService.instance.env.RELAY_URL,
+        });
+
+        // Start the Web Socket Server on the same port
+        // const wsServer = new WebSocketServer({
+        //     server,
+        //     path: WS_ENDPOINT,
+        // });
+
         // https://github.com/enisdenjo/graphql-ws
-        useServer(
-            {
-                schema,
-                // On initial WS connect: Check and verify the user JWT and only setup the subscription with a valid token
-                // onConnect: async (ctx: WsContext) => {
-                //     const params =
-                //         ctx.connectionParams as unknown as WebSocketConnectionParams;
-                //     try {
-                //         const decodedPayload =
-                //             await AccessTokenService.instance.verifyAsync(
-                //                 params.accessToken
-                //             );
-                //         console.log(
-                //             `[ws-server] - ${new Date().toISOString()} - ${
-                //                 decodedPayload.email
-                //             } has opened an authenticated web socket connection.`
-                //         );
-                //     } catch (error) {
-                //         (ctx.extra as WsContextExtra).socket.close(
-                //             4401,
-                //             "Unauthorized"
-                //         ); // This will force the client to NOT reconnect
-                //     }
-                //     return true;
-                // },
-                // Every following subscription access will uses the initial JWT (from the "onConnect") in the connectionParams
-                context: (ctx: WsContext) => {
-                    return {
-                        name: "Peter",
-                    };
-                    // return getGraphqlSubContext(
-                    //     ctx.connectionParams as unknown as WebSocketConnectionParams
-                    // );
-                },
-            },
-            wsServer
-        );
+        // useServer(
+        //     {
+        //         schema,
+        //         // On initial WS connect: Check and verify the user JWT and only setup the subscription with a valid token
+        //         // onConnect: async (ctx: WsContext) => {
+        //         //     const params =
+        //         //         ctx.connectionParams as unknown as WebSocketConnectionParams;
+        //         //     try {
+        //         //         const decodedPayload =
+        //         //             await AccessTokenService.instance.verifyAsync(
+        //         //                 params.accessToken
+        //         //             );
+        //         //         console.log(
+        //         //             `[ws-server] - ${new Date().toISOString()} - ${
+        //         //                 decodedPayload.email
+        //         //             } has opened an authenticated web socket connection.`
+        //         //         );
+        //         //     } catch (error) {
+        //         //         (ctx.extra as WsContextExtra).socket.close(
+        //         //             4401,
+        //         //             "Unauthorized"
+        //         //         ); // This will force the client to NOT reconnect
+        //         //     }
+        //         //     return true;
+        //         // },
+        //         // Every following subscription access will uses the initial JWT (from the "onConnect") in the connectionParams
+        //         context: (ctx: WsContext) => {
+        //             return {
+        //                 name: "Peter",
+        //             };
+        //             // return getGraphqlSubContext(
+        //             //     ctx.connectionParams as unknown as WebSocketConnectionParams
+        //             // );
+        //         },
+        //     },
+        //     wsServer
+        // );
     });
 
-    Nip05NostrService.instance.start();
+    //Nip05NostrService.instance.start();
 }
 
 bootstrap();

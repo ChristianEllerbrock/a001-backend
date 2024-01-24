@@ -19,7 +19,7 @@ model User {
     subscriptionEnd    DateTime?
     lastSeenNip05      String?
     lastSeenNip05At    DateTime?
-    lastSeenNip05Event String?
+    lastSeenNip05Event String?   @db.NVarChar(max)
 
     registrations    Registration[]
     userTokens       UserToken[]
@@ -437,4 +437,26 @@ model BotMetadataRelay {
     url           String
 
     botMetadata BotMetadata @relation(fields: [botMetadataId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// RELAY RELATED MODEL
+
+model RelayEvent {
+    id             String          @id
+    pubkey         String
+    kind           Int
+    created_at     Int
+    content        String          @db.NVarChar(max)
+    tags           String
+    sig            String
+    relayEventTags RelayEventTag[]
+}
+
+model RelayEventTag {
+    id           Int    @id @default(autoincrement())
+    relayEventId String
+    name         String
+    value        String
+
+    relayEvent RelayEvent @relation(fields: [relayEventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }

@@ -31,6 +31,7 @@ export class EnvServiceEnv {
     API_ADMIN_KEY!: string;
     ALBY_ACCESS_TOKEN!: string;
     ENVIRONMENT!: "dev" | "pro";
+    RELAY_URL!: string;
 
     isOptional(property: string) {
         return this._optionalProperties.includes(property);

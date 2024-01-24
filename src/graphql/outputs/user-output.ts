@@ -22,6 +22,15 @@ export class UserOutput {
     @Field((type) => Int)
     subscriptionId!: number;
 
+    @Field((type) => String, { nullable: true })
+    lastSeenNip05!: string | null;
+
+    @Field((type) => Date, { nullable: true })
+    lastSeenNip05At!: Date | null;
+
+    @Field((type) => String, { nullable: true })
+    lastSeenNip05Event!: string | null;
+
     // Model Relations
 
     @Field((type) => [RegistrationOutput], { nullable: true })

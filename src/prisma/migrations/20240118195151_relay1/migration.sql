@@ -1,0 +1,28 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[RelayEvent] (
+    [id] NVARCHAR(1000) NOT NULL,
+    [pubkey] NVARCHAR(1000) NOT NULL,
+    [kind] INT NOT NULL,
+    [created_at] INT NOT NULL,
+    [content] NVARCHAR(1000) NOT NULL,
+    [tags] NVARCHAR(1000) NOT NULL,
+    [signature] NVARCHAR(1000) NOT NULL,
+    CONSTRAINT [RelayEvent_pkey] PRIMARY KEY CLUSTERED ([id])
+);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH

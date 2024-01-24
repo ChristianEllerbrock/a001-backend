@@ -35,10 +35,6 @@ import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-i
 import { HelperRegex } from "../../../helpers/helper-regex";
 import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
 import { IdentifierRegisterCheckOutput } from "../../outputs/identifier-register-check-output";
-import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
-import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
-import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
-import { PUBLISH_TOPICS } from "../../subscriptions/topics";
 import { RegistrationCodeResendInput } from "../../inputs/registration-code-resend-input";
 import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrationNip07CodeOutput";
 import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
@@ -819,63 +815,20 @@ Your nip05.social Team`;
                 ? Option.WithSystemRelayer
                 : Option.WithCustomRelayer;
 
-        let ar: AgentRelayer | undefined;
-        if (option === Option.WithCustomRelayer) {
-            ar = await AgentRelayerService.instance.initWithCustomRelayer([
-                args.relay ?? "",
-            ]);
-        } else {
-            await AgentRelayerService.instance.init();
-            ar = AgentRelayerService.instance.getAgentRelayer();
-        }
-
-        const noOfRelays = ar?.relayClients.length ?? 0;
-        let relayResponses = 0;
-
-        const subscription = ar?.sendEvent.subscribe((event) => {
-            console.log(event);
-            if (event.jobId !== args.jobId) {
-                return; // from some other process
-            }
-            relayResponses++;
-            if (relayResponses === noOfRelays) {
-                console.log("END");
-                subscription?.unsubscribe();
-            }
-
-            const payload: JobStateChangePayload = {
-                relay: event.relay,
-                success: event.success,
-                item: relayResponses,
-                ofItems: noOfRelays,
-                destinationFilter: {
-                    jobId: args.jobId,
-                    pubkey: args.pubkey,
-                },
-            };
-            pubSub.publish(PUBLISH_TOPICS.JOB_STATE_CHANGE, payload);
-        });
-
-        if (option === Option.WithCustomRelayer) {
-            if (typeof ar === "undefined") {
-                throw new Error(
-                    "Internal server error. Could not initialize agent relayer."
-                );
-            }
-            await AgentRelayerService.instance.sendWithCustomRelayer(
-                pubkeyObject.hex,
-                content,
-                args.jobId,
-                ar
+        let relays: string[] = [];
+        if (!args.relay) {
+            relays = await Nip05NostrService.instance.getRelevantAccountRelays(
+                dbUser.pubkey
             );
         } else {
-            // Send with system relayer
-            await AgentRelayerService.instance.send(
-                pubkeyObject.hex,
-                content,
-                args.jobId
-            );
+            relays.push(args.relay);
         }
+
+        await Nip05NostrService.instance.sendDMFromBot(
+            dbUser.pubkey,
+            relays,
+            content
+        );
 
         return dbRegistration;
     }
@@ -938,63 +891,20 @@ Your nip05.social Team`;
                 ? Option.WithSystemRelayer
                 : Option.WithCustomRelayer;
 
-        let ar: AgentRelayer | undefined;
-        if (option === Option.WithCustomRelayer) {
-            ar = await AgentRelayerService.instance.initWithCustomRelayer([
-                args.relay ?? "",
-            ]);
-        } else {
-            await AgentRelayerService.instance.init();
-            ar = AgentRelayerService.instance.getAgentRelayer();
-        }
-
-        const noOfRelays = ar?.relayClients.length ?? 0;
-        let relayResponses = 0;
-
-        const subscription = ar?.sendEvent.subscribe((event) => {
-            console.log(event);
-            if (event.jobId !== args.jobId) {
-                return; // from some other process
-            }
-            relayResponses++;
-            if (relayResponses === noOfRelays) {
-                console.log("END");
-                subscription?.unsubscribe();
-            }
-
-            const payload: JobStateChangePayload = {
-                relay: event.relay,
-                success: event.success,
-                item: relayResponses,
-                ofItems: noOfRelays,
-                destinationFilter: {
-                    jobId: args.jobId,
-                    pubkey: args.pubkey,
-                },
-            };
-            pubSub.publish(PUBLISH_TOPICS.JOB_STATE_CHANGE, payload);
-        });
-
-        if (option === Option.WithCustomRelayer) {
-            if (typeof ar === "undefined") {
-                throw new Error(
-                    "Internal server error. Could not initialize agent relayer."
-                );
-            }
-            await AgentRelayerService.instance.sendWithCustomRelayer(
-                dbRegistration.user.pubkey,
-                content,
-                args.jobId,
-                ar
+        let relays: string[] = [];
+        if (!args.relay) {
+            relays = await Nip05NostrService.instance.getRelevantAccountRelays(
+                dbRegistration.user.pubkey
             );
         } else {
-            // Send with system relayer
-            await AgentRelayerService.instance.send(
-                dbRegistration.user.pubkey,
-                content,
-                args.jobId
-            );
+            relays.push(args.pubkey);
         }
+
+        await Nip05NostrService.instance.sendDMFromBot(
+            dbRegistration.user.pubkey,
+            relays,
+            content
+        );
 
         return true;
     }
