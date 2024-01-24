@@ -122,7 +122,6 @@ async function bootstrap() {
     const server = app.listen(port, () => {
         console.log(`⚡️[server]: Running at http://localhost:${port}`);
         console.log(`⚡️[server]: GraphQL endpoint is '${GRAPHQL_ENDPOINT}'`);
-        console.log(`⚡️[server]: WS endpoint is '${WS_ENDPOINT}'`);
 
         const wsServer = new WebSocketServer({
             server,

@@ -25,14 +25,11 @@ import {
     NostrHelperV2,
     NostrPubkeyObject,
 } from "../../../nostr/nostr-helper-2";
-import { JobStateChangePayload } from "../../subscriptions/payloads/job-state-change-payload";
-import { PUBLISH_TOPICS } from "../../subscriptions/topics";
-import { AgentRelayer } from "../../../nostr/agents/agent-relayer";
-import { AgentRelayerService } from "../../../nostr/agents/agent-relayer-service";
 import { LoginNip07RedeemInputArgs } from "../../inputs/loginNip07RedeemInputArgs";
 import { NostrEvent } from "../../../nostr/nostr";
 import { LoginNip46CodeCreateInputArgs } from "../../inputs/loginNip46CodeCreateInputArgs";
 import { LoginNip46RedeemInputArgs } from "../../inputs/loginNip46RedeemInputArgs";
+import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -400,16 +397,9 @@ export class LoginResolver {
 
         await cleanupExpiredLoginsAsync();
 
-        let pubkeyObject: NostrPubkeyObject | undefined;
-        try {
-            pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
-        } catch (error) {
-            throw new Error(
-                "Invalid pubkey. Please provide the pubkey either in npub or hex representation."
-            );
-        }
+        let pubkeyHex = NostrHelperV2.getNostrPubkeyObject(args.pubkey).hex;
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyHex);
         // Check, if the user was reported as "fraud"
         if (dbUser.fraudReportedAt != null) {
             throw new Error(ErrorMessage.fraud);
@@ -426,7 +416,7 @@ export class LoginResolver {
         }
 
         const code = HelperAuth.generateCode();
-        const dbUserLoginCode = await context.db.userLoginCode.upsert({
+        await context.db.userLoginCode.upsert({
             where: { userId: dbUser.id },
             update: {
                 code,
@@ -472,108 +462,21 @@ Your "NIP05.social" Team`;
         // Determine the sending of the code
         // Option 1: Via the full set of defined SystemRelays
         // Option 2: Via one relay provided by the user
-        enum Option {
-            WithSystemRelayer = 1,
-            WithCustomRelayer = 3,
-        }
-        const option: Option =
-            typeof args.relay === "undefined"
-                ? Option.WithSystemRelayer
-                : Option.WithCustomRelayer;
 
-        let ar: AgentRelayer | undefined;
-        if (option === Option.WithCustomRelayer) {
-            ar = await AgentRelayerService.instance.initWithCustomRelayer([
-                args.relay ?? "",
-            ]);
-        } else {
-            await AgentRelayerService.instance.init();
-            ar = AgentRelayerService.instance.getAgentRelayer();
-        }
-
-        const noOfRelays = ar?.relayClients.length ?? 0;
-        let relayResponses = 0;
-
-        const subscription = ar?.sendEvent.subscribe((event) => {
-            console.log(event);
-            if (event.jobId !== args.jobId) {
-                return; // from some other process
-            }
-            relayResponses++;
-            if (relayResponses === noOfRelays) {
-                console.log("END");
-                subscription?.unsubscribe();
-            }
-
-            const payload: JobStateChangePayload = {
-                relay: event.relay,
-                success: event.success,
-                item: relayResponses,
-                ofItems: noOfRelays,
-                destinationFilter: {
-                    jobId: args.jobId,
-                    pubkey: args.pubkey,
-                },
-            };
-            pubSub.publish(PUBLISH_TOPICS.JOB_STATE_CHANGE, payload);
-        });
-
-        if (option === Option.WithCustomRelayer) {
-            if (typeof ar === "undefined") {
-                throw new Error(
-                    "Internal server error. Could not initialize agent relayer."
-                );
-            }
-            await AgentRelayerService.instance.sendWithCustomRelayer(
-                pubkeyObject.hex,
-                content,
-                args.jobId,
-                ar
+        let relays: string[] = [];
+        if (!args.relay) {
+            relays = await Nip05NostrService.instance.getRelevantAccountRelays(
+                pubkeyHex
             );
         } else {
-            // Send with system relayer
-            await AgentRelayerService.instance.send(
-                pubkeyObject.hex,
-                content,
-                args.jobId
-            );
+            relays.push(args.relay);
         }
 
-        return dbUser.id;
-
-        // Create JOB
-        // const dbJob = await context.db.job.create({
-        //     data: {
-        //         userId: dbUser.id,
-        //         // createdAt: new Date()
-        //         jobTypeId: JobType.NostrDirectMessage,
-        //         jobStateId: JobState.Created,
-        //     },
-        // });
-
-        // Create MESSAGE to send to the queue
-
-        // const agentInfo =
-        //     await AgentService.instance.determineAgentInfoForNextJobAsync(
-        //         cleanedRelay
-        //     );
-
-        // const data: ServiceBusDataDirectMessage = {
-        //     pubkey: pubkeyObject.hex,
-        //     content,
-        //     relay: cleanedRelay,
-        //     agentPubkey: agentInfo[0],
-        //     jobId: dbJob.id,
-        // };
-
-        // const sbMessage: ServiceBusMessage = {
-        //     body: data,
-        // };
-        // await AzureServiceBus.instance.sendAsync(
-        //     sbMessage,
-        //     EnvService.instance.env.SERVICE_BUS_DM_QUEUE,
-        //     agentInfo[1]
-        // );
+        await Nip05NostrService.instance.sendDMFromBot(
+            pubkeyHex,
+            relays,
+            content
+        );
 
         return dbUser.id;
     }

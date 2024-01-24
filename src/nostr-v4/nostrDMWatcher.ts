@@ -1,8 +1,7 @@
 import { Event, Filter, Relay, Sub, relayInit } from "nostr-tools";
-import { Nip65RelayList, RelayEvent } from "./type-defs";
+import { Nip65RelayList } from "./type-defs";
 import { NostrDMWatcherDoctor } from "./nostrDMWatcherDoctor";
 import { OPEN, WebSocket } from "ws";
-import { RelayClientEvent } from "../nostr/agents/relay-client";
 import { DateTime } from "luxon";
 import "../nostr-v4/arrayExtensions";
 
