@@ -446,7 +446,7 @@ model RelayEvent {
     pubkey         String
     kind           Int
     created_at     Int
-    content        String
+    content        String          @db.NVarChar(max)
     tags           String
     sig            String
     relayEventTags RelayEventTag[]
