@@ -12,17 +12,12 @@ import { buildSchema } from "type-graphql";
 import { schemaOptions } from "./graphql/schema";
 import { wellKnownNostrController } from "./controllers/well-known-nostr-controller";
 import { hexController } from "./controllers/hex-controller";
-import { reportFraudController } from "./controllers/report-fraud-controller";
-import { confirmFraudController } from "./controllers/confirm-fraud-controller";
 import { wellKnownLightningController } from "./controllers/well-known-lightning-controller";
 import { testController } from "./controllers/test-controller";
 import { WebSocketServer } from "ws";
-import { useServer } from "graphql-ws/lib/use/ws";
-import { Context as WsContext } from "graphql-ws";
 import { emailController } from "./controllers/email/email-controller";
 var path = require("path");
 import multer from "multer";
-import { Nip05NostrService } from "./services/nip05-nostr/nip05-nostr-service";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
 import { checkSubscriptionsController } from "./controllers/cron/check-subscriptions-controller";
@@ -31,7 +26,6 @@ import { checkUnsettledInvoicesController } from "./controllers/cron/check-unset
 import { genKeyPairController } from "./controllers/tools/gen-key-pair";
 import { checkLastSeenNip05Controller } from "./controllers/cron/check-last-seen-nip05-controller";
 import { RelayWebSocketServerAdapter } from "./relay/adapters/web-socket-server-adapter";
-import { PortMock } from "graphql-scalars";
 import { PrismaService } from "./services/prisma-service";
 import { RelayAllowedService } from "./relay/services/relay-allowed-service";
 
@@ -80,8 +74,6 @@ app.get("/", (req, res, next) => {
 
     res.redirect("https://app.nip05.social");
 });
-app.get("/report-fraud/:userId/:fraudId", reportFraudController);
-app.get("/confirm-fraud/:userId/:fraudId", confirmFraudController);
 app.post(
     `/${EnvService.instance.env.EMAIL_ENDPOINT}/`,
     multer().any(),

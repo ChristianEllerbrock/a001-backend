@@ -452,12 +452,7 @@ ${Array.from(code).join(" ")}
 Click here to login automatically:
 
 ${url}/alogin/${dbUser.id}/${code}
-
-If you did not initiate this login you can either ignore the message or click on the link below to report a fraud attempt:
-
-https://nip05.social/report-fraud/${dbUser.id}/${fraudId}
-
-Your "NIP05.social" Team`;
+`;
 
         // Determine the sending of the code
         // Option 1: Via the full set of defined SystemRelays

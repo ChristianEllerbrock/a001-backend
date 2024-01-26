@@ -793,15 +793,12 @@ export class RegistrationResolver {
             
 ${Array.from(dbRegistrationCode.code).join(" ")}
 
-Click [here](${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${
+Click here to finalize your registration:
+
+${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${
             dbRegistrationCode.code
-        }) to finalize your registration.
-
-If you did not initiate this registration you can either ignore this message or click on this [link](https://nip05.social/report-fraud/${
-            dbRegistration.userId
-        }/${fraudId}) to report a fraud attempt.
-
-Your nip05.social Team`;
+        }
+`;
 
         // Determine the sending of the code
         // Option 1: Via the full set of defined SystemRelays
@@ -869,15 +866,11 @@ Your nip05.social Team`;
             
 ${Array.from(code).join(" ")}
 
-Click [here](${aUrl}/aregister/${dbRegistration.userId}/${
-            dbRegistration.id
-        }/${code}) to finalize your registration.
+Click here to finalize your registration:
 
-If you did not initiate this registration you can either ignore this message or click on this [link](https://nip05.social/report-fraud/${
-            dbRegistration.userId
-        }/${fraudId}) to report a fraud attempt.
+${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${code}
 
-Your nip05.social Team`;
+`;
 
         // Determine the sending of the code
         // Option 1: Via the full set of defined SystemRelays
