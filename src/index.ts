@@ -64,7 +64,7 @@ app.get("/", (req, res, next) => {
             contact: "chris@nip05.social",
             supported_nips: [1, 2, 4, 9, 11, 23, 28, 42],
             software: "https://nip05.social/relay",
-            version: "0.0.1",
+            version: "0.0.2",
             icon: "https://nip05assets.blob.core.windows.net/public/hive.svg",
             limitation: {
                 auth_required: true,
@@ -153,6 +153,24 @@ async function bootstrap() {
                 const pubkeys = result.map((x) => x.pubkey);
                 RelayAllowedService.instance.addPubkeys(pubkeys, "auth");
             });
+
+        PrismaService.instance.db.emailNostr
+            .findMany({
+                select: { pubkey: true },
+            })
+            .then((x) => {
+                RelayAllowedService.instance.addSystemPubkeys(
+                    x.map((x) => x.pubkey),
+                    "email-mirror"
+                );
+            });
+
+        RelayAllowedService.instance.addSystemPubkeys(
+            [
+                "d0894d5ace70ee209774d04d5b9aae91efa28ede1954108300c44dabfbe1d9b2",
+            ],
+            "email-out-bot"
+        );
 
         const adapter = new RelayWebSocketServerAdapter(wsServer, {
             url: EnvService.instance.env.RELAY_URL,

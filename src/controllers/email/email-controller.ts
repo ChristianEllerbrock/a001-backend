@@ -14,6 +14,7 @@ import { DateTime } from "luxon";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { log } from "./common";
 import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-related";
+import { RelayAllowedService } from "../../relay/services/relay-allowed-service";
 
 export async function emailController(
     req: Request,
@@ -140,6 +141,7 @@ const handleEmail = async function (req: Request) {
         dbRegistration.user.pubkey,
         dbRegistration.registrationRelays.map((x) => x.address)
     );
+    targetRelays.unshift("wss://relay.nip05.social");
 
     // The targetRelays define the relays where the email should be published to.
 
@@ -353,6 +355,8 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
             },
         },
     });
+
+    RelayAllowedService.instance.addSystemPubkeys([pubkey], "email-mirror");
 
     return dbEmail;
 };
