@@ -1,3 +1,4 @@
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { IMessageHandler } from "../@types/message-handlers";
 import { Incoming_EVENT_Message } from "../@types/messages";
 import { createLogger } from "../adapters/common";
@@ -6,6 +7,7 @@ import {
     RelayWebSocketAdapterEvent,
 } from "../adapters/relay-web-socket-adapter";
 import { RelayEventRepository } from "../repositories/relay-event-repository";
+import { RelayAllowedService } from "../services/relay-allowed-service";
 import { EventMeaning, getEventMeaning, isEventValid } from "../utils/event";
 import { createOutgoing_OK_Message } from "../utils/messages";
 import { Event } from "nostr-tools";
@@ -91,6 +93,42 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
                 RelayWebSocketAdapterEvent.BroadcastToClients,
                 event
             );
+        }
+
+        this.#checkForEmailOut(event);
+    }
+
+    #checkForEmailOut(event: Event) {
+        if (event.kind !== 4) {
+            return;
+        }
+
+        // Find destination pubkey
+        let pubkey: string | undefined;
+        for (const tag of event.tags) {
+            if (tag[0] === "p") {
+                pubkey = tag[1];
+                break;
+            }
+        }
+
+        if (!pubkey) {
+            return;
+        }
+
+        // Check if the DM is destined for any relevant system pubkey.
+        if (
+            RelayAllowedService.instance.systemPubkeys_emailMirror.has(pubkey)
+        ) {
+            Nip05NostrService.instance.onDMEvent(event, "email-mirror");
+            return;
+        }
+
+        if (
+            RelayAllowedService.instance.systemPubkeys_emailOutBots.has(pubkey)
+        ) {
+            Nip05NostrService.instance.onDMEvent(event, "email-out-bot");
+            return;
         }
     }
 }

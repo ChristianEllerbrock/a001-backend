@@ -36,7 +36,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
-            relevantRelays,
+            ["wss://relay.nip05.social", ...relevantRelays],
             text
         );
 
@@ -78,7 +78,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
-            relevantRelays,
+            ["wss://relay.nip05.social", ...relevantRelays],
             text
         );
 
