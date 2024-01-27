@@ -21,15 +21,13 @@ import {
 } from "../../type-defs";
 import * as uuid from "uuid";
 import { ErrorMessage } from "../error-messages";
-import {
-    NostrHelperV2,
-    NostrPubkeyObject,
-} from "../../../nostr/nostr-helper-2";
+import { NostrHelperV2 } from "../../../nostr/nostr-helper-2";
 import { LoginNip07RedeemInputArgs } from "../../inputs/loginNip07RedeemInputArgs";
-import { NostrEvent } from "../../../nostr/nostr";
 import { LoginNip46CodeCreateInputArgs } from "../../inputs/loginNip46CodeCreateInputArgs";
 import { LoginNip46RedeemInputArgs } from "../../inputs/loginNip46RedeemInputArgs";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
+import { Event, verifySignature } from "nostr-tools";
+import { NostrPubkeyObject } from "../../../nostr/type-defs";
 
 const cleanupExpiredLoginsAsync = async () => {
     const now = DateTime.now();
@@ -186,7 +184,7 @@ export class LoginResolver {
         }
 
         // Check 2: The provided event-signature is valid.
-        if (!NostrHelperV2.verifySignature(args.data as NostrEvent)) {
+        if (!verifySignature(args.data as Event)) {
             throw new Error("The signature is invalid.");
         }
 
@@ -266,7 +264,7 @@ export class LoginResolver {
         }
 
         // Check 2: The provided event-signature is valid.
-        if (!NostrHelperV2.verifySignature(args.data as NostrEvent)) {
+        if (!verifySignature(args.data as Event)) {
             throw new Error("The signature is invalid.");
         }
 

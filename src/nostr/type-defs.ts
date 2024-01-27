@@ -3,3 +3,8 @@ export interface Nip05 {
     relays?: { [key: string]: string[] };
 }
 
+export type NostrPubkeyObject = {
+    hex: string;
+    npub: string;
+};
+
