@@ -4,6 +4,14 @@ import { schnorr } from "@noble/curves/secp256k1";
 import { NostrPubkeyObject } from "./type-defs";
 
 export class NostrHelperV2 {
+    static uint8ArrayToHex(data: Uint8Array): string {
+        return utils.bytesToHex(data);
+    }
+
+    static hexToUint8Array(data: string): Uint8Array {
+        return utils.hexToBytes(data);
+    }
+
     static pubkey2npub(hex: string): string {
         const data = utils.hexToBytes(hex);
         const words = bech32.toWords(data);

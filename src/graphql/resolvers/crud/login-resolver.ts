@@ -26,7 +26,7 @@ import { LoginNip07RedeemInputArgs } from "../../inputs/loginNip07RedeemInputArg
 import { LoginNip46CodeCreateInputArgs } from "../../inputs/loginNip46CodeCreateInputArgs";
 import { LoginNip46RedeemInputArgs } from "../../inputs/loginNip46RedeemInputArgs";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
-import { Event, verifySignature } from "nostr-tools";
+import { Event, NostrEvent, verifyEvent } from "nostr-tools";
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
 
 const cleanupExpiredLoginsAsync = async () => {
@@ -184,7 +184,7 @@ export class LoginResolver {
         }
 
         // Check 2: The provided event-signature is valid.
-        if (!verifySignature(args.data as Event)) {
+        if (!verifyEvent(args.data as NostrEvent)) {
             throw new Error("The signature is invalid.");
         }
 
@@ -264,7 +264,7 @@ export class LoginResolver {
         }
 
         // Check 2: The provided event-signature is valid.
-        if (!verifySignature(args.data as Event)) {
+        if (!verifyEvent(args.data as NostrEvent)) {
             throw new Error("The signature is invalid.");
         }
 

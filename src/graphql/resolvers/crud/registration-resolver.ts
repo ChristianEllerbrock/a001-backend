@@ -38,8 +38,8 @@ import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07
 import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
 import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46RedeemInputArgs";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
-import { verifySignature } from "nostr-tools";
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
+import { verifyEvent } from "nostr-tools";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -514,7 +514,7 @@ export class RegistrationResolver {
         }
 
         // Check 3: The provided event-signature is valid.
-        if (!verifySignature(args.data)) {
+        if (!verifyEvent(args.data)) {
             throw new Error("The signature is invalid.");
         }
 
@@ -620,7 +620,7 @@ export class RegistrationResolver {
         }
 
         // Check 3: The provided event-signature is valid.
-        if (!verifySignature(args.data)) {
+        if (!verifyEvent(args.data)) {
             throw new Error("The signature is invalid.");
         }
 

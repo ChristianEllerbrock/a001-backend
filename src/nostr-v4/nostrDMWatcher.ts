@@ -1,4 +1,4 @@
-import { Event, Filter, Relay, Sub, relayInit } from "nostr-tools";
+import { Event, Filter, Relay } from "nostr-tools";
 import { Nip65RelayList } from "./type-defs";
 import { NostrDMWatcherDoctor } from "./nostrDMWatcherDoctor";
 import { OPEN, WebSocket } from "ws";
@@ -18,7 +18,7 @@ export class NostrDMWatcher {
     #onDMCb!: (event: Event) => void | Promise<void>;
     #relays = new Map<string, Relay>();
     #relayPubkeys = new Map<string, Set<string>>();
-    #relaySubscription = new Map<string, Sub>();
+    //#relaySubscription = new Map<string, Sub>();
     #isDebugOn: boolean = true;
 
     #isOnDMCbSet = false;
@@ -85,7 +85,7 @@ export class NostrDMWatcher {
             } relays) and kill it. `
         );
         const relays = Array.from(this.#relays.values()).filter(
-            (x) => x.status === OPEN
+            (x) => x.connected
         );
 
         if (relays.length === 0) {
@@ -108,26 +108,26 @@ export class NostrDMWatcher {
      *
      * @param data string: relayUrl, Set<string>: list of pubkeys
      */
-    async watch(data: [string, Set<string>]) {
-        if (!this.#isOnDMCbSet) {
-            throw new Error("Error, you need to call 'onDM' first.");
-        }
+    // async watch(data: [string, Set<string>]) {
+    //     if (!this.#isOnDMCbSet) {
+    //         throw new Error("Error, you need to call 'onDM' first.");
+    //     }
 
-        const relay = await this.#ensureRelay(data[0]);
+    //     const relay = await this.#ensureRelay(data[0]);
 
-        // Store the pubkeys for the relay.
-        let relayPubkeys = this.#relayPubkeys.get(data[0]);
-        if (typeof relayPubkeys === "undefined") {
-            this.#relayPubkeys.set(data[0], data[1]);
-        } else {
-            for (const pubkey of data[1]) {
-                relayPubkeys.add(pubkey);
-            }
-        }
+    //     // Store the pubkeys for the relay.
+    //     let relayPubkeys = this.#relayPubkeys.get(data[0]);
+    //     if (typeof relayPubkeys === "undefined") {
+    //         this.#relayPubkeys.set(data[0], data[1]);
+    //     } else {
+    //         for (const pubkey of data[1]) {
+    //             relayPubkeys.add(pubkey);
+    //         }
+    //     }
 
-        this.#enableKeepAlive(relay);
-        this.#subscribeOnRelay(relay);
-    }
+    //     this.#enableKeepAlive(relay);
+    //     this.#subscribeOnRelay(relay);
+    // }
 
     async publishEvent(event: Event, onRelays?: string[]): Promise<string[]> {
         const relevantRelays =
@@ -269,21 +269,16 @@ export class NostrDMWatcher {
             }, timeout);
 
             let relay = this.#relays.get(url);
-            let isNewRelay = false;
+            let isNew = false;
             if (!relay) {
-                relay = relayInit(url);
-                isNewRelay = true;
+                relay = new Relay(url);
+                this.#relays.set(url, relay);
             }
 
             relay
                 .connect()
                 .then(() => {
                     clearTimeout(timer);
-
-                    if (isNewRelay) {
-                        // Only add relay if it is new AND the connection was successful.
-                        this.#relays.set(url, relay as Relay);
-                    }
 
                     resolve(relay as Relay);
                     return;
@@ -296,78 +291,78 @@ export class NostrDMWatcher {
         });
     }
 
-    #enableKeepAlive(relay: Relay) {
-        // Cleanup old callbacks.
-        const oldDisconnectCb = this.#relayCallbacksDISCONNECT.get(relay.url);
-        if (!oldDisconnectCb) {
-            const disconnectCb = () => {
-                this.#log(
-                    `DISCONNECT received on relay '${relay.url}'. Cure relay.`
-                );
-                this.doctor.cure(relay, () => {
-                    this.#subscribeOnRelay(relay);
-                });
-            };
-            relay.on("disconnect", disconnectCb);
-            this.#relayCallbacksDISCONNECT.set(relay.url, disconnectCb);
-        }
+    // #enableKeepAlive(relay: Relay) {
+    //     // Cleanup old callbacks.
+    //     const oldDisconnectCb = this.#relayCallbacksDISCONNECT.get(relay.url);
+    //     if (!oldDisconnectCb) {
+    //         const disconnectCb = () => {
+    //             this.#log(
+    //                 `DISCONNECT received on relay '${relay.url}'. Cure relay.`
+    //             );
+    //             this.doctor.cure(relay, () => {
+    //                 this.#subscribeOnRelay(relay);
+    //             });
+    //         };
+    //         relay.onclose = disconnectCb;
+    //         this.#relayCallbacksDISCONNECT.set(relay.url, disconnectCb);
+    //     }
 
-        const oldErrorCb = this.#relayCallbacksERROR.get(relay.url);
-        if (!oldErrorCb) {
-            const errorCb = () => {
-                this.#log(`ERROR received on relay '${relay.url}'`);
-            };
-            relay.on("error", errorCb);
-            this.#relayCallbacksERROR.set(relay.url, errorCb);
-        }
+    //     const oldErrorCb = this.#relayCallbacksERROR.get(relay.url);
+    //     if (!oldErrorCb) {
+    //         const errorCb = () => {
+    //             this.#log(`ERROR received on relay '${relay.url}'`);
+    //         };
+    //         relay.on("error", errorCb);
+    //         this.#relayCallbacksERROR.set(relay.url, errorCb);
+    //     }
 
-        const oldConnectCb = this.#relayCallbacksCONNECT.get(relay.url);
-        if (!oldConnectCb) {
-            const connectCb = () => {
-                this.#log(`CONNECT received on relay '${relay.url}'`);
-            };
-            relay.on("connect", connectCb);
-            this.#relayCallbacksCONNECT.set(relay.url, connectCb);
-        }
+    //     const oldConnectCb = this.#relayCallbacksCONNECT.get(relay.url);
+    //     if (!oldConnectCb) {
+    //         const connectCb = () => {
+    //             this.#log(`CONNECT received on relay '${relay.url}'`);
+    //         };
+    //         relay.on("connect", connectCb);
+    //         this.#relayCallbacksCONNECT.set(relay.url, connectCb);
+    //     }
 
-        const oldNoticeCb = this.#relayCallbacksNOTICE.get(relay.url);
-        if (!oldNoticeCb) {
-            const noticeCb = (msg: string) => {
-                this.#log(`NOTICE received on relay '${relay.url}': ${msg}`);
-            };
-            relay.on("notice", noticeCb);
-            this.#relayCallbacksNOTICE.set(relay.url, noticeCb);
-        }
-    }
+    //     const oldNoticeCb = this.#relayCallbacksNOTICE.get(relay.url);
+    //     if (!oldNoticeCb) {
+    //         const noticeCb = (msg: string) => {
+    //             this.#log(`NOTICE received on relay '${relay.url}': ${msg}`);
+    //         };
+    //         relay.on("notice", noticeCb);
+    //         this.#relayCallbacksNOTICE.set(relay.url, noticeCb);
+    //     }
+    // }
 
-    #subscribeOnRelay(relay: Relay) {
-        const pubkeys = this.#relayPubkeys.get(relay.url);
-        if (typeof pubkeys === "undefined" || pubkeys.size === 0) {
-            this.#log(`No pubkeys to subscribe to for relay '${relay.url}'`);
-            return;
-        }
+    // #subscribeOnRelay(relay: Relay) {
+    //     const pubkeys = this.#relayPubkeys.get(relay.url);
+    //     if (typeof pubkeys === "undefined" || pubkeys.size === 0) {
+    //         this.#log(`No pubkeys to subscribe to for relay '${relay.url}'`);
+    //         return;
+    //     }
 
-        const relaySub = this.#relaySubscription.get(relay.url);
-        if (relaySub) {
-            // Cleanup.
-            relaySub.off("event", this.#onDMCb);
-            relaySub.unsub(); // Will probably fail.
-        }
+    //     const relaySub = this.#relaySubscription.get(relay.url);
+    //     if (relaySub) {
+    //         // Cleanup.
+    //         relaySub.off("event", this.#onDMCb);
+    //         relaySub.unsub(); // Will probably fail.
+    //     }
 
-        const filter: Filter = {
-            kinds: [4],
-            "#p": Array.from(pubkeys),
-            since: Math.floor(new Date().getTime() / 1000) - 150,
-        };
+    //     const filter: Filter = {
+    //         kinds: [4],
+    //         "#p": Array.from(pubkeys),
+    //         since: Math.floor(new Date().getTime() / 1000) - 150,
+    //     };
 
-        this.#log(
-            `Subscribe to DMs for ${pubkeys.size} pubkeys on relay '${relay.url}'`
-        );
-        const sub = relay.sub([filter]);
+    //     this.#log(
+    //         `Subscribe to DMs for ${pubkeys.size} pubkeys on relay '${relay.url}'`
+    //     );
+    //     const sub = relay.sub([filter]);
 
-        this.#relaySubscription.set(relay.url, sub);
-        sub.on("event", this.#onDMCb);
-    }
+    //     this.#relaySubscription.set(relay.url, sub);
+    //     sub.on("event", this.#onDMCb);
+    // }
 
     async #fetchRelayEvents(
         filters: Filter[],
@@ -393,16 +388,21 @@ export class NostrDMWatcher {
                             this.#log(`ok: ${diff} seconds`);
                         }
 
-                        relay
-                            .list(filters)
-                            .then((events) => {
+                        const events: Event[] = [];
+                        const sub = relay.subscribe(filters, {
+                            onevent(event) {
+                                events.push(event);
+                            },
+                            oneose() {
+                                sub.close();
                                 resolve(events);
                                 return;
-                            })
-                            .catch((error) => {
-                                reject(`${x} - ${error}`);
+                            },
+                            onclose(reason) {
+                                resolve(events);
                                 return;
-                            });
+                            },
+                        });
                     })
                     .catch((error) => {
                         const diff = start
@@ -420,19 +420,6 @@ export class NostrDMWatcher {
             });
         });
 
-        // for (const url of relevantRelays) {
-        //     try {
-        //         const relay = await this.#ensureRelay(url);
-        //         relays.push(relay);
-        //     } catch (error) {
-        //         // Continue
-        //         this.#log(
-        //             `Error trying to fetch relay event on relay '${url}'`
-        //         );
-        //     }
-        // }
-
-        //const lists = relays.map((x) => x.list(filters));
         const events = new Map<string, Event>();
 
         const relayEventsArray = await Promise.allSettled(promises);
@@ -448,39 +435,6 @@ export class NostrDMWatcher {
         return Array.from(events.values());
     }
 
-    // async #fetchRelayEvents(
-    //     filters: Filter[],
-    //     onRelays?: string[]
-    // ): Promise<Event[]> {
-    //     const relevantRelays =
-    //         typeof onRelays === "undefined"
-    //             ? Array.from(this.#relays.keys())
-    //             : onRelays;
-
-    //     const relays: Relay[] = [];
-    //     for (const url of relevantRelays) {
-    //         try {
-    //             const relay = await this.#ensureRelay(url);
-    //             relays.push(relay);
-    //         } catch (error) {
-    //             // Continue
-    //             this.#log(
-    //                 `Error trying to fetch relay event on relay '${url}'`
-    //             );
-    //         }
-    //     }
-
-    //     const lists = relays.map((x) => x.list(filters));
-    //     const relayEventsArray = await Promise.all(lists);
-
-    //     const events = new Map<string, Event>();
-    //     for (const relayEvents of relayEventsArray) {
-    //         relayEvents.forEach((x) => events.set(x.id, x));
-    //     }
-
-    //     return Array.from(events.values());
-    // }
-
     #log(text: string) {
         if (!this.#isDebugOn) {
             return;
@@ -489,22 +443,7 @@ export class NostrDMWatcher {
     }
 
     #getRelayStatus(relay: Relay): string {
-        switch (relay.status) {
-            case WebSocket.CONNECTING:
-                return "CONNECTING";
-
-            case WebSocket.OPEN:
-                return "OPEN";
-
-            case WebSocket.CLOSING:
-                return "CLOSING";
-
-            case WebSocket.CLOSED:
-                return "CLOSED";
-
-            default:
-                return "UNKNOWN";
-        }
+        return relay.connected ? "OPEN" : "NOT OPEN";
     }
 
     #calculateAverageTimeBetween(times: Date[]): string {

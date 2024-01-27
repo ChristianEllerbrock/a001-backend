@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../../services/prisma-service";
 import { systemDomainIds } from "../../common/enums/system-domain";
 import { AzureSecretService } from "../../services/azure-secret-service";
-import { EventTemplate, generatePrivateKey, getPublicKey } from "nostr-tools";
+import { EventTemplate, generateSecretKey, getPublicKey } from "nostr-tools";
 import {
     KeyVaultType_Email,
     emailKeyvaultTypeKeyPrefix,
@@ -15,6 +15,7 @@ import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-servic
 import { log } from "./common";
 import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-related";
 import { RelayAllowedService } from "../../relay/services/relay-allowed-service";
+import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
 
 export async function emailController(
     req: Request,
@@ -205,17 +206,6 @@ const handleEmail = async function (req: Request) {
                 });
             }
         }
-
-        // Now, make sure that the new entries are watched for EMAIL OUT.
-        log(
-            `Start watching for DMs to '${
-                connector.conf.pubkey
-            }' on ${missingRelaysForMetadata.join(", ")}`
-        );
-        Nip05NostrService.instance.watchForDMs(
-            connector.conf.pubkey,
-            missingRelaysForMetadata
-        );
     }
 
     // Finally, generate the DM and publish to all targetRelays.
@@ -302,8 +292,9 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
     }
 
     // Now, create a new pubkey/privkey pair.
-    const privkey = generatePrivateKey();
-    const pubkey = getPublicKey(privkey);
+    const secretKey = generateSecretKey();
+    const privkey = NostrHelperV2.uint8ArrayToHex(secretKey);
+    const pubkey = getPublicKey(secretKey);
 
     // Store pubkey/privkey for the email in the Azure vault.
     const keyvaultSecretName = `${emailKeyvaultTypeKeyPrefix}${fromEmail.replace(

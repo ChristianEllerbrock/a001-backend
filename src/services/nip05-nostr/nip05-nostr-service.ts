@@ -65,15 +65,15 @@ export class Nip05NostrService {
     //     await this.#initialize();
     // }
 
-    async watchForDMs(toPubkey: string, onRelays: string[]) {
-        for (const relay of onRelays) {
-            await this.dmWatcher.watch([relay, new Set<string>([toPubkey])]);
-        }
-    }
+    // async watchForDMs(toPubkey: string, onRelays: string[]) {
+    //     for (const relay of onRelays) {
+    //         await this.dmWatcher.watch([relay, new Set<string>([toPubkey])]);
+    //     }
+    // }
 
-    killRandomRelayConnection() {
-        this.dmWatcher.killRandomRelayConnection();
-    }
+    // killRandomRelayConnection() {
+    //     this.dmWatcher.killRandomRelayConnection();
+    // }
 
     async sendDMFromBot(
         receiverPubkey: string,

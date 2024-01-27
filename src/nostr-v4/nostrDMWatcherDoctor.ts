@@ -55,7 +55,7 @@ class RelayPatient {
 
         this.#therapyTimeout = setTimeout(async () => {
             // First check if for some reason the relay is healthy.
-            if (this.relay.status === OPEN) {
+            if (this.relay.connected) {
                 this.recovered.push(new Date());
                 this.#therapyTimeout = undefined;
                 this.noOfTherapiesInARow = 0;
@@ -72,7 +72,7 @@ class RelayPatient {
                 await this.relay.connect();
             } catch (error) {}
 
-            if (this.relay.status === OPEN) {
+            if (this.relay.connected) {
                 this.recovered.push(new Date());
                 this.#therapyTimeout = undefined;
                 this.noOfTherapiesInARow = 0;
@@ -132,7 +132,7 @@ export class NostrDMWatcherDoctor {
     }
 
     cure(relay: Relay, curedCallback: () => void) {
-        if (relay.status === OPEN) {
+        if (relay.connected) {
             // Nothing to cure. "Patient" is well.
             return;
         }

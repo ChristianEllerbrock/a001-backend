@@ -1,4 +1,4 @@
-import { Event, validateEvent, verifySignature } from "nostr-tools";
+import { Event, verifyEvent } from "nostr-tools";
 import { RelayAllowedService } from "../services/relay-allowed-service";
 
 export const auth = function (
@@ -8,7 +8,7 @@ export const auth = function (
         relayUrl: string;
     }
 ): [boolean, string] {
-    const isSignatureOk = verifySignature(authEvent);
+    const isSignatureOk = verifyEvent(authEvent);
     if (!isSignatureOk) {
         return [false, "Auth event has invalid signature"];
     }
