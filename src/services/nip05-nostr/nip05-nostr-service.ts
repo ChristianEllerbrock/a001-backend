@@ -123,9 +123,12 @@ export class Nip05NostrService {
     /**
      * This methods returns all relays that the user has configured for any
      * of his registrations plus all public relays configured in the database
-     * plus all user configured NIP65 relays on any of these.
+     * plus all user configured NIP65 relays on any of these plus
+     * "relay.nip05.social".
      */
     async getRelevantAccountRelays(pubkey: string): Promise<string[]> {
+        const ownRelay = "wss://relay.nip05.social";
+
         const dbUser = await PrismaService.instance.db.user.findFirst({
             where: { pubkey },
             include: {
@@ -136,7 +139,7 @@ export class Nip05NostrService {
         });
 
         if (!dbUser) {
-            return []; // No user account available.
+            return [ownRelay]; // No user account available.
         }
 
         const registrationRelays = dbUser.registrations
@@ -150,7 +153,11 @@ export class Nip05NostrService {
         ).map((x) => x.url);
 
         const databaseRelays = Array.from(
-            new Set<string>([...registrationRelays, ...dbPublicRelays])
+            new Set<string>([
+                ownRelay,
+                ...registrationRelays,
+                ...dbPublicRelays,
+            ])
         );
         const relevantRelays = await this.includeNip65Relays(
             pubkey,
@@ -186,96 +193,6 @@ export class Nip05NostrService {
         );
         return destinationRelays;
     }
-
-    // async #initialize() {
-    //     const start = DateTime.now();
-    //     log(undefined, "STARTUP start: " + start.toJSDate().toISOString());
-
-    //     const pubkeys = new Set<string>();
-
-    //     // First go through all the emailNostr records in the database.
-    //     const dbEmailNostrs =
-    //         await PrismaService.instance.db.emailNostr.findMany({
-    //             include: { emailNostrProfiles: true },
-    //         });
-    //     for (const dbEmailNostr of dbEmailNostrs) {
-    //         pubkeys.add(dbEmailNostr.pubkey);
-
-    //         for (const profile of dbEmailNostr.emailNostrProfiles) {
-    //             // Only add PUBLIC relays.
-    //             if (paidRelays.includes(profile.publishedRelay)) {
-    //                 continue;
-    //             }
-
-    //             // Only add relays where Kind4 is possible
-    //             if (
-    //                 relaysWithoutKind4Support.includes(profile.publishedRelay)
-    //             ) {
-    //                 continue;
-    //             }
-
-    //             const record = this.#relayPubkeys.get(profile.publishedRelay);
-    //             if (typeof record === "undefined") {
-    //                 this.#relayPubkeys.set(
-    //                     profile.publishedRelay,
-    //                     new Set([dbEmailNostr.pubkey])
-    //                 );
-    //             } else {
-    //                 record.add(dbEmailNostr.pubkey);
-    //             }
-    //         }
-    //     }
-
-    //     // Now also include the systemUser records in the database.
-    //     const dbSystemUsers =
-    //         await PrismaService.instance.db.systemUser.findMany({
-    //             include: { systemUserRelays: true },
-    //         });
-    //     for (const dbSystemUser of dbSystemUsers) {
-    //         pubkeys.add(dbSystemUser.pubkey);
-
-    //         // Add to all already set up relays.
-    //         for (const relayPubkeys of this.#relayPubkeys.values()) {
-    //             relayPubkeys.add(dbSystemUser.pubkey);
-    //         }
-
-    //         // Add to all configured relays in the database (might be some new).
-    //         for (const dbSystemUserRelay of dbSystemUser.systemUserRelays) {
-    //             const record = this.#relayPubkeys.get(dbSystemUserRelay.url);
-    //             if (typeof record === "undefined") {
-    //                 this.#relayPubkeys.set(
-    //                     dbSystemUserRelay.url,
-    //                     new Set([dbSystemUser.pubkey])
-    //                 );
-    //             } else {
-    //                 record.add(dbSystemUser.pubkey);
-    //             }
-    //         }
-    //     }
-
-    //     this.dmWatcher.onDM(this.#onDMEvent.bind(this));
-
-    //     for (const data of this.#relayPubkeys) {
-    //         try {
-    //             await this.dmWatcher.watch([data[0], data[1]]);
-    //         } catch (error) {
-    //             // TODO
-    //         }
-    //     }
-
-    //     const end = DateTime.now();
-    //     log(undefined, "STARTUP finished: " + end.toJSDate().toISOString());
-
-    //     log(
-    //         undefined,
-    //         "STARTUP #duration (seconds): " +
-    //             end.diff(start, "seconds").toObject().seconds
-    //     );
-
-    //     log(undefined, "STARTUP #relays: " + this.#relayPubkeys.size);
-
-    //     log(undefined, "STARTUP #pubkeys: " + pubkeys.size);
-    // }
 
     async onDMEvent(
         event: Event,
