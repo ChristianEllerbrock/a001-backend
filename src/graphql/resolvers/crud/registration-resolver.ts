@@ -27,10 +27,7 @@ import {
 } from "../../type-defs";
 import { RegistrationDeleteInputArgs } from "../../inputs/registration-delete-input";
 import { ErrorMessage } from "../error-messages";
-import {
-    NostrHelperV2,
-    NostrPubkeyObject,
-} from "../../../nostr/nostr-helper-2";
+import { NostrHelperV2 } from "../../../nostr/nostr-helper-2";
 import { RegistrationInputUpdateArgs } from "../../inputs/updates/registration-input-update";
 import { HelperRegex } from "../../../helpers/helper-regex";
 import { NostrAddressStatisticsOutput } from "../../outputs/statistics/nostr-address-statistics-output";
@@ -41,6 +38,8 @@ import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07
 import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
 import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46RedeemInputArgs";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
+import { NostrPubkeyObject } from "../../../nostr/type-defs";
+import { verifyEvent } from "nostr-tools";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -515,7 +514,7 @@ export class RegistrationResolver {
         }
 
         // Check 3: The provided event-signature is valid.
-        if (!NostrHelperV2.verifySignature(args.data)) {
+        if (!verifyEvent(args.data)) {
             throw new Error("The signature is invalid.");
         }
 
@@ -621,7 +620,7 @@ export class RegistrationResolver {
         }
 
         // Check 3: The provided event-signature is valid.
-        if (!NostrHelperV2.verifySignature(args.data)) {
+        if (!verifyEvent(args.data)) {
             throw new Error("The signature is invalid.");
         }
 

@@ -98,10 +98,11 @@ const handlePaymentIn = async function (req: Request) {
 
     // Notify user
     log(`Settled, notify account '${updatedDbUser.pubkey}'.`);
-    const relevantUserRelays = await determineRelevantRelays(
-        updatedDbUser.id,
+
+    const relays = await Nip05NostrService.instance.getRelevantAccountRelays(
         updatedDbUser.pubkey
     );
+
     try {
         const message =
             `Thank you for subscribing to the plan '${updatedDbUser.subscription.name}'.` +
@@ -112,35 +113,12 @@ const handlePaymentIn = async function (req: Request) {
 
         const publishedRelays = await Nip05NostrService.instance.sendDMFromBot(
             updatedDbUser.pubkey,
-            relevantUserRelays,
+            relays,
             message
         );
         log(`Notified on relays: ${publishedRelays.join(", ")}`);
     } catch (error) {
         log(JSON.stringify(error));
     }
-};
-
-const determineRelevantRelays = async function (
-    userId: string,
-    pubkey: string
-): Promise<string[]> {
-    const relays = new Set<string>();
-
-    const dbData = await PrismaService.instance.db.registration.findMany({
-        where: { userId },
-        select: { registrationRelays: true },
-    });
-
-    for (const data of dbData) {
-        data.registrationRelays
-            .map((x) => x.address)
-            .forEach((y) => relays.add(y));
-    }
-
-    return await Nip05NostrService.instance.includeNip65Relays(
-        pubkey,
-        Array.from(relays)
-    );
 };
 

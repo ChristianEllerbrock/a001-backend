@@ -1,14 +1,9 @@
-import {
-    Event,
-    EventTemplate,
-    UnsignedEvent,
-    getEventHash,
-    getSignature,
-} from "nostr-tools";
+import { Event, EventTemplate, NostrEvent, finalizeEvent } from "nostr-tools";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { randomBytes } from "@noble/hashes/utils";
 import * as crypto from "node:crypto";
 import { base64 } from "@scure/base";
+import { NostrHelperV2 } from "../nostr/nostr-helper-2";
 
 export type NostrConnectorConfig = {
     pubkey: string;
@@ -30,21 +25,11 @@ export class NostrConnector {
         return this.#conf.pubkey;
     }
 
-    signEvent<K extends number = number>(
-        eventTemplate: EventTemplate<K>
-    ): Event<K> {
-        const unsignedEvent: UnsignedEvent = {
-            ...eventTemplate,
-            pubkey: this.conf.pubkey,
-        };
-
-        const event: Event = {
-            ...unsignedEvent,
-            id: getEventHash(unsignedEvent),
-            sig: getSignature(unsignedEvent, this.conf.privkey),
-        };
-
-        return event as Event<K>;
+    signEvent(eventTemplate: EventTemplate): NostrEvent {
+        return finalizeEvent(
+            eventTemplate,
+            NostrHelperV2.hexToUint8Array(this.conf.privkey)
+        );
     }
 
     async generateDM(message: string, receiverPubkey: string): Promise<Event> {

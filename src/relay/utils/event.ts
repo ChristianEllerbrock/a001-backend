@@ -1,4 +1,4 @@
-import { Event, Filter, validateEvent, verifySignature } from "nostr-tools";
+import { Event, Filter, validateEvent, verifyEvent } from "nostr-tools";
 import { isGenericTagQuery } from "./filter";
 
 /**
@@ -81,9 +81,8 @@ export const getEventDTagValue = (event: Event): string | undefined => {
 export const isEventValid = async function (
     event: Event
 ): Promise<string | undefined> {
-    const isValidEvent = validateEvent(event);
-    const isSignatureValid = verifySignature(event);
-    if (!isValidEvent || !isSignatureValid) {
+    const ok = verifyEvent(event);
+    if (!ok) {
         return "invalid event";
     }
     return undefined;
