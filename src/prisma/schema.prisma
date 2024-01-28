@@ -468,3 +468,9 @@ model RelayStat {
     noOfAuthConnections Int
     noOfEvents          Int
 }
+
+model RelayConnection {
+    id              Int      @id @default(autoincrement())
+    date            DateTime
+    uptimeInSeconds Int?
+}
