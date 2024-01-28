@@ -25,9 +25,10 @@ import { paymentInController } from "./controllers/alby/payment-in-controller";
 import { checkUnsettledInvoicesController } from "./controllers/cron/check-unsettled-invoices-controller";
 import { genKeyPairController } from "./controllers/tools/gen-key-pair";
 import { checkLastSeenNip05Controller } from "./controllers/cron/check-last-seen-nip05-controller";
-import { RelayWebSocketServerAdapter } from "./relay/adapters/web-socket-server-adapter";
+import { Nip05SocialRelay } from "./relay/nip05-social-relay";
 import { PrismaService } from "./services/prisma-service";
-import { RelayAllowedService } from "./relay/services/relay-allowed-service";
+import { Nip05SocialRelayAllowedService } from "./relay/nip05-social-relay-allowed-service";
+import { generateRelayStatsController } from "./controllers/cron/generate-relay-stats-controller";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -91,6 +92,7 @@ app.get("/admin/publish-system-user/:id", publishSystemUserController);
 app.get("/cron/check-subscriptions", checkSubscriptionsController);
 app.get("/cron/check-unsettled-invoices", checkUnsettledInvoicesController);
 app.get("/cron/check-last-seen-nip05", checkLastSeenNip05Controller);
+app.get("/cron/generate-relay-stats", generateRelayStatsController);
 
 app.get("/tools/gen-key-pair", genKeyPairController);
 
@@ -143,7 +145,10 @@ async function bootstrap() {
             })
             .then((result): void => {
                 const pubkeys = result.map((x) => x.pubkey);
-                RelayAllowedService.instance.addPubkeys(pubkeys, "auth");
+                Nip05SocialRelayAllowedService.instance.addPubkeys(
+                    pubkeys,
+                    "auth"
+                );
             });
 
         PrismaService.instance.db.emailNostr
@@ -151,20 +156,20 @@ async function bootstrap() {
                 select: { pubkey: true },
             })
             .then((x) => {
-                RelayAllowedService.instance.addSystemPubkeys(
+                Nip05SocialRelayAllowedService.instance.addSystemPubkeys(
                     x.map((x) => x.pubkey),
                     "email-mirror"
                 );
             });
 
-        RelayAllowedService.instance.addSystemPubkeys(
+        Nip05SocialRelayAllowedService.instance.addSystemPubkeys(
             [
                 "d0894d5ace70ee209774d04d5b9aae91efa28ede1954108300c44dabfbe1d9b2",
             ],
             "email-out-bot"
         );
 
-        const adapter = new RelayWebSocketServerAdapter(wsServer, {
+        Nip05SocialRelay.i.initialize(wsServer, {
             url: EnvService.instance.env.RELAY_URL,
         });
 

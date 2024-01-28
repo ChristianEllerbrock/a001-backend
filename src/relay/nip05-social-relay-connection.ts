@@ -13,6 +13,9 @@ import { createMessageHandler } from "./handlers/create-handler";
 import { SubscriptionId } from "./@types/subscription";
 import { isEventMatchingFilter } from "./utils/event";
 import { createOutgoing_EVENT_Message } from "./utils/messages";
+import { PrismaService } from "../services/prisma-service";
+import { RelayConnection } from "@prisma/client";
+import { DateTime } from "luxon";
 
 const debug = createLogger("[Relay] - RelayWebSocketAdapter");
 
@@ -27,6 +30,10 @@ export enum Nip05SocialRelayConnectionEvent {
 }
 
 export class Nip05SocialRelayConnection extends EventEmitter {
+    get isAuthenticated(): boolean {
+        return this.#isAuthenticated;
+    }
+
     #clientId: string;
     #alive = true;
     #isAuthenticated = false;
@@ -37,7 +44,8 @@ export class Nip05SocialRelayConnection extends EventEmitter {
     constructor(
         private readonly client: WebSocket,
         private readonly connectionRequest: IncomingMessage,
-        private readonly webSocketServerAdapter: Nip05SocialRelay
+        private readonly relay: Nip05SocialRelay,
+        private dbRelayConnection: RelayConnection
     ) {
         super();
 
@@ -49,6 +57,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
             .on("error", (error) => {
                 debug(`clientId ${this.#clientId} error: ${error}`);
                 this.client.close();
+                this.#calculateUptimeAndUpdateDatabase();
             });
 
         this.on(
@@ -77,6 +86,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
             "base64"
         ).toString("hex");
         debug(`clientId ${this.#clientId}: connected`);
+
         this.#sendMessageToClient(["AUTH", this.#challenge]);
     }
 
@@ -115,8 +125,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
                     const authEvent = message[1] as Event;
                     const authResult = auth(authEvent, {
                         challenge: this.#challenge,
-                        relayUrl:
-                            this.webSocketServerAdapter.config?.url ?? "na",
+                        relayUrl: this.relay.config?.url ?? "na",
                     });
                     this.#isAuthenticated = authResult[0];
                     if (this.#isAuthenticated) {
@@ -149,6 +158,8 @@ export class Nip05SocialRelayConnection extends EventEmitter {
         this.#alive = false;
 
         this.client.removeAllListeners();
+
+        this.#calculateUptimeAndUpdateDatabase();
     }
 
     #onClientPing(data: any) {
@@ -179,10 +190,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
     }
 
     #broadcastToClients(event: Event) {
-        this.webSocketServerAdapter.emit(
-            Nip05SocialRelayEvent.BroadcastToClients,
-            event
-        );
+        this.relay.emit(Nip05SocialRelayEvent.BroadcastToClients, event);
     }
 
     /**
@@ -200,6 +208,21 @@ export class Nip05SocialRelayConnection extends EventEmitter {
                     createOutgoing_EVENT_Message(subscriptionId, event)
                 );
             }
+        });
+    }
+
+    async #calculateUptimeAndUpdateDatabase() {
+        const now = DateTime.now();
+
+        const uptimeInSeconds = now
+            .diff(DateTime.fromJSDate(this.dbRelayConnection.date), "seconds")
+            .toObject().seconds;
+
+        await PrismaService.instance.db.relayConnection.update({
+            where: { id: this.dbRelayConnection.id },
+            data: {
+                uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
+            },
         });
     }
 }
