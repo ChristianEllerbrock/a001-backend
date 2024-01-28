@@ -1,0 +1,26 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[RelayStat] (
+    [id] INT NOT NULL IDENTITY(1,1),
+    [date] DATETIME2 NOT NULL,
+    [noOfConnections] INT NOT NULL,
+    [noOfAuthConnections] INT NOT NULL,
+    [noOfEvents] INT NOT NULL,
+    CONSTRAINT [RelayStat_pkey] PRIMARY KEY CLUSTERED ([id])
+);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH
