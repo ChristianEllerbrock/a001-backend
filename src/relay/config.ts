@@ -1,4 +1,4 @@
-export type RelayConfig = {
+export type Nip05SocialRelayConfig = {
     url: string;
 };
 

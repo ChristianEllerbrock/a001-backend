@@ -1,32 +1,29 @@
-import { Event, Filter } from "nostr-tools";
+import { Filter } from "nostr-tools";
 import { IMessageHandler } from "../@types/message-handlers";
 import { Incoming_REQ_Message } from "../@types/messages";
-import {
-    RelayWebSocketAdapter,
-    RelayWebSocketAdapterEvent,
-} from "../adapters/relay-web-socket-adapter";
 import { RelayEventRepository } from "../repositories/relay-event-repository";
-import { pipeline } from "stream/promises";
-import { streamFilter } from "../utils/stream";
 import { isEventMatchingFilter } from "../utils/event";
 import {
     createOutgoing_EOSE_Message,
     createOutgoing_EVENT_Message,
-    createOutgoing_NOTICE_Message,
 } from "../utils/messages";
-import { createLogger } from "../adapters/common";
+import { createLogger } from "../utils/common";
+import {
+    Nip05SocialRelayConnection,
+    Nip05SocialRelayConnectionEvent,
+} from "../nip05-social-relay-connection";
 
 const debug = createLogger("[Relay] - (REQ)MessageHandler");
 
 export class RelayIncoming_REQ_MessageHandler implements IMessageHandler {
-    constructor(private readonly wsAdapter: RelayWebSocketAdapter) {}
+    constructor(private readonly wsAdapter: Nip05SocialRelayConnection) {}
 
     async handleMessage(message: Incoming_REQ_Message): Promise<void> {
         const subscriptionId = message[1];
         const filters = message.slice(2);
 
         this.wsAdapter.emit(
-            RelayWebSocketAdapterEvent.Subscribe,
+            Nip05SocialRelayConnectionEvent.Subscribe,
             subscriptionId,
             filters
         );
@@ -45,13 +42,13 @@ export class RelayIncoming_REQ_MessageHandler implements IMessageHandler {
             );
             matchingEvents.forEach((x) => {
                 this.wsAdapter.emit(
-                    RelayWebSocketAdapterEvent.SendMessageToClient,
+                    Nip05SocialRelayConnectionEvent.SendMessageToClient,
                     createOutgoing_EVENT_Message(subscriptionId, x)
                 );
             });
 
             this.wsAdapter.emit(
-                RelayWebSocketAdapterEvent.SendMessageToClient,
+                Nip05SocialRelayConnectionEvent.SendMessageToClient,
                 createOutgoing_EOSE_Message(subscriptionId)
             );
         } catch (error: any) {

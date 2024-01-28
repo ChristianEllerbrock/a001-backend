@@ -1,13 +1,13 @@
-export class RelayAllowedService {
+export class Nip05SocialRelayAllowedService {
     // #region Singleton
-    static #instance: RelayAllowedService;
+    static #instance: Nip05SocialRelayAllowedService;
 
     static get instance() {
         if (this.#instance) {
             return this.#instance;
         }
 
-        this.#instance = new RelayAllowedService();
+        this.#instance = new Nip05SocialRelayAllowedService();
         return this.#instance;
     }
 

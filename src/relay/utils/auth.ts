@@ -1,5 +1,5 @@
 import { Event, verifyEvent } from "nostr-tools";
-import { RelayAllowedService } from "../services/relay-allowed-service";
+import { Nip05SocialRelayAllowedService } from "../nip05-social-relay-allowed-service";
 
 export const auth = function (
     authEvent: Event,
@@ -54,7 +54,11 @@ export const auth = function (
     }
 
     // Last check: pubkey is a valid NIP05.social user.
-    if (!RelayAllowedService.instance.pubkeys_auth.has(authEvent.pubkey)) {
+    if (
+        !Nip05SocialRelayAllowedService.instance.pubkeys_auth.has(
+            authEvent.pubkey
+        )
+    ) {
         return [false, "Auth event pubkey is not in allowed list"];
     }
 

@@ -14,7 +14,7 @@ import { DateTime } from "luxon";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { log } from "./common";
 import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-related";
-import { RelayAllowedService } from "../../relay/services/relay-allowed-service";
+import { Nip05SocialRelayAllowedService } from "../../relay/nip05-social-relay-allowed-service";
 import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
 
 export async function emailController(
@@ -347,7 +347,10 @@ const assureEmailExists = async function (fromEmail: string, to: string) {
         },
     });
 
-    RelayAllowedService.instance.addSystemPubkeys([pubkey], "email-mirror");
+    Nip05SocialRelayAllowedService.instance.addSystemPubkeys(
+        [pubkey],
+        "email-mirror"
+    );
 
     return dbEmail;
 };

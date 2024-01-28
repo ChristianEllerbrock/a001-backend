@@ -1,28 +1,25 @@
 import { IncomingMessage } from "http";
 import { WebSocket } from "ws";
-import {
-    RelayWebSocketServerAdapterEvent,
-    RelayWebSocketServerAdapter,
-} from "./web-socket-server-adapter";
-import { createLogger } from "./common";
+import { Nip05SocialRelayEvent, Nip05SocialRelay } from "./nip05-social-relay";
+import { createLogger } from "./utils/common";
 import { v4 } from "uuid";
-import { attemptValidation } from "../utils/validation";
-import { messageSchema } from "../schemas/message-schema";
-import {
-    MessageTypeFromClient,
-    MessageTypeFromRelay,
-} from "../@types/messages";
-import { auth } from "../utils/auth";
+import { attemptValidation } from "./utils/validation";
+import { messageSchema } from "./schemas/message-schema";
+import { MessageTypeFromClient, MessageTypeFromRelay } from "./@types/messages";
+import { auth } from "./utils/auth";
 import { Event, Filter } from "nostr-tools";
 import { EventEmitter } from "stream";
-import { createMessageHandler } from "../handlers/create-handler";
-import { SubscriptionId } from "../@types/subscription";
-import { isEventMatchingFilter } from "../utils/event";
-import { createOutgoing_EVENT_Message } from "../utils/messages";
+import { createMessageHandler } from "./handlers/create-handler";
+import { SubscriptionId } from "./@types/subscription";
+import { isEventMatchingFilter } from "./utils/event";
+import { createOutgoing_EVENT_Message } from "./utils/messages";
+import { PrismaService } from "../services/prisma-service";
+import { RelayConnection } from "@prisma/client";
+import { DateTime } from "luxon";
 
 const debug = createLogger("[Relay] - RelayWebSocketAdapter");
 
-export enum RelayWebSocketAdapterEvent {
+export enum Nip05SocialRelayConnectionEvent {
     //Event = "event",
     SendMessageToClient = "SendMessageToClient",
     ProcessEventToClient = "ProcessEventToClient",
@@ -32,7 +29,11 @@ export enum RelayWebSocketAdapterEvent {
     //Heartbeat = "heartbeat",
 }
 
-export class RelayWebSocketAdapter extends EventEmitter {
+export class Nip05SocialRelayConnection extends EventEmitter {
+    get isAuthenticated(): boolean {
+        return this.#isAuthenticated;
+    }
+
     #clientId: string;
     #alive = true;
     #isAuthenticated = false;
@@ -43,7 +44,8 @@ export class RelayWebSocketAdapter extends EventEmitter {
     constructor(
         private readonly client: WebSocket,
         private readonly connectionRequest: IncomingMessage,
-        private readonly webSocketServerAdapter: RelayWebSocketServerAdapter
+        private readonly relay: Nip05SocialRelay,
+        private dbRelayConnection: RelayConnection
     ) {
         super();
 
@@ -55,26 +57,27 @@ export class RelayWebSocketAdapter extends EventEmitter {
             .on("error", (error) => {
                 debug(`clientId ${this.#clientId} error: ${error}`);
                 this.client.close();
+                this.#calculateUptimeAndUpdateDatabase();
             });
 
         this.on(
-            RelayWebSocketAdapterEvent.SendMessageToClient,
+            Nip05SocialRelayConnectionEvent.SendMessageToClient,
             this.#sendMessageToClient.bind(this)
         )
             .on(
-                RelayWebSocketAdapterEvent.Subscribe,
+                Nip05SocialRelayConnectionEvent.Subscribe,
                 this.#subscribe.bind(this)
             )
             .on(
-                RelayWebSocketAdapterEvent.Unsubscribe,
+                Nip05SocialRelayConnectionEvent.Unsubscribe,
                 this.#unsubscribe.bind(this)
             )
             .on(
-                RelayWebSocketAdapterEvent.BroadcastToClients,
+                Nip05SocialRelayConnectionEvent.BroadcastToClients,
                 this.#broadcastToClients.bind(this)
             )
             .on(
-                RelayWebSocketAdapterEvent.ProcessEventToClient,
+                Nip05SocialRelayConnectionEvent.ProcessEventToClient,
                 this.#processEventToClient.bind(this)
             );
 
@@ -83,6 +86,7 @@ export class RelayWebSocketAdapter extends EventEmitter {
             "base64"
         ).toString("hex");
         debug(`clientId ${this.#clientId}: connected`);
+
         this.#sendMessageToClient(["AUTH", this.#challenge]);
     }
 
@@ -121,7 +125,7 @@ export class RelayWebSocketAdapter extends EventEmitter {
                     const authEvent = message[1] as Event;
                     const authResult = auth(authEvent, {
                         challenge: this.#challenge,
-                        relayUrl: this.webSocketServerAdapter.relayConfig.url,
+                        relayUrl: this.relay.config?.url ?? "na",
                     });
                     this.#isAuthenticated = authResult[0];
                     if (this.#isAuthenticated) {
@@ -154,6 +158,8 @@ export class RelayWebSocketAdapter extends EventEmitter {
         this.#alive = false;
 
         this.client.removeAllListeners();
+
+        this.#calculateUptimeAndUpdateDatabase();
     }
 
     #onClientPing(data: any) {
@@ -184,10 +190,7 @@ export class RelayWebSocketAdapter extends EventEmitter {
     }
 
     #broadcastToClients(event: Event) {
-        this.webSocketServerAdapter.emit(
-            RelayWebSocketServerAdapterEvent.BroadcastToClients,
-            event
-        );
+        this.relay.emit(Nip05SocialRelayEvent.BroadcastToClients, event);
     }
 
     /**
@@ -205,6 +208,21 @@ export class RelayWebSocketAdapter extends EventEmitter {
                     createOutgoing_EVENT_Message(subscriptionId, event)
                 );
             }
+        });
+    }
+
+    async #calculateUptimeAndUpdateDatabase() {
+        const now = DateTime.now();
+
+        const uptimeInSeconds = now
+            .diff(DateTime.fromJSDate(this.dbRelayConnection.date), "seconds")
+            .toObject().seconds;
+
+        await PrismaService.instance.db.relayConnection.update({
+            where: { id: this.dbRelayConnection.id },
+            data: {
+                uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
+            },
         });
     }
 }
