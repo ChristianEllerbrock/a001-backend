@@ -1,18 +1,18 @@
 import { IMessageHandler } from "../@types/message-handlers";
 import { Incoming_CLOSE_Message } from "../@types/messages";
 import {
-    RelayWebSocketAdapter,
-    RelayWebSocketAdapterEvent,
-} from "../adapters/relay-web-socket-adapter";
+    Nip05SocialRelayConnection,
+    Nip05SocialRelayConnectionEvent,
+} from "../nip05-social-relay-connection";
 
 export class RelayIncoming_CLOSE_MessageHandler implements IMessageHandler {
-    constructor(private readonly wsAdapter: RelayWebSocketAdapter) {}
+    constructor(private readonly wsAdapter: Nip05SocialRelayConnection) {}
 
     async handleMessage(message: Incoming_CLOSE_Message) {
         const subscriptionId = message[1];
 
         this.wsAdapter.emit(
-            RelayWebSocketAdapterEvent.Unsubscribe,
+            Nip05SocialRelayConnectionEvent.Unsubscribe,
             subscriptionId
         );
     }

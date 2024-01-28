@@ -1,13 +1,13 @@
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { IMessageHandler } from "../@types/message-handlers";
 import { Incoming_EVENT_Message } from "../@types/messages";
-import { createLogger } from "../adapters/common";
+import { Nip05SocialRelayAllowedService } from "../nip05-social-relay-allowed-service";
 import {
-    RelayWebSocketAdapter,
-    RelayWebSocketAdapterEvent,
-} from "../adapters/relay-web-socket-adapter";
+    Nip05SocialRelayConnection,
+    Nip05SocialRelayConnectionEvent,
+} from "../nip05-social-relay-connection";
 import { RelayEventRepository } from "../repositories/relay-event-repository";
-import { RelayAllowedService } from "../services/relay-allowed-service";
+import { createLogger } from "../utils/common";
 import { EventMeaning, getEventMeaning, isEventValid } from "../utils/event";
 import { createOutgoing_OK_Message } from "../utils/messages";
 import { Event } from "nostr-tools";
@@ -15,7 +15,7 @@ import { Event } from "nostr-tools";
 const debug = createLogger("[Relay] - (EVENT)MessageHandler");
 
 export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
-    constructor(private readonly wsAdapter: RelayWebSocketAdapter) {}
+    constructor(private readonly wsAdapter: Nip05SocialRelayConnection) {}
 
     async handleMessage(message: Incoming_EVENT_Message) {
         const event = message[1];
@@ -29,7 +29,7 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
             debug(`Error: ${error}`);
 
             this.wsAdapter.emit(
-                RelayWebSocketAdapterEvent.SendMessageToClient,
+                Nip05SocialRelayConnectionEvent.SendMessageToClient,
                 createOutgoing_OK_Message(
                     event.id,
                     false,
@@ -45,7 +45,7 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
         if (reason) {
             debug(`event ${event.id} rejected: ${reason}`);
             this.wsAdapter.emit(
-                RelayWebSocketAdapterEvent.SendMessageToClient,
+                Nip05SocialRelayConnectionEvent.SendMessageToClient,
                 createOutgoing_OK_Message(event.id, false, reason)
             );
             return false;
@@ -80,7 +80,7 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
         }
 
         this.wsAdapter.emit(
-            RelayWebSocketAdapterEvent.SendMessageToClient,
+            Nip05SocialRelayConnectionEvent.SendMessageToClient,
             createOutgoing_OK_Message(
                 event.id,
                 true,
@@ -90,7 +90,7 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
 
         if (result === 1) {
             this.wsAdapter.emit(
-                RelayWebSocketAdapterEvent.BroadcastToClients,
+                Nip05SocialRelayConnectionEvent.BroadcastToClients,
                 event
             );
         }
@@ -118,14 +118,18 @@ export class RelayIncoming_EVENT_MessageHandler implements IMessageHandler {
 
         // Check if the DM is destined for any relevant system pubkey.
         if (
-            RelayAllowedService.instance.systemPubkeys_emailMirror.has(pubkey)
+            Nip05SocialRelayAllowedService.instance.systemPubkeys_emailMirror.has(
+                pubkey
+            )
         ) {
             Nip05NostrService.instance.onDMEvent(event, "email-mirror");
             return;
         }
 
         if (
-            RelayAllowedService.instance.systemPubkeys_emailOutBots.has(pubkey)
+            Nip05SocialRelayAllowedService.instance.systemPubkeys_emailOutBots.has(
+                pubkey
+            )
         ) {
             Nip05NostrService.instance.onDMEvent(event, "email-out-bot");
             return;
