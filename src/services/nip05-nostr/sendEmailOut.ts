@@ -10,6 +10,7 @@ export const sendEmailOut = async function (
     event: Event,
     senderEmail: string,
     senderMessage: string,
+    senderFallbackSubject: string,
     dbEmailNostr: DbEmailNostr | null,
     dbSystemUser: DbSystemUser | null
 ): Promise<
@@ -25,6 +26,7 @@ export const sendEmailOut = async function (
             event,
             senderEmail,
             senderMessage,
+            senderFallbackSubject,
             dbEmailNostr
         );
 
@@ -40,6 +42,7 @@ export const sendEmailOut = async function (
             event,
             senderEmail,
             senderMessage,
+            senderFallbackSubject,
             dbSystemUser
         );
 
@@ -55,6 +58,7 @@ const sendEmailOutViaEmailMirror = async function (
     event: Event,
     senderEmail: string,
     senderMessage: string,
+    senderFallbackSubject: string,
     dbEmailNostr: DbEmailNostr
 ): Promise<number | undefined> {
     // Check if the intended email was already sent.
@@ -72,14 +76,14 @@ const sendEmailOutViaEmailMirror = async function (
     // Make sure that the email exists in Azure as sender.
     await AzureCommunicationService.instance.addEmail(senderEmail);
 
+    // Determine the right connectionString;
+
     // Send Email.
-    const client = new EmailClient(
-        EnvService.instance.env.COMMUNICATION_SERVICES_CONNECTION_STRING
-    );
+    const client = new EmailClient(determineConnectionString(senderEmail));
     const emailMessage = {
         senderAddress: senderEmail,
         content: {
-            subject: deconstructedMessage.subject ?? "Nostr 2 Email",
+            subject: deconstructedMessage.subject ?? senderFallbackSubject,
             plainText: deconstructedMessage.message ?? "na",
         },
         recipients: {
@@ -97,6 +101,7 @@ const sendEmailOutViaEmailHub = async function (
     event: Event,
     senderEmail: string,
     senderMessage: string,
+    senderFallbackSubject: string,
     dbSystemUser: DbSystemUser
 ): Promise<number | undefined> {
     const deconstructedMessage = deconstructMessage(senderMessage);
@@ -118,13 +123,11 @@ const sendEmailOutViaEmailHub = async function (
     await AzureCommunicationService.instance.addEmail(senderEmail);
 
     // Send Email.
-    const client = new EmailClient(
-        EnvService.instance.env.COMMUNICATION_SERVICES_CONNECTION_STRING
-    );
+    const client = new EmailClient(determineConnectionString(senderEmail));
     const emailMessage = {
         senderAddress: senderEmail,
         content: {
-            subject: deconstructedMessage.subject ?? "Nostr 2 Email",
+            subject: deconstructedMessage.subject ?? senderFallbackSubject,
             plainText: deconstructedMessage.message ?? "na",
         },
         recipients: {
@@ -172,5 +175,54 @@ const deconstructMessage = function (message: string) {
 
     returnValue.message = remainingMessage.trim();
     return returnValue;
+};
+
+const determineConnectionString = function (email: string): string {
+    const domainName = email.split("@")[1].toLowerCase();
+
+    // Determine the right connectionString;
+    let connectionString = "";
+    switch (domainName) {
+        case "nip05.social":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_NIP05SOCIAL;
+            break;
+
+        case "nostrid.info":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_NOSTRIDINFO;
+            break;
+
+        case "nostrcom.com":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_NOSTRCOMCOM;
+            break;
+
+        case "nip05.cloud":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_NIP05CLOUD;
+            break;
+
+        case "unitednostr.com":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_UNITEDNOSTRCOM;
+            break;
+
+        case "protonostr.com":
+            connectionString =
+                EnvService.instance.env
+                    .COMMUNICATION_SERVICES_CONNECTION_STRING_PROTONOSTRCOM;
+            break;
+
+        default:
+            break;
+    }
+
+    return connectionString;
 };
 

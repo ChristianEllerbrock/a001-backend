@@ -89,7 +89,7 @@ export const checkSubscriptionAndRespondIfNecessary = async function (
             )}`
         );
         let text =
-            "== MESSAGE FROM NIP05.social\n\n" +
+            "ATTENTION: NIP05.social\n\n" +
             "Your current subscription does not include OUTBOUND EMAIL FORWARDING. " +
             "Please subscribe to a higher plan on\n\n" +
             "https://nip05.social";
