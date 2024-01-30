@@ -346,24 +346,32 @@ export class Nip05NostrService {
             return; // No valid subscription.
         }
 
-        //
-        // CURRENTLY ONLY ALLOW CHRIS pubkey
+        // Determine the CURRENT registration that has EMAIL OUT enabled
+        const dbEmailOutRegistration = dbUser.registrations.find(
+            (x) => x.emailOut
+        );
+        if (!dbEmailOutRegistration) {
+            log(
+                event,
+                `Respond with DM: No registration found with activated EMAIL OUT.`
+            );
+            // TODO: Answer
 
-        if (
-            event.pubkey !==
-            "090e4e48e07e331b7a9eb527532794969ab1086ddfa4d805fff88c6358e9d15d"
-        ) {
-            log(event, "DEBUG PHASE: ONLY Chris is allowed.");
+            const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
+            let text =
+                "ATTENTION: NIP05.social\n\n" +
+                "Currently, you have NOT configured any of your #nostr addresses to" +
+                " act as #email sender. The previous message was NOT delivered as #email.\n\n" +
+                "Please visit your account section and make the appropriate changes before" +
+                " sending another message.";
+            await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
             return;
         }
 
-        // Determine the CURRENT user's NIP05.
-        // TODO
-        const dbFirstRegistration = dbUser.registrations[0];
         const senderEmail =
-            dbFirstRegistration.identifier +
+            dbEmailOutRegistration.identifier +
             "@" +
-            dbFirstRegistration.systemDomain.name;
+            dbEmailOutRegistration.systemDomain.name;
         log(event, `Will use email address as sender: ${senderEmail}`);
 
         // Everything is ok. We can send the email.
@@ -372,6 +380,7 @@ export class Nip05NostrService {
             event,
             senderEmail,
             message,
+            dbEmailOutRegistration.emailOutSubject,
             receiverDbEmailNostr,
             receiverDbSystemUser
         );
@@ -405,13 +414,13 @@ export class Nip05NostrService {
             await PrismaService.instance.db.registrationEmailOut.upsert({
                 where: {
                     registrationId_date: {
-                        registrationId: dbFirstRegistration.id,
+                        registrationId: dbEmailOutRegistration.id,
                         date: DateTime.now().startOf("day").toJSDate(),
                     },
                 },
                 update: { total: { increment: 1 } },
                 create: {
-                    registrationId: dbFirstRegistration.id,
+                    registrationId: dbEmailOutRegistration.id,
                     date: DateTime.now().startOf("day").toJSDate(),
                     total: 1,
                 },
@@ -420,6 +429,14 @@ export class Nip05NostrService {
             event,
             `Sent ${dbRegistrationEmailOut.total} today on behalf of the user.`
         );
+
+        // Inform user via DM about success
+        const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
+        let text =
+            "INFO: NIP05.social\n\n" +
+            "Message successfully sent as #email to" +
+            ` ${receiverDbEmailNostr?.email.address}`;
+        await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
     }
 
     /**
