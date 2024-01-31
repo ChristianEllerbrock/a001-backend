@@ -434,8 +434,10 @@ export class Nip05NostrService {
         const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
         let text =
             "INFO: NIP05.social\n\n" +
-            "Message successfully sent as #email to" +
-            ` ${receiverDbEmailNostr?.email.address}`;
+            "Message successfully sent as #email:\n\n" +
+            `FROM: ${sendResult.from}\n` +
+            `TO: ${sendResult.to}\n` +
+            `SUBJECT: ${sendResult.subject}\n`;
         await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
     }
 

@@ -5,6 +5,14 @@ import { AzureCommunicationService } from "../azure-communication-service";
 import { EmailClient } from "@azure/communication-email";
 import { EnvService } from "../env-service";
 
+export type SendEmailOutResponse = {
+    emailNostrId: number | undefined;
+    systemUserId: number | undefined;
+    to: string;
+    from: string;
+    subject: string;
+};
+
 export const sendEmailOut = async function (
     this: Nip05NostrService,
     event: Event,
@@ -13,15 +21,9 @@ export const sendEmailOut = async function (
     senderFallbackSubject: string,
     dbEmailNostr: DbEmailNostr | null,
     dbSystemUser: DbSystemUser | null
-): Promise<
-    | {
-          emailNostrId: number | undefined;
-          systemUserId: number | undefined;
-      }
-    | undefined
-> {
+): Promise<SendEmailOutResponse | undefined> {
     if (dbEmailNostr) {
-        const emailNostrId = await sendEmailOutViaEmailMirror.call(
+        return await sendEmailOutViaEmailMirror.call(
             this,
             event,
             senderEmail,
@@ -29,15 +31,10 @@ export const sendEmailOut = async function (
             senderFallbackSubject,
             dbEmailNostr
         );
-
-        return {
-            emailNostrId,
-            systemUserId: undefined,
-        };
     }
 
     if (dbSystemUser) {
-        const systemUserId = await sendEmailOutViaEmailHub.call(
+        return await sendEmailOutViaEmailHub.call(
             this,
             event,
             senderEmail,
@@ -45,11 +42,6 @@ export const sendEmailOut = async function (
             senderFallbackSubject,
             dbSystemUser
         );
-
-        return {
-            emailNostrId: undefined,
-            systemUserId,
-        };
     }
 };
 
@@ -60,7 +52,7 @@ const sendEmailOutViaEmailMirror = async function (
     senderMessage: string,
     senderFallbackSubject: string,
     dbEmailNostr: DbEmailNostr
-): Promise<number | undefined> {
+): Promise<SendEmailOutResponse | undefined> {
     // Check if the intended email was already sent.
     if (
         dbEmailNostr.emailNostrDms.find(
@@ -93,7 +85,13 @@ const sendEmailOutViaEmailMirror = async function (
     // https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/add-multiple-senders-mgmt-sdks?pivots=programming-language-javascript
     const poller = await client.beginSend(emailMessage);
     await poller.pollUntilDone();
-    return dbEmailNostr.id;
+    return {
+        emailNostrId: dbEmailNostr.id,
+        systemUserId: undefined,
+        from: senderEmail,
+        to: dbEmailNostr.email.address,
+        subject: deconstructedMessage.subject ?? senderFallbackSubject,
+    };
 };
 
 const sendEmailOutViaEmailHub = async function (
@@ -103,7 +101,7 @@ const sendEmailOutViaEmailHub = async function (
     senderMessage: string,
     senderFallbackSubject: string,
     dbSystemUser: DbSystemUser
-): Promise<number | undefined> {
+): Promise<SendEmailOutResponse | undefined> {
     const deconstructedMessage = deconstructMessage(senderMessage);
 
     if (!deconstructedMessage.to) {
@@ -137,7 +135,13 @@ const sendEmailOutViaEmailHub = async function (
     // https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/add-multiple-senders-mgmt-sdks?pivots=programming-language-javascript
     const poller = await client.beginSend(emailMessage);
     await poller.pollUntilDone();
-    return dbSystemUser.id;
+    return {
+        emailNostrId: undefined,
+        systemUserId: dbSystemUser.id,
+        from: senderEmail,
+        to: deconstructedMessage.to,
+        subject: deconstructedMessage.subject ?? senderFallbackSubject,
+    };
 };
 
 const deconstructMessage = function (message: string) {
