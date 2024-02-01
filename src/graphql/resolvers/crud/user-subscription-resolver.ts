@@ -98,12 +98,22 @@ export class UserSubscriptionResolver {
             where: { id: userId },
             include: { subscription: true },
         });
-
         if (!dbUser) {
             throw new Error(
                 "Could not find you and your subscription in the database. Please try again later."
             );
         }
+
+        const pendingUserSubscription =
+            await context.db.userSubscription.findFirst({
+                where: { userId: dbUser.id, pending: true },
+            });
+        if (pendingUserSubscription) {
+            throw new Error(
+                "You have a pending subscription change. Please cancel it before updating your subscription."
+            );
+        }
+
         const initialSubscriptionId = dbUser.subscriptionId;
         const initialSubscriptionName = dbUser.subscription.name;
 
