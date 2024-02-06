@@ -1,13 +1,5 @@
 import { DateTime } from "luxon";
-import {
-    Arg,
-    Args,
-    Ctx,
-    Mutation,
-    PubSub,
-    PubSubEngine,
-    Resolver,
-} from "type-graphql";
+import { Arg, Args, Ctx, Mutation, Resolver } from "type-graphql";
 import { HelperAuth } from "../../../helpers/helper-auth";
 import { SystemConfigId } from "../../../prisma/assortments";
 import { PrismaService } from "../../../services/prisma-service";
@@ -388,8 +380,7 @@ export class LoginResolver {
     @Mutation((returns) => String)
     async createLoginCode(
         @Ctx() context: GraphqlContext,
-        @Args() args: LoginCodeCreateInputArgs,
-        @PubSub() pubSub: PubSubEngine
+        @Args() args: LoginCodeCreateInputArgs
     ): Promise<string> {
         const now = DateTime.now();
 

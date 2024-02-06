@@ -1,6 +1,6 @@
 import { ArgsType, Field, InputType } from "type-graphql";
 
-@InputType("RelayInput", { isAbstract: true })
+@InputType("RelayInput")
 export class RelayInput {
     @Field((type) => String)
     id!: string;
@@ -9,7 +9,7 @@ export class RelayInput {
     address!: string;
 }
 
-@InputType("UpdateRegistrationRelayInput", { isAbstract: true })
+@InputType("UpdateRegistrationRelayInput")
 export class UpdateRegistrationRelayInput {
     @Field((type) => [String])
     toBeDeletedIds!: string[];

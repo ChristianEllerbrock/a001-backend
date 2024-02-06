@@ -8,7 +8,7 @@ export class AuthResolver {
     async isAuthenticated(
         @Ctx() context: GraphqlContext
     ): Promise<UserTokenOutput | null> {
-        if (!context.user) {
+        if (!context.user?.userId || !context.user?.deviceId) {
             return null;
         }
 
