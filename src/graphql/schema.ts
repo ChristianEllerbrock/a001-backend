@@ -38,8 +38,8 @@ export const schemaOptions: BuildSchemaOptions = {
         DirectoryResolver,
 
         // Subscription resolvers
-        JobSubResolver,
-        NostrEventSubscriptionResolver,
+        //JobSubResolver,
+        //NostrEventSubscriptionResolver,
 
         // Nostr
         NostrEventResolver,

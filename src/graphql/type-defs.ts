@@ -6,7 +6,9 @@ import * as uuid from "uuid";
 import { DateTime } from "luxon";
 import { SystemConfigId } from "../prisma/assortments";
 import { UserTokenOutput } from "./outputs/user-token-output";
+import { OperationContext } from "graphql-http";
 import { Request } from "express";
+import { RequestContext } from "graphql-http/lib/use/express";
 
 export enum Role {
     Admin = "Admin",
@@ -19,20 +21,85 @@ export interface GraphqlContext {
         hostname: string;
         domain: string;
     };
-    user:
-        | {
-              userId: string;
-              userToken: string;
-              deviceId: string;
-              hasValidTokenAsync: () => Promise<boolean>;
-              isSystemUser: () => Promise<boolean>;
-          }
-        | undefined;
+    user: GraphqlContextUser | undefined;
 }
 
-export const getGraphqlContext = function (
-    req: IncomingMessage
-): GraphqlContext {
+class GraphqlContextUser {
+    #hasValidToken: boolean | undefined;
+    #isSystemUser: boolean | undefined;
+
+    constructor(
+        public userId: string | undefined,
+        public userToken: string | undefined,
+        public deviceId: string | undefined
+    ) {}
+
+    async hasValidTokenAsync(): Promise<boolean> {
+        if (typeof this.#hasValidToken !== "undefined") {
+            return this.#hasValidToken;
+        }
+
+        if (
+            typeof this.userId === "undefined" ||
+            typeof this.userToken === "undefined" ||
+            typeof this.deviceId === "undefined"
+        ) {
+            this.#hasValidToken = false;
+            return false;
+        }
+
+        const dbUserToken = await PrismaService.instance.db.userToken.findFirst(
+            {
+                where: {
+                    userId: this.userId,
+                    deviceId: this.deviceId,
+                    token: this.userToken,
+                },
+            }
+        );
+
+        if (!dbUserToken) {
+            this.#hasValidToken = false;
+            return false;
+        }
+
+        // Check validity
+        this.#hasValidToken = Date.now() < dbUserToken.validUntil.getTime();
+        return this.#hasValidToken;
+    }
+
+    async isSystemUser(): Promise<boolean> {
+        if (typeof this.#isSystemUser !== "undefined") {
+            return this.#isSystemUser;
+        }
+
+        if (
+            typeof this.userId === "undefined" ||
+            typeof this.userToken === "undefined" ||
+            typeof this.deviceId === "undefined"
+        ) {
+            this.#isSystemUser = false;
+            return false;
+        }
+
+        const dbUser = await PrismaService.instance.db.user.findUnique({
+            where: { id: this.userId },
+        });
+
+        if (dbUser?.isSystemUser === true) {
+            this.#isSystemUser = true;
+            return true;
+        }
+
+        this.#isSystemUser = false;
+        return false;
+    }
+}
+
+export const getGraphqlContext2 = function (request: any): OperationContext {
+    const req = request.raw;
+    const context: Record<string, any> = {};
+
     let userId: string | undefined;
     let userToken: string | undefined;
     let deviceId: string | undefined;
@@ -60,70 +127,63 @@ export const getGraphqlContext = function (
         typeof userId !== "undefined" &&
         typeof userToken !== "undefined" &&
         typeof deviceId !== "undefined"
-            ? {
-                  userId,
-                  userToken,
-                  deviceId,
-                  hasValidTokenAsync: async (): Promise<boolean> => {
-                      if (
-                          typeof userId === "undefined" ||
-                          typeof userToken === "undefined" ||
-                          typeof deviceId === "undefined"
-                      ) {
-                          return false;
-                      }
-
-                      const dbUserToken =
-                          await PrismaService.instance.db.userToken.findFirst({
-                              where: {
-                                  userId,
-                                  deviceId,
-                                  token: userToken,
-                              },
-                          });
-
-                      if (!dbUserToken) {
-                          return false;
-                      }
-
-                      // Check validity
-                      return Date.now() < dbUserToken.validUntil.getTime()
-                          ? true
-                          : false;
-                  },
-                  isSystemUser: async (): Promise<boolean> => {
-                      if (
-                          typeof userId === "undefined" ||
-                          typeof userToken === "undefined" ||
-                          typeof deviceId === "undefined"
-                      ) {
-                          return false;
-                      }
-
-                      const dbUser =
-                          await PrismaService.instance.db.user.findUnique({
-                              where: { id: userId },
-                          });
-
-                      if (dbUser?.isSystemUser === true) {
-                          return true;
-                      }
-
-                      return false;
-                  },
-              }
+            ? new GraphqlContextUser(userId, userToken, deviceId)
             : undefined;
 
-    return {
-        db: PrismaService.instance.db,
-        user,
-        req: {
-            hostname,
-            protocol,
-            domain,
-        },
+    context["db"] = PrismaService.instance.db;
+    context["user"] = user;
+    context["req"] = {
+        hostname,
+        protocol,
+        domain,
     };
+
+    return context;
 };
+
+// export const getGraphqlContext = function (
+//     req: IncomingMessage
+// ): GraphqlContext {
+//     let userId: string | undefined;
+//     let userToken: string | undefined;
+//     let deviceId: string | undefined;
+//     try {
+//         const value1 = req.headers["nip05socialuserid"];
+//         userId = Array.isArray(value1) ? undefined : value1;
+
+//         const value2 = req.headers["nip05socialauthorization"];
+//         userToken = Array.isArray(value2) ? undefined : value2;
+
+//         const value3 = req.headers["nip05socialdeviceid"];
+//         deviceId = Array.isArray(value3) ? undefined : value3;
+//     } catch (error) {
+//         console.log(error);
+//     }
+
+//     const hostname = (req as any).hostname;
+//     const protocol = (req as any).protocol;
+//     const hostnameParts = hostname.toLowerCase().split(".");
+//     const lastIndex = hostnameParts.length - 1;
+//     const domain =
+//         hostnameParts[lastIndex - 1] + "." + hostnameParts[lastIndex];
+
+//     const user =
+//         typeof userId !== "undefined" &&
+//         typeof userToken !== "undefined" &&
+//         typeof deviceId !== "undefined"
+//             ? new GraphqlContextUser(userId, userToken, deviceId)
+//             : undefined;
+
+//     return {
+//         db: PrismaService.instance.db,
+//         user,
+//         req: {
+//             hostname,
+//             protocol,
+//             domain,
+//         },
+//     };
+// };
 
 export const customAuthChecker: AuthChecker<GraphqlContext> = async (
     { root, args, context, info },

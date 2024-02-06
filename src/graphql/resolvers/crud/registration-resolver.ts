@@ -6,8 +6,6 @@ import {
     Ctx,
     Int,
     Mutation,
-    PubSub,
-    PubSubEngine,
     Query,
     Resolver,
 } from "type-graphql";
@@ -697,8 +695,7 @@ export class RegistrationResolver {
     @Mutation((returns) => RegistrationOutput)
     async createRegistrationCode(
         @Ctx() context: GraphqlContext,
-        @Args() args: RegistrationCodeCreateInput,
-        @PubSub() pubSub: PubSubEngine
+        @Args() args: RegistrationCodeCreateInput
     ): Promise<RegistrationOutput> {
         await cleanupExpiredRegistrationsAsync();
         const now = DateTime.now();
@@ -832,8 +829,7 @@ ${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${
     @Mutation((returns) => Boolean)
     async resendRegistrationCode(
         @Ctx() context: GraphqlContext,
-        @Args() args: RegistrationCodeResendInput,
-        @PubSub() pubSub: PubSubEngine
+        @Args() args: RegistrationCodeResendInput
     ): Promise<boolean> {
         await cleanupExpiredRegistrationsAsync();
 

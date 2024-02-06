@@ -3,11 +3,11 @@ import "reflect-metadata";
 import "./extensions";
 import "websocket-polyfill";
 import express, { Express } from "express";
+import { createHandler } from "graphql-http/lib/use/express";
 import dotenv from "dotenv";
 import cors from "cors";
 import { EnvService } from "./services/env-service";
-import { graphqlHTTP } from "express-graphql";
-import { getGraphqlContext } from "./graphql/type-defs";
+import { getGraphqlContext2 } from "./graphql/type-defs";
 import { buildSchema } from "type-graphql";
 import { schemaOptions } from "./graphql/schema";
 import { wellKnownNostrController } from "./controllers/well-known-nostr-controller";
@@ -101,17 +101,28 @@ app.post("/alby/payment-in", paymentInController);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);
-    app.use(
+
+    app.all(
         GRAPHQL_ENDPOINT,
-        graphqlHTTP((req, res, graphQLParams) => {
-            return {
-                schema: schema,
-                context: getGraphqlContext(req),
-                graphiql: { headerEditorEnabled: true },
-                pretty: true,
-            };
+        createHandler({
+            schema,
+            context: (req, params) => {
+                return getGraphqlContext2(req);
+            },
         })
     );
+
+    // app.use(
+    //     GRAPHQL_ENDPOINT,
+    //     graphqlHTTP((req, res, graphQLParams) => {
+    //         return {
+    //             schema: schema,
+    //             context: getGraphqlContext(req),
+    //             graphiql: { headerEditorEnabled: true },
+    //             pretty: true,
+    //         };
+    //     })
+    // );
 
     const server = app.listen(port, () => {
         console.log(`⚡️[server]: Running at http://localhost:${port}`);

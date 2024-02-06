@@ -19,16 +19,27 @@ export class UserRelationResolver {
         @Root() user: UserOutput,
         @Ctx() context: GraphqlContext
     ): Promise<RegistrationOutput[]> {
-        const dbRegistrations = context.db.registration.findMany({
-            where: {
-                userId: user.id,
-                verifiedAt: {
-                    not: null,
-                },
-            },
+        // const dbRegistrations = await context.db.registration.findMany({
+        //     where: {
+        //         userId: user.id,
+        //         verifiedAt: {
+        //             not: null,
+        //         },
+        //     },
+        // });
+
+        const dbUser = await context.db.user.findUnique({
+            where: { id: user.id },
+            include: { registrations: true },
         });
 
-        return (await dbRegistrations).sortBy((x) => x.identifier);
+        return (
+            dbUser?.registrations
+                .filter((x) => x.verifiedAt != null)
+                .sortBy((x) => x.identifier) ?? []
+        );
+
+        //return dbRegistrations.sortBy((x) => x.identifier);
     }
 
     @Authorized()

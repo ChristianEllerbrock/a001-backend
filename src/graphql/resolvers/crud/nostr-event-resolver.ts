@@ -1,4 +1,4 @@
-import { Args, Ctx, PubSub, PubSubEngine, Query, Resolver } from "type-graphql";
+import { Args, Ctx, Query, Resolver } from "type-graphql";
 import { NostrEventOutput } from "../../outputs/nostr-event-output";
 import { GraphqlContext } from "../../type-defs";
 import { ProfileInputArgs } from "../../inputs/profile-input";
