@@ -474,3 +474,13 @@ model RelayConnection {
     date            DateTime
     uptimeInSeconds Int?
 }
+
+// typeId = 
+model CronJob {
+    id              Int      @id @default(autoincrement())
+    typeId          Int      @unique
+    lastRunAt       DateTime
+    lastRunDuration Int?
+    lastRunSuccess  Boolean?
+    lastRunResult   String?
+}
