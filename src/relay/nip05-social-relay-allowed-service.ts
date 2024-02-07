@@ -16,6 +16,7 @@ export class Nip05SocialRelayAllowedService {
     readonly pubkeys_auth = new Set<string>();
     readonly systemPubkeys_emailMirror = new Set<string>();
     readonly systemPubkeys_emailOutBots = new Set<string>();
+    readonly systemPubkeys = new Set<string>();
 
     addPubkeys(pubkeys: string[], allow: "auth") {
         switch (allow) {
@@ -41,7 +42,7 @@ export class Nip05SocialRelayAllowedService {
 
     addSystemPubkeys(
         pubkeys: string[],
-        type: "email-mirror" | "email-out-bot"
+        type: "email-mirror" | "email-out-bot" | "default"
     ) {
         switch (type) {
             case "email-mirror":
@@ -50,6 +51,10 @@ export class Nip05SocialRelayAllowedService {
 
             case "email-out-bot":
                 this.#addToSet(this.systemPubkeys_emailOutBots, pubkeys);
+                break;
+
+            case "default":
+                this.#addToSet(this.systemPubkeys, pubkeys);
                 break;
 
             default:

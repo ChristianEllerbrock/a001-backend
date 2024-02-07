@@ -19,6 +19,7 @@ import { findCommandInOutMessage, respondToCommand } from "./command-related";
 import { log } from "./common";
 import { checkSubscriptionAndRespondIfNecessary } from "./subscription-related";
 import { sendEmailOut } from "./sendEmailOut";
+import { EnvService } from "../env-service";
 
 const paidRelays: string[] = [
     "wss://nostr.wine",
@@ -127,7 +128,7 @@ export class Nip05NostrService {
      * "relay.nip05.social".
      */
     async getRelevantAccountRelays(pubkey: string): Promise<string[]> {
-        const ownRelay = "wss://relay.nip05.social";
+        const ownRelay = EnvService.instance.env.RELAY_URL; //"wss://relay.nip05.social";
 
         const dbUser = await PrismaService.instance.db.user.findFirst({
             where: { pubkey },

@@ -269,9 +269,9 @@ export class NostrDMWatcher {
             }, timeout);
 
             let relay = this.#relays.get(url);
-            let isNew = false;
             if (!relay) {
                 relay = new Relay(url);
+
                 this.#relays.set(url, relay);
             }
 
