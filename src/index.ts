@@ -112,18 +112,6 @@ async function bootstrap() {
         })
     );
 
-    // app.use(
-    //     GRAPHQL_ENDPOINT,
-    //     graphqlHTTP((req, res, graphQLParams) => {
-    //         return {
-    //             schema: schema,
-    //             context: getGraphqlContext(req),
-    //             graphiql: { headerEditorEnabled: true },
-    //             pretty: true,
-    //         };
-    //     })
-    // );
-
     const server = app.listen(port, () => {
         console.log(`⚡️[server]: Running at http://localhost:${port}`);
         console.log(`⚡️[server]: GraphQL endpoint is '${GRAPHQL_ENDPOINT}'`);
@@ -178,6 +166,14 @@ async function bootstrap() {
                 "d0894d5ace70ee209774d04d5b9aae91efa28ede1954108300c44dabfbe1d9b2",
             ],
             "email-out-bot"
+        );
+
+        Nip05SocialRelayAllowedService.instance.addSystemPubkeys(
+            [
+                "decfe634a6a6a6025fb59d4e139026381242b9ddad6b8d612d370c343942c005", // NIP05.social [Bot]
+                "ae064aa171e0d49799252c1034e24b88cdf4fae2328f1736339a41d43567a754", // NIP05.social [Admin]
+            ],
+            "default"
         );
 
         Nip05SocialRelay.i.initialize(wsServer, {

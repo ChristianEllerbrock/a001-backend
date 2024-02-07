@@ -16,6 +16,7 @@ import { createOutgoing_EVENT_Message } from "./utils/messages";
 import { PrismaService } from "../services/prisma-service";
 import { RelayConnection } from "@prisma/client";
 import { DateTime } from "luxon";
+import { Nip05SocialRelayAllowedService } from "./nip05-social-relay-allowed-service";
 
 const debug = createLogger("[Relay] - RelayWebSocketAdapter");
 
@@ -99,7 +100,43 @@ export class Nip05SocialRelayConnection extends EventEmitter {
                 JSON.parse(raw.toString("utf8"))
             );
 
-            if (!this.#isAuthenticated) {
+            let bypassAuth = false;
+            // Certain system accounts should NOT be forced to perform an AUTH
+            // for Kind 0 (Metadata), Kind 1 (Note) and Kind 4 (direct messages) EVENTs.
+            if (message[0] === MessageTypeFromClient.EVENT) {
+                const event = message[1] as Event;
+
+                if ([0, 1, 4].includes(event.kind)) {
+                    // We received a kind 0, 1 or 4 event.
+                    // Check if it originates from an "allowed" pubkey.
+
+                    if (
+                        Nip05SocialRelayAllowedService.instance.systemPubkeys.has(
+                            event.pubkey
+                        )
+                    ) {
+                        bypassAuth = true;
+                    } else if (
+                        Nip05SocialRelayAllowedService.instance.systemPubkeys_emailOutBots.has(
+                            event.pubkey
+                        )
+                    ) {
+                        bypassAuth = true;
+                    } else if (
+                        Nip05SocialRelayAllowedService.instance.systemPubkeys_emailMirror.has(
+                            event.pubkey
+                        )
+                    ) {
+                        bypassAuth = true;
+                    }
+                }
+            }
+
+            if (bypassAuth || this.isAuthenticated) {
+                // Continue, the client is authenticated or allowed.
+                const messageHandler = createMessageHandler(message, this);
+                await messageHandler.handleMessage(message);
+            } else {
                 // The client IS NOT authenticated.
                 if (message[0] === MessageTypeFromClient.REQ) {
                     this.#sendMessageToClient([
@@ -139,10 +176,6 @@ export class Nip05SocialRelayConnection extends EventEmitter {
                     ]);
                     return;
                 }
-            } else {
-                // Continue, the client IS authenticated.
-                const messageHandler = createMessageHandler(message, this);
-                await messageHandler.handleMessage(message);
             }
         } catch (error: any) {
             debug(`clientId ${this.#clientId}: message error: ${error}`);
