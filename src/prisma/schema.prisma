@@ -484,3 +484,13 @@ model CronJob {
     lastRunSuccess  Boolean?
     lastRunResult   String?
 }
+
+model PromoCode {
+    id         Int      @id @default(autoincrement())
+    code       String   @unique
+    sats       Int
+    createdAt  DateTime
+    validUntil DateTime
+    pubkey     String?
+    info       String?
+}

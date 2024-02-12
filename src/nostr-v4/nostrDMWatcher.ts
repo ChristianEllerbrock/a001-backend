@@ -146,9 +146,10 @@ export class NostrDMWatcher {
             }
         }
 
+        const publishedOn: string[] = [];
+
         const pubs = relays.map((x) => this.#publish(x, event));
         const promiseResults = await Promise.allSettled(pubs);
-        const publishedOn: string[] = [];
 
         for (const result of promiseResults) {
             if (result.status === "fulfilled") {

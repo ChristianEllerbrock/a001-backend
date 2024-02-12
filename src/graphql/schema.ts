@@ -22,6 +22,7 @@ import { UserSubscriptionInvoiceResolverRelations } from "./resolvers/crud/user-
 import { PublicRelayResolver } from "./resolvers/crud/public-relay-resolver";
 import { BotMetadataResolver } from "./resolvers/crud/bot-metadata-resolver";
 import { BotMetadataRelationResolver } from "./resolvers/crud/bot-metadata-relation-resolver";
+import { PromoCodeResolver } from "./resolvers/crud/promo-code-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -49,6 +50,8 @@ export const schemaOptions: BuildSchemaOptions = {
 
         BotMetadataResolver,
         BotMetadataRelationResolver,
+
+        PromoCodeResolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },
