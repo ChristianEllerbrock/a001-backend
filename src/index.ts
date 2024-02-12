@@ -113,8 +113,14 @@ async function bootstrap() {
     );
 
     const server = app.listen(port, () => {
-        console.log(`⚡️[server]: Running at http://localhost:${port}`);
-        console.log(`⚡️[server]: GraphQL endpoint is '${GRAPHQL_ENDPOINT}'`);
+        console.log(`⚡️[Server]: Running  on port ${port}`);
+
+        if (EnvService.instance.env.RELAY_START === "0") {
+            console.log(`⚡️[Relay]: Not starting the relay.`);
+            return;
+        }
+
+        console.log(`⚡️[Relay]: Starting the relay...`);
 
         const wsServer = new WebSocketServer({
             server,
