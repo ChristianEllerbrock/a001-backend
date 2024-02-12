@@ -1,0 +1,29 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[PromoCode] (
+    [id] INT NOT NULL IDENTITY(1,1),
+    [code] NVARCHAR(1000) NOT NULL,
+    [sats] INT NOT NULL,
+    [createdAt] DATETIME2 NOT NULL,
+    [validUntil] DATETIME2 NOT NULL,
+    [pubkey] NVARCHAR(1000),
+    [info] NVARCHAR(1000),
+    CONSTRAINT [PromoCode_pkey] PRIMARY KEY CLUSTERED ([id]),
+    CONSTRAINT [PromoCode_code_key] UNIQUE NONCLUSTERED ([code])
+);
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH
