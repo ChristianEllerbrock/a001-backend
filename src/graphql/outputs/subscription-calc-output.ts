@@ -12,6 +12,12 @@ export class SubscriptionCalcOutput {
     days!: number;
 
     @Field((type) => Int)
+    amount!: number;
+
+    @Field((type) => Int)
+    promoAmount!: number;
+
+    @Field((type) => Int)
     invoiceAmount!: number;
 }
 

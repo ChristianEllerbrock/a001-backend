@@ -7,5 +7,8 @@ export class SubscriptionCalcInput {
 
     @Field((type) => Int)
     days!: number;
+
+    @Field((type) => String, { nullable: true })
+    promoCode!: string | null;
 }
 
