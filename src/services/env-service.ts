@@ -4,9 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export class EnvServiceEnv {
-    private _optionalProperties = [
+    #optionalProperties = [
         "NODE_TLS_REJECT_UNAUTHORIZED",
         "SHADOW_DATABASE_URL",
+        "RELAY_START",
     ];
 
     PORT!: string;
@@ -16,9 +17,6 @@ export class EnvServiceEnv {
     DATABASE_URL!: string;
     SHADOW_DATABASE_URL?: string;
 
-    //BOT_PRIVKEY!: string;
-    //APP_URL!: string;
-    //DOMAIN!: string;
     SERVICE_BUS_CONNECTION_STRING!: string;
     SERVICE_BUS_DM_QUEUE!: string;
 
@@ -40,23 +38,28 @@ export class EnvServiceEnv {
     ALBY_ACCESS_TOKEN!: string;
     ENVIRONMENT!: "dev" | "pro";
     RELAY_URL!: string;
+    RELAY_START?: string;
 
     isOptional(property: string) {
-        return this._optionalProperties.includes(property);
+        return this.#optionalProperties.includes(property);
+    }
+
+    getOptionalKeys(): string[] {
+        return this.#optionalProperties;
     }
 }
 
 export class EnvService {
     // #region Singleton
 
-    private static _instance: EnvService;
+    static #instance: EnvService;
     static get instance() {
-        if (this._instance) {
-            return this._instance;
+        if (this.#instance) {
+            return this.#instance;
         }
 
-        this._instance = new EnvService();
-        return this._instance;
+        this.#instance = new EnvService();
+        return this.#instance;
     }
 
     // #endregion Singleton
@@ -68,14 +71,14 @@ export class EnvService {
     // #region Public Properties
 
     get env() {
-        return this._env;
+        return this.#env;
     }
 
     // #endregion Public Properties
 
     // #region Private Properties
 
-    private _env!: EnvServiceEnv;
+    #env!: EnvServiceEnv;
 
     // #endregion Private Properties
 
@@ -87,10 +90,6 @@ export class EnvService {
         console.log("Trying to read the following required keys from ENV:");
 
         for (let key of Object.keys(env)) {
-            if (key[0] === "_") {
-                continue;
-            }
-
             if (env.isOptional(key)) {
                 continue;
             }
@@ -99,10 +98,6 @@ export class EnvService {
         }
 
         for (let key of Object.keys(env)) {
-            if (key[0] === "_") {
-                continue;
-            }
-
             if (env.isOptional(key)) {
                 continue;
             }
@@ -115,7 +110,16 @@ export class EnvService {
             (env as any)[key] = process.env[key];
         }
 
-        this._env = env;
+        console.log("Trying to read optional keys from ENV:");
+
+        for (const key of env.getOptionalKeys()) {
+            if (typeof process.env[key] !== "undefined") {
+                (env as any)[key] = process.env[key];
+                console.log(` ${key}`);
+            }
+        }
+
+        this.#env = env;
     }
 
     // #endregion Private Methods

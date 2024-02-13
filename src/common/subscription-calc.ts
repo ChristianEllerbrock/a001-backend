@@ -8,7 +8,8 @@ export class SubscriptionCalc {
     static async exec(
         userId: string,
         subscriptionId: number,
-        days: number
+        days: number,
+        promoCodeId: number | undefined
     ): Promise<SubscriptionCalcOutput> {
         const now = DateTime.now();
         const dbUser = await PrismaService.instance.db.user.findUnique({
@@ -17,6 +18,15 @@ export class SubscriptionCalc {
         });
         const dbSubscriptions =
             await PrismaService.instance.db.subscription.findMany({});
+
+        let promoAmount = 0;
+        if (promoCodeId) {
+            const dbPromoCode =
+                await PrismaService.instance.db.promoCode.findUnique({
+                    where: { id: promoCodeId },
+                });
+            promoAmount = (dbPromoCode?.sats ?? 0) * -1;
+        }
 
         if (!dbUser) {
             throw new Error(`Could not find user with id '${userId}'`);
@@ -45,14 +55,17 @@ export class SubscriptionCalc {
             });
 
             // Calculate the costs.
-            const invoiceAmount =
+            const amount =
                 Math.round(days / 30) * dbUser.subscription.satsPer30Days;
 
             return {
                 subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
                 subscriptionId,
-                invoiceAmount,
+                amount,
+                promoAmount: promoAmount,
+                invoiceAmount:
+                    amount + promoAmount > 0 ? amount + promoAmount : 0,
             };
         }
 
@@ -118,7 +131,12 @@ export class SubscriptionCalc {
                 subscriptionId,
                 subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
-                invoiceAmount: newSubscriptionInvoiceAmount,
+                amount: newSubscriptionInvoiceAmount,
+                promoAmount,
+                invoiceAmount:
+                    newSubscriptionInvoiceAmount + promoAmount > 0
+                        ? newSubscriptionInvoiceAmount + promoAmount
+                        : 0,
             };
         }
 
@@ -142,14 +160,17 @@ export class SubscriptionCalc {
             const newSubscriptionEndDate = now.plus({
                 days: days,
             });
-            const invoiceAmount =
+            const amount =
                 Math.round(days / 30) * newSubscription.satsPer30Days;
 
             return {
                 subscriptionId,
                 subscriptionEnd: newSubscriptionEndDate.toJSDate(),
                 days,
-                invoiceAmount,
+                amount,
+                promoAmount,
+                invoiceAmount:
+                    amount + promoAmount > 0 ? amount + promoAmount : 0,
             };
         }
 
@@ -200,7 +221,12 @@ export class SubscriptionCalc {
             subscriptionId,
             subscriptionEnd: newSubscriptionEndDate.toJSDate(),
             days,
-            invoiceAmount: newSubscriptionInvoiceAmount,
+            amount: newSubscriptionInvoiceAmount,
+            promoAmount,
+            invoiceAmount:
+                newSubscriptionInvoiceAmount + promoAmount > 0
+                    ? newSubscriptionInvoiceAmount + promoAmount
+                    : 0,
         };
     }
 
