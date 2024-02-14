@@ -18,6 +18,7 @@ import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-ser
 import { DateTime } from "luxon";
 import { UserOutput } from "../../outputs/user-output";
 import { PromoCode, UserSubscription } from "@prisma/client";
+import { v4 } from "uuid";
 
 @Resolver()
 export class UserSubscriptionResolver {
@@ -302,7 +303,18 @@ export class UserSubscriptionResolver {
                             },
                         });
 
-                        // 2. Store a fake invoice in the database.
+                        // 2. Update the User table to reflect the new subscription.
+                        await tx.user.update({
+                            where: { id: userId },
+                            data: {
+                                subscriptionId:
+                                    dbUserSubscription.newSubscriptionId,
+                                subscriptionEnd:
+                                    dbUserSubscription.newSubscriptionEnd,
+                            },
+                        });
+
+                        // 3. Store a fake invoice in the database.
                         const dbUserSubscriptionInvoice =
                             await tx.userSubscriptionInvoice.create({
                                 data: {
@@ -310,7 +322,7 @@ export class UserSubscriptionResolver {
                                     amount: calculation.invoiceAmount,
                                     description: "na",
                                     expiresAt: now,
-                                    paymentHash: "na",
+                                    paymentHash: v4(),
                                     paymentRequest: "na",
                                     createdAt: now,
                                     qrCodePng: "na",
@@ -318,7 +330,7 @@ export class UserSubscriptionResolver {
                                 },
                             });
 
-                        // 3. Store a fake payment in the database.
+                        // 4. Store a fake payment in the database.
                         await tx.userSubscriptionInvoicePayment.create({
                             data: {
                                 userSubscriptionInvoiceId:
@@ -328,7 +340,7 @@ export class UserSubscriptionResolver {
                             },
                         });
 
-                        // 4. Remove the promo code from the database.
+                        // 5. Remove the promo code from the database.
                         await tx.promoCode.delete({
                             where: { id: dbPromoCode?.id ?? -1 },
                         });
