@@ -22,6 +22,7 @@ export class EnvServiceEnv {
 
     KEYVAULT_URI!: string;
     EMAIL_ENDPOINT!: string;
+    EMAIL_ENDPOINT_V2!: string;
 
     COMMUNICATION_SERVICES_SUBSCRIPTION_ID!: string;
     COMMUNICATION_SERVICES_RESOURCE_GROUP_NAME!: string;
