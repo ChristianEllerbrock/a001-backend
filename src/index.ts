@@ -29,6 +29,7 @@ import { Nip05SocialRelay } from "./relay/nip05-social-relay";
 import { PrismaService } from "./services/prisma-service";
 import { Nip05SocialRelayAllowedService } from "./relay/nip05-social-relay-allowed-service";
 import { generateRelayStatsController } from "./controllers/cron/generate-relay-stats-controller";
+import { emailControllerV2 } from "./controllers/email/email-controller-v2";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -75,11 +76,19 @@ app.get("/", (req, res, next) => {
 
     res.redirect("https://app.nip05.social");
 });
+
+// Email Webhook
 app.post(
     `/${EnvService.instance.env.EMAIL_ENDPOINT}/`,
     multer().any(),
     emailController
 );
+app.post(
+    `/email-in/${EnvService.instance.env.EMAIL_ENDPOINT_V2}/`,
+    multer().any(),
+    emailControllerV2
+);
+
 app.get(`/${EnvService.instance.env.EMAIL_ENDPOINT}/`, (req, res) => {
     res.json("OK");
 });
