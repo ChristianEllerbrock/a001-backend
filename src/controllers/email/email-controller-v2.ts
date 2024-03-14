@@ -9,7 +9,6 @@ import {
 } from "../../common/key-vault";
 import { NostrConnector } from "../../nostr-v4/nostrConnector";
 import { v4 } from "uuid";
-import { SendGridEmailEnvelope } from "./type-defs";
 import { DateTime } from "luxon";
 import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
 import { log } from "./common";
@@ -17,6 +16,11 @@ import { checkEmailInSubscriptionAndRespondIfNecessary } from "./subscription-re
 import { Nip05SocialRelayAllowedService } from "../../relay/nip05-social-relay-allowed-service";
 import { NostrHelperV2 } from "../../nostr/nostr-helper-2";
 import { EnvService } from "../../services/env-service";
+import {
+    WebhookEmailIn,
+    WebhookEmailInData,
+    WebhookEmailInProcessedRegistrationDetails,
+} from "./webhook-email-in";
 
 export async function emailControllerV2(
     req: Request,
@@ -31,235 +35,272 @@ export async function emailControllerV2(
         res.sendStatus(401);
         return;
     }
+    log("Webhook triggered");
 
     handleEmail(req);
     res.json({ received: true });
 }
 
 const handleEmail = async function (req: Request) {
-    const body = req.body;
+    const body = req.body as WebhookEmailIn;
 
-    console.log(body);
-    return;
+    const webhookEmailIn = new WebhookEmailIn(body);
+    log(JSON.stringify(webhookEmailIn.data));
 
-    // // Some emails only contain HTML and no TEXT.
-    // const bodyTextOrHtml = body.text ?? body.html;
+    if (!webhookEmailIn.isValid()) {
+        log(`Invalid email data`);
+        return;
+    }
 
-    // if (!body.from || !body.envelope || !bodyTextOrHtml) {
-    //     log(`Trigger without TEXT/HTML, FROM or TO (via ENVELOPE)`);
-    //     log(JSON.stringify(body));
-    //     return;
-    // }
+    // 1. Determine the TO systemDomainIds
+    webhookEmailIn.data.to.forEach((x) => {
+        const nip05DomainId = systemDomainIds.get(webhookEmailIn.getDomain(x));
+        webhookEmailIn.processed.to.push([x, nip05DomainId, undefined]);
+    });
 
-    // const envelope: SendGridEmailEnvelope = JSON.parse(body.envelope);
-    // const to = envelope.to[0];
+    if (webhookEmailIn.processed.to.every((x) => typeof x[1] === "undefined")) {
+        log(`No domain found in the database that matches the TO domain(s).`);
+        return;
+    }
 
-    // log(`${to} < ${body.from}`);
+    // 2. Determine the registration details of the receiver(s).
+    for (const processedTo of webhookEmailIn.processed.to) {
+        if (processedTo[1] === undefined) {
+            continue;
+        }
 
-    // // 1. Check if the intended TO domain exists in the database.
-    // let receiverDomainId = systemDomainIds.get(to.split("@")[1].toLowerCase());
+        const dbRegistration =
+            await PrismaService.instance.db.registration.findFirst({
+                where: {
+                    systemDomainId: processedTo[1],
+                    identifier: processedTo[0].split("@")[0],
+                },
+                include: {
+                    user: {
+                        include: { subscription: true },
+                    },
+                    registrationRelays: true,
+                    registrationEmailIns: true,
+                },
+            });
+        if (!dbRegistration) {
+            continue;
+        }
 
-    // // SPECIAL DEBUG HACK !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // if (!receiverDomainId && to.split("@")[1].toLowerCase() === "pubkey.info") {
-    //     receiverDomainId = 1; // Map to nip05.social
-    // }
+        const registrationDetails: WebhookEmailInProcessedRegistrationDetails =
+            {
+                registrationId: dbRegistration.id,
+                subscriptionMaxNoOfInboundEmailsPer30Days:
+                    dbRegistration.user.subscription
+                        .maxNoOfInboundEmailsPer30Days,
+                emailForwardingOn: dbRegistration.emailForwardingOn ?? false,
+                userPubkey: dbRegistration.user.pubkey,
+                registrationEmailIns: dbRegistration.registrationEmailIns,
+            };
+        processedTo[2] = registrationDetails;
+    }
 
-    // if (!receiverDomainId) {
-    //     // This will most likely not happen since sendgrid will be configured to
-    //     // only forward requests for the system domains.
-    //     return;
-    // }
+    if (webhookEmailIn.processed.to.every((x) => typeof x[2] === "undefined")) {
+        log(
+            `No registrations found in the database that match the TO domain(s).`
+        );
+        return;
+    }
 
-    // // 2. Check if the intended TO (identifier + domain) exists in the database.
-    // const dbRegistration =
-    //     await PrismaService.instance.db.registration.findFirst({
-    //         where: {
-    //             systemDomainId: receiverDomainId,
-    //             identifier: to.split("@")[0].toLowerCase(),
-    //         },
-    //         include: {
-    //             user: {
-    //                 include: { subscription: true },
-    //             },
-    //             registrationRelays: true,
-    //             registrationEmailIns: true,
-    //         },
-    //     });
-    // if (!dbRegistration) {
-    //     console.log(
-    //         `${to} - No registration found in the database for the receiver.`
-    //     );
-    //     return;
-    // }
+    for (const processedTo of webhookEmailIn.processed.to) {
+        if (typeof processedTo[1] === "undefined") {
+            continue;
+        }
 
-    // // 3. Check if email forwarding is activated for the registration.
-    // if (!dbRegistration.emailForwardingOn) {
-    //     console.log(
-    //         `${to} - Email forwarding is NOT activated for the registration.`
-    //     );
-    //     return;
-    // }
+        if (typeof processedTo[2] === "undefined") {
+            log(
+                `No registration found in the database that matches ${processedTo[0]}. Skip.`
+            );
+            continue;
+        }
 
-    // // 4. Check if the account has configured at least one relay.
-    // if (dbRegistration.registrationRelays.length === 0) {
-    //     console.log(`${to} - The receiver has NOT configured any relays.`);
-    //     return;
-    // }
+        await processTo(processedTo, webhookEmailIn.data);
+    }
+};
 
-    // // The receiver (aka the registration) exists in the database
-    // // and has at least one relay configured.
+const processTo = async function (
+    processedTo: [
+        address: string,
+        nip05DomainId: number | undefined,
+        registrationDetails:
+            | WebhookEmailInProcessedRegistrationDetails
+            | undefined
+    ],
+    data: WebhookEmailInData
+) {
+    if (
+        typeof processedTo[1] === "undefined" ||
+        typeof processedTo[2] === "undefined"
+    ) {
+        return;
+    }
 
-    // // We will try to deliver the email as Nostr DM (after a subscription check).
+    const from = data.from[0];
 
-    // const fromEmailString = body.from.toLowerCase();
-    // let fromEmail = fromEmailString;
-    // // fromEmailString could look like "Peter Lustig <peter.lustig@gmail.com>"
-    // if (fromEmailString.includes("<")) {
-    //     fromEmail = fromEmailString.split("<")[1].replace(">", "");
-    // }
+    // Check, if email forwarding is activated for the registration.
+    if (!processedTo[2].emailForwardingOn) {
+        log(
+            `${processedTo[0]} - Email forwarding is NOT activated for this registration. Skip.`
+        );
+        return;
+    }
 
-    // const dbEmail = await assureEmailExists(fromEmail, to);
+    const dbEmailFrom = await assureFromEmailExists(from);
 
-    // // Get the privkey/pubkey info from the Azure keyvault.
-    // const emailKeyvault =
-    //     await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
-    //         dbEmail.keyvaultKey
-    //     );
-    // if (!emailKeyvault) {
-    //     throw new Error(
-    //         `${to} - Could not retrieve email object from Azure keyvault.`
-    //     );
-    // }
+    // Get the privkey/pubkey info from the Azure keyvault.
+    const emailKeyvault =
+        await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
+            dbEmailFrom.keyvaultKey
+        );
+    if (!emailKeyvault) {
+        throw new Error(
+            `${processedTo[0]} - Could not retrieve the email object from Azure keyvault for FROM ${from}.`
+        );
+    }
 
-    // const connector = new NostrConnector({
-    //     pubkey: emailKeyvault.pubkey,
-    //     privkey: emailKeyvault.privkey,
-    // });
+    const connector = new NostrConnector({
+        pubkey: emailKeyvault.pubkey,
+        privkey: emailKeyvault.privkey,
+    });
 
-    // // Check if the subscription covers EMAIL IN
-    // const ok = await checkEmailInSubscriptionAndRespondIfNecessary(
-    //     dbRegistration.user.subscription.maxNoOfInboundEmailsPer30Days,
-    //     dbRegistration.registrationEmailIns,
-    //     connector,
-    //     dbRegistration.user.pubkey,
-    //     dbRegistration.registrationRelays.map((x) => x.address)
-    // );
+    // Check if the subscription covers EMAIL IN
+    const ok = await checkEmailInSubscriptionAndRespondIfNecessary(
+        processedTo[2].subscriptionMaxNoOfInboundEmailsPer30Days,
+        processedTo[2].registrationEmailIns,
+        connector,
+        processedTo[2].userPubkey
+    );
 
-    // if (!ok) {
-    //     return;
-    // }
+    if (!ok) {
+        return;
+    }
 
     // // The user has an appropriate subscription. Deliver email as DM.
 
-    // const targetRelays = await Nip05NostrService.instance.includeNip65Relays(
-    //     dbRegistration.user.pubkey,
-    //     dbRegistration.registrationRelays.map((x) => x.address)
-    // );
-    // targetRelays.unshift("wss://relay.nip05.social");
+    // The targetRelays define the relays where the email should be published to.
+    const targetRelays =
+        await Nip05NostrService.instance.getRelevantAccountRelays(
+            processedTo[2].userPubkey
+        );
 
-    // // The targetRelays define the relays where the email should be published to.
+    // Check, if the created nostr email account (for the FROM) already has published
+    // his metadata profile to these relays.
+    const missingRelaysForMetadata: string[] = [];
+    for (const targetRelay of targetRelays) {
+        if (
+            !dbEmailFrom.emailNostr?.emailNostrProfiles
+                .map((x) => x.publishedRelay)
+                .includes(targetRelay)
+        ) {
+            missingRelaysForMetadata.push(targetRelay);
+        }
+    }
 
-    // // Check, if the created nostr email account (for the FROM) already has published
-    // // his metadata profile to these relays.
-    // const missingRelaysForMetadata: string[] = [];
-    // for (const targetRelay of targetRelays) {
-    //     if (
-    //         !dbEmail.emailNostr?.emailNostrProfiles
-    //             .map((x) => x.publishedRelay)
-    //             .includes(targetRelay)
-    //     ) {
-    //         missingRelaysForMetadata.push(targetRelay);
-    //     }
-    // }
+    if (missingRelaysForMetadata.length > 0) {
+        // Publish the profile to these relays.
+        // Create Kind0 metadata event.
+        const eventTemplate: EventTemplate = {
+            kind: 0,
+            created_at: Math.floor(new Date().getTime() / 1000),
+            content: JSON.stringify({
+                name: dbEmailFrom.emailNostr?.name,
+                nip05: dbEmailFrom.emailNostr?.nip05,
+                about: dbEmailFrom.emailNostr?.about,
+                banner: dbEmailFrom.emailNostr?.banner,
+                picture: dbEmailFrom.emailNostr?.picture,
+            }),
+            tags: [],
+        };
+        const kind0Event = connector.signEvent(eventTemplate);
 
-    // if (missingRelaysForMetadata.length > 0) {
-    //     // Publish the profile to these relays.
-    //     // Create Kind0 metadata event.
-    //     const eventTemplate: EventTemplate = {
-    //         kind: 0,
-    //         created_at: Math.floor(new Date().getTime() / 1000),
-    //         content: JSON.stringify({
-    //             name: dbEmail.emailNostr?.name,
-    //             nip05: dbEmail.emailNostr?.nip05,
-    //             about: dbEmail.emailNostr?.about,
-    //             banner: dbEmail.emailNostr?.banner,
-    //             picture: dbEmail.emailNostr?.picture,
-    //         }),
-    //         tags: [],
-    //     };
-    //     const kind0Event = connector.signEvent(eventTemplate);
+        log(
+            `${
+                processedTo[0]
+            } - Publish metadata for FROM nostr account ${from} to the relays: ${missingRelaysForMetadata.join(
+                ", "
+            )}`
+        );
 
-    //     console.log(
-    //         `${to} - Publish metadata to the relays: ${missingRelaysForMetadata.join(
-    //             ", "
-    //         )}`
-    //     );
+        // Publish event.
+        const publishedRelays = await Nip05NostrService.instance.publishEvent(
+            kind0Event,
+            missingRelaysForMetadata
+        );
 
-    //     // Publish event.
-    //     const publishedRelays = await Nip05NostrService.instance.publishEvent(
-    //         kind0Event,
-    //         missingRelaysForMetadata
-    //     );
+        log(
+            `${
+                processedTo[0]
+            } - Successfully published metadata for FROM nostr account ${from} to the relays ${publishedRelays.join(
+                ", "
+            )}`
+        );
 
-    //     console.log(
-    //         `${to} - Successfully published metadata to the relays ${publishedRelays.join(
-    //             ", "
-    //         )}`
-    //     );
+        const now = new Date();
+        if (dbEmailFrom.emailNostr) {
+            for (const relay of publishedRelays) {
+                await PrismaService.instance.db.emailNostrProfile.create({
+                    data: {
+                        emailNostrId: dbEmailFrom.emailNostr.id,
+                        publishedAt: now,
+                        publishedRelay: relay,
+                    },
+                });
+            }
+        }
+    }
 
-    //     const now = new Date();
-    //     if (dbEmail.emailNostr) {
-    //         for (const relay of publishedRelays) {
-    //             await PrismaService.instance.db.emailNostrProfile.create({
-    //                 data: {
-    //                     emailNostrId: dbEmail.emailNostr.id,
-    //                     publishedAt: now,
-    //                     publishedRelay: relay,
-    //                 },
-    //             });
-    //         }
-    //     }
-    // }
-
-    // // Finally, generate the DM and publish to all targetRelays.
-    // let message = `SUBJECT: ${body.subject}\n` + `FROM: ${dbEmail.address}\n`;
+    // Finally, generate the DM and publish to all targetRelays.
+    let message = "";
+    if (data.subject) {
+        message += `SUBJECT: ${data.subject}\n`;
+    }
+    message += `FROM: ${from}\n`;
     // if (body.cc) {
     //     message += `CC: ${body.cc}\n`;
     // }
-    // if ((body.attachments as number) > 0) {
-    //     message += `ATTACHMENTS: ${body.attachments}\n`;
-    // }
-    // message += "---\n\n" + bodyTextOrHtml;
+    if (data.noOfAttachments > 0) {
+        message += `ATTACHMENTS: ${data.noOfAttachments}\n`;
+    }
+    message += "---\n\n" + data.text;
 
-    // log(`${to} - Sending DM event to the relays ${targetRelays.join(", ")}`);
-    // await Nip05NostrService.instance.sendDM(
-    //     connector,
-    //     dbRegistration.user.pubkey,
-    //     targetRelays,
-    //     message
-    // );
+    log(
+        `${processedTo[0]} - Sending DM event to the relays ${targetRelays.join(
+            ", "
+        )}`
+    );
+    await Nip05NostrService.instance.sendDM(
+        connector,
+        processedTo[2].userPubkey,
+        targetRelays,
+        message
+    );
 
-    // // Update Stats
-    // const today = DateTime.now().startOf("day");
-    // await PrismaService.instance.db.registrationEmailIn.upsert({
-    //     where: {
-    //         registrationId_date: {
-    //             registrationId: dbRegistration.id,
-    //             date: today.toJSDate(),
-    //         },
-    //     },
-    //     update: {
-    //         total: { increment: 1 },
-    //     },
-    //     create: {
-    //         registrationId: dbRegistration.id,
-    //         date: today.toJSDate(),
-    //         total: 1,
-    //     },
-    // });
+    // Update Stats
+    const today = DateTime.now().startOf("day");
+    await PrismaService.instance.db.registrationEmailIn.upsert({
+        where: {
+            registrationId_date: {
+                registrationId: processedTo[2].registrationId,
+                date: today.toJSDate(),
+            },
+        },
+        update: {
+            total: { increment: 1 },
+        },
+        create: {
+            registrationId: processedTo[2].registrationId,
+            date: today.toJSDate(),
+            total: 1,
+        },
+    });
 };
 
-const assureEmailExists = async function (fromEmail: string, to: string) {
+const assureFromEmailExists = async function (fromEmail: string) {
     let dbEmail = await PrismaService.instance.db.email.findFirst({
         where: {
             address: fromEmail,

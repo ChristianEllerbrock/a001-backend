@@ -128,8 +128,7 @@ const handleEmail = async function (req: Request) {
         dbRegistration.user.subscription.maxNoOfInboundEmailsPer30Days,
         dbRegistration.registrationEmailIns,
         connector,
-        dbRegistration.user.pubkey,
-        dbRegistration.registrationRelays.map((x) => x.address)
+        dbRegistration.user.pubkey
     );
 
     if (!ok) {
