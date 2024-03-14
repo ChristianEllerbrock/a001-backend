@@ -7,8 +7,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
     maxNoOfEmailInPerMonth: number,
     dbRegistrationEmailIns: RegistrationEmailIn[],
     emailInMirrorConnector: NostrConnector,
-    receiverPubkey: string,
-    receiverInitialRelays: string[]
+    receiverPubkey: string
 ): Promise<boolean> {
     if (maxNoOfEmailInPerMonth === -1) {
         // The user's subscription allows unlimited email ins.
@@ -19,9 +18,8 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
     if (maxNoOfEmailInPerMonth === 0) {
         // The user's subscription does not cover EMAIL IN at all.
         const relevantRelays =
-            await Nip05NostrService.instance.includeNip65Relays(
-                receiverPubkey,
-                receiverInitialRelays
+            await Nip05NostrService.instance.getRelevantAccountRelays(
+                receiverPubkey
             );
 
         log(
@@ -36,7 +34,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
-            ["wss://relay.nip05.social", ...relevantRelays],
+            relevantRelays,
             text
         );
 
@@ -60,9 +58,8 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         // The user has spent his contingent for this month.
 
         const relevantRelays =
-            await Nip05NostrService.instance.includeNip65Relays(
-                receiverPubkey,
-                receiverInitialRelays
+            await Nip05NostrService.instance.getRelevantAccountRelays(
+                receiverPubkey
             );
 
         log(
@@ -78,7 +75,7 @@ export const checkEmailInSubscriptionAndRespondIfNecessary = async function (
         await Nip05NostrService.instance.sendDM(
             emailInMirrorConnector,
             receiverPubkey,
-            ["wss://relay.nip05.social", ...relevantRelays],
+            relevantRelays,
             text
         );
 
