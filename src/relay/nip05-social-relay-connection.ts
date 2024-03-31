@@ -251,12 +251,17 @@ export class Nip05SocialRelayConnection extends EventEmitter {
             .diff(DateTime.fromJSDate(this.dbRelayConnection.date), "seconds")
             .toObject().seconds;
 
-        await PrismaService.instance.db.relayConnection.update({
-            where: { id: this.dbRelayConnection.id },
-            data: {
-                uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
-            },
-        });
+        try {
+            // Use try-catch to avoid crashing the server.
+            await PrismaService.instance.db.relayConnection.update({
+                where: { id: this.dbRelayConnection.id },
+                data: {
+                    uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
+                },
+            });
+        } catch (error) {
+            debug(`clientId ${this.#clientId}: send ${JSON.stringify(error)}`);
+        }
     }
 }
 
