@@ -199,247 +199,262 @@ export class Nip05NostrService {
         event: Event,
         destination: "email-mirror" | "email-out-bot"
     ) {
-        // Check, if the event already is (or was) processed.
-        if (this.#dmEventIds.has(event.id)) {
-            return;
-        }
-
-        log(event, "DM event received from pubkey " + event.pubkey);
-
-        // New event => Process
-        this.#dmEventIds.set(event.id, new Date());
-        this.#purgeOldDmEventIds();
-
-        // Check if the DM was sent from an allowed sender (i.e. a NIP05.social user).
-        const dbUser = await PrismaService.instance.db.user.findFirst({
-            where: { pubkey: event.pubkey },
-            include: {
-                subscription: true,
-                registrations: {
-                    include: { systemDomain: true, registrationRelays: true },
-                },
-            },
-        });
-        if (!dbUser) {
-            // No user found in the database with the sender's pubkey. Ignore.
-            log(event, "Unknown sender. Ignore.");
-            return;
-        }
-
-        // Get some data that will later be used.
-        // Data: The sender's initial relays (stored in the NIP05.social database)
-        const senderInitialRelays: string[] = ["wss://relay.nip05.social"];
-        for (const dbRegistration of dbUser.registrations) {
-            senderInitialRelays.push(
-                ...dbRegistration.registrationRelays.map((x) => x.address)
-            );
-        }
-
-        // Data: The receiver pubkey of the DM
-        const receiverPubkey = getReceiverPubkeyFromKind4Event(event);
-        if (!receiverPubkey) {
-            log(
-                event,
-                "Could not determine receiver pubkey from event. Do nothing."
-            );
-            return;
-        }
-
-        // Data: The receiver database entries.
-        // It could either be a record from emailNostr or systemUser.
-        const receiverDbEmailNostr = await getReceiverDbEmailNostr(
-            receiverPubkey
-        );
-        const receiverDbSystemUser = await getReceiverDbSystemUser(
-            receiverPubkey
-        );
-        if (!receiverDbEmailNostr && !receiverDbSystemUser) {
-            log(
-                event,
-                "Could not fetch the database record for the given receiver pubkey. Do nothing"
-            );
-            return;
-        }
-        const receiverIsSystemUser = !!receiverDbSystemUser;
-
-        // Data: The receiver's connector object
-        let receiverConnector: NostrConnector | undefined;
-        if (receiverDbSystemUser) {
-            const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<KeyVaultType_SystemUser>(
-                    receiverDbSystemUser.keyvaultKey
-                );
-            if (keyvaulData) {
-                receiverConnector = new NostrConnector({
-                    pubkey: keyvaulData.pubkey,
-                    privkey: keyvaulData.privkey,
-                });
+        try {
+            // Check, if the event already is (or was) processed.
+            if (this.#dmEventIds.has(event.id)) {
+                return;
             }
-        } else if (receiverDbEmailNostr) {
-            const keyvaulData =
-                await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
-                    receiverDbEmailNostr.email.keyvaultKey
-                );
-            if (keyvaulData) {
-                receiverConnector = new NostrConnector({
-                    pubkey: keyvaulData.pubkey,
-                    privkey: keyvaulData.privkey,
-                });
-            }
-        }
 
-        if (!receiverConnector) {
-            log(
-                event,
-                "Could not retrieve the keyvault data for the given receiver pubkey. Do nothing."
-            );
-            return;
-        }
+            log(event, "DM event received from pubkey " + event.pubkey);
 
-        // Data: the decrypted content of the DM
-        const message = await receiverConnector.decryptDM(event);
+            // New event => Process
+            this.#dmEventIds.set(event.id, new Date());
+            this.#purgeOldDmEventIds();
 
-        // Continue with all relevant data at hand.
-
-        // Check, if the DM contains a COMMAND.
-        const command = findCommandInOutMessage(
-            message,
-            receiverDbSystemUser?.id
-        );
-        if (command) {
-            const relevantRelays = await this.includeNip65Relays(
-                event.pubkey,
-                senderInitialRelays
-            );
-
-            log(
-                event,
-                `DM includes COMMAND '${command}'. Will respond with a corresponding DM on ${relevantRelays.join(
-                    ", "
-                )}.`
-            );
-
-            await respondToCommand.call(
-                this,
-                command,
-                event.pubkey,
-                receiverConnector,
-                relevantRelays
-            );
-
-            log(event, "Done");
-            return;
-        }
-
-        // From a technical perspective everything looks good. We have all the
-        // necessary data and the sender has NOT send us a COMMAND.
-        // Continue.
-
-        // Check if the user has a valid subscription
-        const checkResult = await checkSubscriptionAndRespondIfNecessary.call(
-            this,
-            event,
-            dbUser,
-            receiverConnector,
-            senderInitialRelays
-        );
-        if (!checkResult) {
-            return; // No valid subscription.
-        }
-
-        // Determine the CURRENT registration that has EMAIL OUT enabled
-        const dbEmailOutRegistration = dbUser.registrations.find(
-            (x) => x.emailOut
-        );
-        if (!dbEmailOutRegistration) {
-            log(
-                event,
-                `Respond with DM: No registration found with activated EMAIL OUT.`
-            );
-            // TODO: Answer
-
-            const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
-            let text =
-                "ATTENTION: NIP05.social\n\n" +
-                "Currently, you have NOT configured any of your #nostr addresses to" +
-                " act as #email sender. The previous message was NOT delivered as #email.\n\n" +
-                "Please visit your account section and make the appropriate changes before" +
-                " sending another message.";
-            await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
-            return;
-        }
-
-        const senderEmail =
-            dbEmailOutRegistration.identifier +
-            "@" +
-            dbEmailOutRegistration.systemDomain.name;
-        log(event, `Will use email address as sender: ${senderEmail}`);
-
-        // Everything is ok. We can send the email.
-        const sendResult = await sendEmailOut.call(
-            this,
-            event,
-            senderEmail,
-            message,
-            dbEmailOutRegistration.emailOutSubject,
-            receiverDbEmailNostr,
-            receiverDbSystemUser
-        );
-
-        if (!sendResult) {
-            return;
-        }
-
-        // Send ok.
-        // Store event info in database.
-        if (sendResult.emailNostrId) {
-            await PrismaService.instance.db.emailNostrDm.create({
-                data: {
-                    emailNostrId: sendResult.emailNostrId,
-                    eventId: event.id,
-                    eventCreatedAt: event.created_at,
-                    sent: new Date(),
-                },
-            });
-        } else if (sendResult.systemUserId) {
-            await PrismaService.instance.db.systemUserDm.create({
-                data: {
-                    systemUserId: sendResult.systemUserId,
-                    eventId: event.id,
-                },
-            });
-        }
-
-        // Update user stats.
-        const dbRegistrationEmailOut =
-            await PrismaService.instance.db.registrationEmailOut.upsert({
-                where: {
-                    registrationId_date: {
-                        registrationId: dbEmailOutRegistration.id,
-                        date: DateTime.now().startOf("day").toJSDate(),
+            // Check if the DM was sent from an allowed sender (i.e. a NIP05.social user).
+            const dbUser = await PrismaService.instance.db.user.findFirst({
+                where: { pubkey: event.pubkey },
+                include: {
+                    subscription: true,
+                    registrations: {
+                        include: {
+                            systemDomain: true,
+                            registrationRelays: true,
+                        },
                     },
                 },
-                update: { total: { increment: 1 } },
-                create: {
-                    registrationId: dbEmailOutRegistration.id,
-                    date: DateTime.now().startOf("day").toJSDate(),
-                    total: 1,
-                },
             });
-        log(
-            event,
-            `Sent ${dbRegistrationEmailOut.total} today on behalf of the user.`
-        );
+            if (!dbUser) {
+                // No user found in the database with the sender's pubkey. Ignore.
+                log(event, "Unknown sender. Ignore.");
+                return;
+            }
 
-        // Inform user via DM about success
-        const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
-        let text =
-            "INFO: NIP05.social\n\n" +
-            "Message successfully sent as #email:\n\n" +
-            `FROM: ${sendResult.from}\n` +
-            `TO: ${sendResult.to}\n` +
-            `SUBJECT: ${sendResult.subject}\n`;
-        await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
+            // Get some data that will later be used.
+            // Data: The sender's initial relays (stored in the NIP05.social database)
+            const senderInitialRelays: string[] = ["wss://relay.nip05.social"];
+            for (const dbRegistration of dbUser.registrations) {
+                senderInitialRelays.push(
+                    ...dbRegistration.registrationRelays.map((x) => x.address)
+                );
+            }
+
+            // Data: The receiver pubkey of the DM
+            const receiverPubkey = getReceiverPubkeyFromKind4Event(event);
+            if (!receiverPubkey) {
+                log(
+                    event,
+                    "Could not determine receiver pubkey from event. Do nothing."
+                );
+                return;
+            }
+
+            // Data: The receiver database entries.
+            // It could either be a record from emailNostr or systemUser.
+            const receiverDbEmailNostr = await getReceiverDbEmailNostr(
+                receiverPubkey
+            );
+            const receiverDbSystemUser = await getReceiverDbSystemUser(
+                receiverPubkey
+            );
+            if (!receiverDbEmailNostr && !receiverDbSystemUser) {
+                log(
+                    event,
+                    "Could not fetch the database record for the given receiver pubkey. Do nothing"
+                );
+                return;
+            }
+            const receiverIsSystemUser = !!receiverDbSystemUser;
+
+            // Data: The receiver's connector object
+            let receiverConnector: NostrConnector | undefined;
+            if (receiverDbSystemUser) {
+                const keyvaulData =
+                    await AzureSecretService.instance.tryGetValue<KeyVaultType_SystemUser>(
+                        receiverDbSystemUser.keyvaultKey
+                    );
+                if (keyvaulData) {
+                    receiverConnector = new NostrConnector({
+                        pubkey: keyvaulData.pubkey,
+                        privkey: keyvaulData.privkey,
+                    });
+                }
+            } else if (receiverDbEmailNostr) {
+                const keyvaulData =
+                    await AzureSecretService.instance.tryGetValue<KeyVaultType_Email>(
+                        receiverDbEmailNostr.email.keyvaultKey
+                    );
+                if (keyvaulData) {
+                    receiverConnector = new NostrConnector({
+                        pubkey: keyvaulData.pubkey,
+                        privkey: keyvaulData.privkey,
+                    });
+                }
+            }
+
+            if (!receiverConnector) {
+                log(
+                    event,
+                    "Could not retrieve the keyvault data for the given receiver pubkey. Do nothing."
+                );
+                return;
+            }
+
+            // Data: the decrypted content of the DM
+            const message = await receiverConnector.decryptDM(event);
+
+            // Continue with all relevant data at hand.
+
+            // Check, if the DM contains a COMMAND.
+            const command = findCommandInOutMessage(
+                message,
+                receiverDbSystemUser?.id
+            );
+            if (command) {
+                const relevantRelays = await this.includeNip65Relays(
+                    event.pubkey,
+                    senderInitialRelays
+                );
+
+                log(
+                    event,
+                    `DM includes COMMAND '${command}'. Will respond with a corresponding DM on ${relevantRelays.join(
+                        ", "
+                    )}.`
+                );
+
+                await respondToCommand.call(
+                    this,
+                    command,
+                    event.pubkey,
+                    receiverConnector,
+                    relevantRelays
+                );
+
+                log(event, "Done");
+                return;
+            }
+
+            // From a technical perspective everything looks good. We have all the
+            // necessary data and the sender has NOT send us a COMMAND.
+            // Continue.
+
+            // Check if the user has a valid subscription
+            const checkResult =
+                await checkSubscriptionAndRespondIfNecessary.call(
+                    this,
+                    event,
+                    dbUser,
+                    receiverConnector,
+                    senderInitialRelays
+                );
+            if (!checkResult) {
+                return; // No valid subscription.
+            }
+
+            // Determine the CURRENT registration that has EMAIL OUT enabled
+            const dbEmailOutRegistration = dbUser.registrations.find(
+                (x) => x.emailOut
+            );
+            if (!dbEmailOutRegistration) {
+                log(
+                    event,
+                    `Respond with DM: No registration found with activated EMAIL OUT.`
+                );
+                // TODO: Answer
+
+                const relays = await this.getRelevantAccountRelays(
+                    dbUser.pubkey
+                );
+                let text =
+                    "ATTENTION: NIP05.social\n\n" +
+                    "Currently, you have NOT configured any of your #nostr addresses to" +
+                    " act as #email sender. The previous message was NOT delivered as #email.\n\n" +
+                    "Please visit your account section and make the appropriate changes before" +
+                    " sending another message.";
+                await this.sendDM(
+                    receiverConnector,
+                    dbUser.pubkey,
+                    relays,
+                    text
+                );
+                return;
+            }
+
+            const senderEmail =
+                dbEmailOutRegistration.identifier +
+                "@" +
+                dbEmailOutRegistration.systemDomain.name;
+            log(event, `Will use email address as sender: ${senderEmail}`);
+
+            // Everything is ok. We can send the email.
+            const sendResult = await sendEmailOut.call(
+                this,
+                event,
+                senderEmail,
+                message,
+                dbEmailOutRegistration.emailOutSubject,
+                receiverDbEmailNostr,
+                receiverDbSystemUser
+            );
+
+            if (!sendResult) {
+                return;
+            }
+
+            // Send ok.
+            // Store event info in database.
+            if (sendResult.emailNostrId) {
+                await PrismaService.instance.db.emailNostrDm.create({
+                    data: {
+                        emailNostrId: sendResult.emailNostrId,
+                        eventId: event.id,
+                        eventCreatedAt: event.created_at,
+                        sent: new Date(),
+                    },
+                });
+            } else if (sendResult.systemUserId) {
+                await PrismaService.instance.db.systemUserDm.create({
+                    data: {
+                        systemUserId: sendResult.systemUserId,
+                        eventId: event.id,
+                    },
+                });
+            }
+
+            // Update user stats.
+            const dbRegistrationEmailOut =
+                await PrismaService.instance.db.registrationEmailOut.upsert({
+                    where: {
+                        registrationId_date: {
+                            registrationId: dbEmailOutRegistration.id,
+                            date: DateTime.now().startOf("day").toJSDate(),
+                        },
+                    },
+                    update: { total: { increment: 1 } },
+                    create: {
+                        registrationId: dbEmailOutRegistration.id,
+                        date: DateTime.now().startOf("day").toJSDate(),
+                        total: 1,
+                    },
+                });
+            log(
+                event,
+                `Sent ${dbRegistrationEmailOut.total} today on behalf of the user.`
+            );
+
+            // Inform user via DM about success
+            const relays = await this.getRelevantAccountRelays(dbUser.pubkey);
+            let text =
+                "INFO: NIP05.social\n\n" +
+                "Message successfully sent as #email:\n\n" +
+                `FROM: ${sendResult.from}\n` +
+                `TO: ${sendResult.to}\n` +
+                `SUBJECT: ${sendResult.subject}\n`;
+            await this.sendDM(receiverConnector, dbUser.pubkey, relays, text);
+        } catch (error) {
+            log(event, `Error: ${error}`);
+        }
     }
 
     /**
