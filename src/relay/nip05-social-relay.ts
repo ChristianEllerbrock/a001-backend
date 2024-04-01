@@ -48,11 +48,10 @@ export class Nip05SocialRelay extends EventEmitter {
         this.#wsServer = webSocketServer;
         this.config = relayConfig;
 
-        this.#wsServer
-            .on("connection", this.#onConnection.bind(this))
-            .on("error", (error) => {
-                debug(`error: ${error}`);
-            });
+        this.#wsServer.on("connection", this.#onConnection.bind(this));
+        // .on("error", (error) => {
+        //     debug(`error: ${error}`);
+        // });
 
         this.on(
             Nip05SocialRelayEvent.BroadcastToClients,
@@ -90,6 +89,10 @@ export class Nip05SocialRelay extends EventEmitter {
         //console.log(req.socket);
 
         debug(`connect: ${req.socket.remoteAddress}`);
+
+        client.on("error", (error) => {
+            debug(`error: ${error}`);
+        });
 
         // Todo: Disconnect limited clients
 
