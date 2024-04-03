@@ -1,3 +1,5 @@
+import * as tls from "tls";
+
 export interface AttachmentCommon {
     type: "attachment";
     content: any;
@@ -74,5 +76,31 @@ export interface ParsedMail {
     messageId?: string | undefined;
     inReplyTo?: string | undefined;
     priority?: "normal" | "low" | "high" | undefined;
+}
+
+export interface SMTPServerSession {
+    id: string;
+    localAddress: string;
+    localPort: number;
+    remoteAddress: string;
+    remotePort: number;
+    clientHostname: string;
+    openingCommand: string;
+    hostNameAppearsAs: string;
+    envelope: SMTPServerEnvelope;
+    secure: boolean;
+    transmissionType: string;
+    tlsOptions: tls.TlsOptions;
+    user?: string | undefined;
+}
+
+export interface SMTPServerEnvelope {
+    mailFrom: SMTPServerAddress | false;
+    rcptTo: SMTPServerAddress[];
+}
+
+export interface SMTPServerAddress {
+    address: string;
+    args: object;
 }
 

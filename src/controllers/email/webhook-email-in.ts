@@ -1,5 +1,5 @@
 import { RegistrationEmailIn } from "@prisma/client";
-import { ParsedMail } from "./@types";
+import { ParsedMail, SMTPServerSession } from "./@types";
 
 export type WebhookAttachments = {
     numberOfAttachments: number;
@@ -32,7 +32,7 @@ type WebhookEmailInProcessed = {
 };
 
 export class WebhookEmailIn {
-    #session: any;
+    #session: SMTPServerSession | undefined;
     #parsed: ParsedMail | undefined;
     #attachments: WebhookAttachments | undefined;
 
@@ -81,7 +81,7 @@ export class WebhookEmailIn {
     }
 
     #build() {
-        if (!this.#parsed) {
+        if (!this.#parsed || !this.#session) {
             return;
         }
 
@@ -91,31 +91,41 @@ export class WebhookEmailIn {
                 .filter((x) => typeof x.address !== "undefined")
                 .map((x) => x.address?.toLowerCase()) ?? []) as string[];
 
-            // Determine TO (array).
-            if (typeof this.#parsed.to !== "undefined") {
-                const to = new Set<string>();
-
-                // "to" could be an array or single object.
-                if (Array.isArray(this.#parsed.to)) {
-                    for (const objectTo of this.#parsed.to) {
-                        const objectToItems = (objectTo.value
-                            .filter((x) => typeof x.address !== "undefined")
-                            .map((x) => x.address?.toLowerCase()) ??
-                            []) as string[];
-                        objectToItems.forEach((x) => to.add(x));
-                    }
-                } else {
-                    const objectToItems = (this.#parsed.to.value
-                        .filter((x) => typeof x.address !== "undefined")
-                        .map((x) => x.address?.toLowerCase()) ??
-                        []) as string[];
-                    objectToItems.forEach((x) => to.add(x));
-                }
-
-                if (to.size > 0) {
-                    this.data.to = Array.from(to);
-                }
+            // Determine TO (array) from session (!important).
+            const to = new Set<string>(
+                this.#session.envelope.rcptTo.map((x) =>
+                    x.address.toLowerCase()
+                )
+            );
+            if (to.size > 0) {
+                this.data.to = Array.from(to);
             }
+
+            // Determine TO (array).
+            // if (typeof this.#parsed.to !== "undefined") {
+            //     const to = new Set<string>();
+
+            //     // "to" could be an array or single object.
+            //     if (Array.isArray(this.#parsed.to)) {
+            //         for (const objectTo of this.#parsed.to) {
+            //             const objectToItems = (objectTo.value
+            //                 .filter((x) => typeof x.address !== "undefined")
+            //                 .map((x) => x.address?.toLowerCase()) ??
+            //                 []) as string[];
+            //             objectToItems.forEach((x) => to.add(x));
+            //         }
+            //     } else {
+            //         const objectToItems = (this.#parsed.to.value
+            //             .filter((x) => typeof x.address !== "undefined")
+            //             .map((x) => x.address?.toLowerCase()) ??
+            //             []) as string[];
+            //         objectToItems.forEach((x) => to.add(x));
+            //     }
+
+            //     if (to.size > 0) {
+            //         this.data.to = Array.from(to);
+            //     }
+            // }
 
             // Determine TEXT (string).
             this.data.text = this.#parsed.text ?? this.#parsed.html;

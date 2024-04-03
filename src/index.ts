@@ -133,7 +133,8 @@ async function bootstrap() {
 
         const wsServer = new WebSocketServer({
             server,
-            maxPayload: 131072, // 128KB
+            maxPayload: 131072, // 128KB,
+
             perMessageDeflate: {
                 zlibDeflateOptions: {
                     chunkSize: 1024,
