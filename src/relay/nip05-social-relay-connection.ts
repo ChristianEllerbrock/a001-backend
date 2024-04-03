@@ -45,8 +45,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
     constructor(
         private readonly client: WebSocket,
         private readonly connectionRequest: IncomingMessage,
-        private readonly relay: Nip05SocialRelay,
-        private dbRelayConnection: RelayConnection
+        private readonly relay: Nip05SocialRelay //private dbRelayConnection: RelayConnection
     ) {
         super();
 
@@ -58,7 +57,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
             .on("error", (error) => {
                 debug(`clientId ${this.#clientId} error: ${error}`);
                 this.client.close();
-                this.#calculateUptimeAndUpdateDatabase();
+                //this.#calculateUptimeAndUpdateDatabase();
             });
 
         this.on(
@@ -192,7 +191,7 @@ export class Nip05SocialRelayConnection extends EventEmitter {
 
         this.client.removeAllListeners();
 
-        this.#calculateUptimeAndUpdateDatabase();
+        //this.#calculateUptimeAndUpdateDatabase();
     }
 
     #onClientPing(data: any) {
@@ -244,24 +243,24 @@ export class Nip05SocialRelayConnection extends EventEmitter {
         });
     }
 
-    async #calculateUptimeAndUpdateDatabase() {
-        const now = DateTime.now();
+    // async #calculateUptimeAndUpdateDatabase() {
+    //     const now = DateTime.now();
 
-        const uptimeInSeconds = now
-            .diff(DateTime.fromJSDate(this.dbRelayConnection.date), "seconds")
-            .toObject().seconds;
+    //     const uptimeInSeconds = now
+    //         .diff(DateTime.fromJSDate(this.dbRelayConnection.date), "seconds")
+    //         .toObject().seconds;
 
-        try {
-            // Use try-catch to avoid crashing the server.
-            await PrismaService.instance.db.relayConnection.update({
-                where: { id: this.dbRelayConnection.id },
-                data: {
-                    uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
-                },
-            });
-        } catch (error) {
-            debug(`clientId ${this.#clientId}: send ${JSON.stringify(error)}`);
-        }
-    }
+    //     try {
+    //         // Use try-catch to avoid crashing the server.
+    //         await PrismaService.instance.db.relayConnection.update({
+    //             where: { id: this.dbRelayConnection.id },
+    //             data: {
+    //                 uptimeInSeconds: Math.floor(uptimeInSeconds ?? 0),
+    //             },
+    //         });
+    //     } catch (error) {
+    //         debug(`clientId ${this.#clientId}: send ${JSON.stringify(error)}`);
+    //     }
+    // }
 }
 

@@ -96,16 +96,20 @@ export class Nip05SocialRelay extends EventEmitter {
 
         // Todo: Disconnect limited clients
 
-        const dbRelayConnection =
-            await PrismaService.instance.db.relayConnection.create({
-                data: {
-                    date: new Date(),
-                },
-            });
+        // const dbRelayConnection =
+        //     await PrismaService.instance.db.relayConnection.create({
+        //         data: {
+        //             date: new Date(),
+        //         },
+        //     });
 
         this.#connections.set(
             client,
-            new Nip05SocialRelayConnection(client, req, this, dbRelayConnection)
+            new Nip05SocialRelayConnection(
+                client,
+                req,
+                this /*, dbRelayConnection*/
+            )
         );
 
         // todo
