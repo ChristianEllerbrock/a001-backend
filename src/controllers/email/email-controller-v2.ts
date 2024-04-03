@@ -42,7 +42,6 @@ export async function emailControllerV2(
 }
 
 const handleEmail = async function (req: Request) {
-    log(JSON.stringify(req.body));
     const webhookEmailIn = new WebhookEmailIn(req.body);
     log(JSON.stringify(webhookEmailIn.data));
 
