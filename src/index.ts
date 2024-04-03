@@ -30,6 +30,7 @@ import { PrismaService } from "./services/prisma-service";
 import { Nip05SocialRelayAllowedService } from "./relay/nip05-social-relay-allowed-service";
 import { generateRelayStatsController } from "./controllers/cron/generate-relay-stats-controller";
 import { emailControllerV2 } from "./controllers/email/email-controller-v2";
+import { errorHandler } from "./middlewares/errors";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -107,6 +108,9 @@ app.get("/tools/gen-key-pair", genKeyPairController);
 
 // Alby controllers
 app.post("/alby/payment-in", paymentInController);
+
+// Error handling
+app.use(errorHandler);
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);
