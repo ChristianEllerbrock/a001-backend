@@ -1,6 +1,4 @@
 import { PrismaClient, SystemConfig } from "@prisma/client";
-import { UserEventTypeId } from "../prisma/interfaces";
-import { DateTime } from "luxon";
 import { SystemConfigId } from "../prisma/assortments";
 
 export class PrismaService {

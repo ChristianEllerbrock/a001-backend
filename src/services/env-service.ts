@@ -40,6 +40,7 @@ export class EnvServiceEnv {
     ENVIRONMENT!: "dev" | "pro";
     RELAY_URL!: string;
     RELAY_START?: string;
+    REDIS_URL!: string;
 
     isOptional(property: string) {
         return this.#optionalProperties.includes(property);
