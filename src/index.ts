@@ -31,6 +31,8 @@ import { Nip05SocialRelayAllowedService } from "./relay/nip05-social-relay-allow
 import { generateRelayStatsController } from "./controllers/cron/generate-relay-stats-controller";
 import { emailControllerV2 } from "./controllers/email/email-controller-v2";
 import { errorHandler } from "./middlewares/errors";
+import { RedisMemory } from "./common/redis-memory/redis-memory";
+import { RedisMemoryService } from "./services/redis-memory-service";
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -111,6 +113,16 @@ app.post("/alby/payment-in", paymentInController);
 
 // Error handling
 app.use(errorHandler);
+
+// Start RedisMemoryService
+RedisMemoryService.i.init({
+    redisUrl: EnvService.instance.env.REDIS_URL,
+    inMemoryTTL: 60 * 60, // 1 hour
+});
+
+RedisMemoryService.i.db?.on("debug", (level, data) => {
+    console.log(`${data}`);
+});
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);
