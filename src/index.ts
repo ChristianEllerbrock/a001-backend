@@ -115,14 +115,19 @@ app.post("/alby/payment-in", paymentInController);
 app.use(errorHandler);
 
 // Start RedisMemoryService
-RedisMemoryService.i.init({
-    redisUrl: EnvService.instance.env.REDIS_URL,
-    inMemoryTTL: 60 * 60, // 1 hour
-});
-
-RedisMemoryService.i.db?.on("debug", (level, data) => {
-    console.log(`${data}`);
-});
+RedisMemoryService.i
+    .init({
+        redisUrl: EnvService.instance.env.REDIS_URL,
+        inMemoryTTL: 60 * 60, // 1 hour
+    })
+    .then(() => {
+        RedisMemoryService.i.db?.on("debug", (level, data) => {
+            console.log(`${data}`);
+        });
+    })
+    .catch((error) => {
+        console.log(error);
+    });
 
 async function bootstrap() {
     const schema = await buildSchema(schemaOptions);

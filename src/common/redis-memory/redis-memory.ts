@@ -40,6 +40,10 @@ export class RedisMemory<
 > extends TypedEventEmitter<RedisMemoryEventType> {
     static readonly logPrefix = "[RedisMemory] -";
 
+    get client() {
+        return this.#client;
+    }
+
     #client: RedisClientType;
     #inMemoryCache: Map<
         string,
