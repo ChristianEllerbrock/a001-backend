@@ -84,9 +84,13 @@ export class StatisticsResolver {
             .toISOString()
             .slice(0, 10)
             .replaceAll("-", "\\-");
+
         const result = await RedisMemoryService.i.db?.client.ft.search(
             RedisIndex.idxLookupStats,
-            `@date:{${escapedTodayString}*}`
+            `@date:{${escapedTodayString}*}`,
+            {
+                LIMIT: { from: 0, size: 10000 },
+            }
         );
         const lookups: LookupStatisticsOutput[] = [];
         for (const lookupStatsResult of result?.documents ?? []) {
