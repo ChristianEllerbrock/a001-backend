@@ -1,14 +1,16 @@
+import { RediSearchSchema, SchemaFieldTypes } from "redis";
 import {
     RedisMemory,
     RedisMemoryConfig,
 } from "../common/redis-memory/redis-memory";
 import {
+    RedisIndex,
     RedisTypeGlobalLookupStats,
     RedisTypeLookupData,
     RedisTypeLookupStats,
 } from "../types/redis/@types";
 
-type MyModel = {
+type MyCollectionTypes = {
     globalLookupStats: RedisTypeGlobalLookupStats;
     lookupStats: RedisTypeLookupStats;
     lookupData: RedisTypeLookupData;
@@ -35,10 +37,47 @@ export class RedisMemoryService {
         return this.#db;
     }
 
-    #db: RedisMemory<MyModel> | undefined;
+    #db: RedisMemory<MyCollectionTypes> | undefined;
+    #isInitialized = false;
 
-    init(config: RedisMemoryConfig) {
-        this.#db = new RedisMemory<MyModel>(config);
+    async init(config: RedisMemoryConfig) {
+        if (this.#isInitialized) {
+            return;
+        }
+
+        this.#db = new RedisMemory<MyCollectionTypes>(config);
+        this.#createIndexes();
+        this.#isInitialized = true;
+    }
+
+    async #createIndexes() {
+        if (!this.#db) {
+            return;
+        }
+
+        try {
+            await this.#db.connect();
+
+            const indexes = await this.#db.client.ft._list();
+
+            if (!indexes.includes(RedisIndex.idxLookupStats)) {
+                await this.#db.client.ft.create(
+                    RedisIndex.idxLookupStats,
+                    {
+                        "$.dailyLookups[*].date": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "date",
+                        },
+                    },
+                    {
+                        ON: "JSON",
+                        PREFIX: "lookupStats:",
+                    }
+                );
+            }
+        } catch (error) {
+            console.log(error);
+        }
     }
 }
 

@@ -8,6 +8,13 @@ import { DateTime } from "luxon";
 import { CacheService } from "../../../services/cache-service";
 import { RegistrationStatisticsOutput } from "../../outputs/statistics/registration-statistics-output";
 import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statistics-output";
+import { RedisMemory } from "../../../common/redis-memory/redis-memory";
+import { RedisMemoryService } from "../../../services/redis-memory-service";
+import {
+    RedisIndex,
+    RedisTypeGlobalLookupStats,
+    RedisTypeLookupStats,
+} from "../../../types/redis/@types";
 
 const USAGE_STATISTICS = "usageStatistics";
 
@@ -26,9 +33,7 @@ export class StatisticsResolver {
 
         // 2nd: There was NO cache hit. Get the data from the database and cache the value.
         const now = DateTime.now();
-        const nowString = now.toJSDate().toISOString().slice(0, 10);
         const yesterday = now.plus({ days: -1 });
-        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
 
         const queryNoOfUsers = `SELECT 
             noOfUsers = COUNT(DISTINCT([user].pubkey))
@@ -53,47 +58,55 @@ export class StatisticsResolver {
         );
         const noOfRegistrations = (result2 as any[])[0].noOfRegistrations;
 
-        const queryNoOfLookups = `SELECT
-            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            FROM
-            dbo.RegistrationLookup registrationLookup
-            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
-            JOIN dbo.[User] [user] ON [user].id = registration.userId 
-            WHERE 
-            registrationLookup.[date] in (
-                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
-                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
-            )
-            AND [user].isSystemAgent = 0`;
-        const result3 = await context.db.$queryRawUnsafe(queryNoOfLookups);
-        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
-        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
+        const todayString = now.startOf("day").toJSDate().toISOString();
+        const yesterString = yesterday.startOf("day").toJSDate().toISOString();
 
-        const queryTop10Lookups = `SELECT
-            Top 10
-            identifier = registration.identifier
-            , domain = domain.name
-            --, [date] = registrationLookup.[date] 
-            , total = registrationLookup.total
-            , pubkey = [user].pubkey
-            FROM
-            dbo.RegistrationLookup registrationLookup
-            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
-            JOIN dbo.[User] [user] ON [user].id = registration.userId 
-            JOIN dbo.SystemDomain domain ON registration.systemDomainId = domain.id
-            WHERE 
-            registrationLookup.[date] = (SELECT CONVERT (Date, GETDATE()))
-            AND [user].isSystemAgent = 0
-            order by registrationLookup.total DESC`;
-        const result4 = await context.db.$queryRawUnsafe(queryTop10Lookups);
-        const top10Lookups = result4 as LookupStatisticsOutput[];
+        let noOfLookupsToday = 0;
+        let noOfLookupsYesterday = 0;
+        const redisTypeGlobalLookupStats =
+            await RedisMemoryService.i.db?.getJson<RedisTypeGlobalLookupStats>(
+                "globalLookupStats"
+            );
+        if (redisTypeGlobalLookupStats) {
+            noOfLookupsToday =
+                redisTypeGlobalLookupStats.dailyLookups.find(
+                    (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
+                )?.lookups ?? 0;
+            noOfLookupsYesterday =
+                redisTypeGlobalLookupStats.dailyLookups.find(
+                    (x) => x.date.slice(0, 10) === yesterString.slice(0, 10)
+                )?.lookups ?? 0;
+        }
+
+        const escapedTodayString = now
+            .startOf("day")
+            .toJSDate()
+            .toISOString()
+            .slice(0, 10)
+            .replaceAll("-", "\\-");
+        const result = await RedisMemoryService.i.db?.client.ft.search(
+            RedisIndex.idxLookupStats,
+            `@date:{${escapedTodayString}*}`
+        );
+        const lookups: LookupStatisticsOutput[] = [];
+        for (const lookupStatsResult of result?.documents ?? []) {
+            const lookupStats =
+                lookupStatsResult.value as unknown as RedisTypeLookupStats;
+
+            const todayDaily = lookupStats.dailyLookups.find(
+                (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
+            );
+            lookups.push({
+                identifier: lookupStats.nip05.split("@")[0],
+                domain: lookupStats.nip05.split("@")[1],
+                total: todayDaily?.lookups ?? 0,
+                pubkey: "unknown",
+            });
+        }
+
+        const top10Lookups = lookups
+            .sortBy((x) => x.total, "desc")
+            .slice(0, 10);
 
         const queryLast10Registrations = `SELECT
             TOP 10

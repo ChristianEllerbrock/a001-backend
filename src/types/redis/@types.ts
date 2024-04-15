@@ -1,3 +1,8 @@
+export enum RedisIndex {
+    idxLookupStats = "idx:lookupStats",
+    ixdGlobalLookupStats = "idx:globalLookupStats",
+}
+
 export interface RedisTypeLookupStats {
     nip05: string;
     lastLookupAt: string;
