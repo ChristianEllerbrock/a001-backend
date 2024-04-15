@@ -122,7 +122,9 @@ RedisMemoryService.i
     })
     .then(() => {
         RedisMemoryService.i.db?.on("debug", (level, data) => {
-            console.log(`${data}`);
+            if (level === "error") {
+                console.log(`${data}`);
+            }
         });
     })
     .catch((error) => {
