@@ -8,14 +8,13 @@ import { DateTime } from "luxon";
 import { CacheService } from "../../../services/cache-service";
 import { RegistrationStatisticsOutput } from "../../outputs/statistics/registration-statistics-output";
 import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statistics-output";
-import { RedisMemory } from "../../../common/redis-memory/redis-memory";
-import { RedisMemoryService } from "../../../services/redis-memory-service";
+import { RMService } from "../../../services/redis-memory-service";
 import {
     NonCollectionRedisTypes,
-    RedisIndex,
     RedisTypeGlobalLookupStats,
-    RedisTypeLookupStats,
+    RedisTypeGlobalUserStats,
 } from "../../../types/redis/@types";
+import { CronService } from "../../../services/cron-service";
 
 const USAGE_STATISTICS = "usageStatistics";
 
@@ -26,38 +25,49 @@ export class StatisticsResolver {
         @Ctx() context: GraphqlContext
     ): Promise<UsageStatisticsOutput> {
         // 1st: query the cache for previously stored (and still cached) value
-        const cachedValue =
-            CacheService.instance.get<UsageStatisticsOutput>(USAGE_STATISTICS);
-        if (cachedValue) {
-            return cachedValue;
-        }
+        // const cachedValue =
+        //     CacheService.instance.get<UsageStatisticsOutput>(USAGE_STATISTICS);
+        // if (cachedValue) {
+        //     return cachedValue;
+        // }
 
         // 2nd: There was NO cache hit. Get the data from the database and cache the value.
         const now = DateTime.now();
         const yesterday = now.plus({ days: -1 });
 
-        const queryNoOfUsers = `SELECT 
-            noOfUsers = COUNT(DISTINCT([user].pubkey))
-            FROM 
-            dbo.Registration registration
-            LEFT JOIN dbo.[User] [user] ON registration.userId  = [user].id
-            WHERE [user].[isSystemAgent] = 0 AND registration.id IS NOT NULL
-            AND registration.verifiedAt IS NOT NULL`;
-        const result1 = await context.db.$queryRawUnsafe(queryNoOfUsers);
-        const noOfUsers = (result1 as any[])[0].noOfUsers;
+        let redisGlobalUserStats = await CronService.i.getGlobalUserStats();
 
-        const queryNoOfRegistrations = `SELECT 
-            noOfRegistrations = COUNT(registration.id)
-            FROM 
-            dbo.Registration registration
-            JOIN dbo.[User] [user] ON registration.userId  = [user].id
-            WHERE 
-            registration.verifiedAt IS NOT NULL
-            AND [user].[isSystemAgent] = 0`;
-        const result2 = await context.db.$queryRawUnsafe(
-            queryNoOfRegistrations
-        );
-        const noOfRegistrations = (result2 as any[])[0].noOfRegistrations;
+        let noOfUsers = 0;
+        let noOfRegistrations = 0;
+        let registrationsPerDomain: RegistrationsPerDomainStatisticsOutput[] =
+            [];
+        let lastRegistrations: RegistrationStatisticsOutput[] = [];
+
+        if (redisGlobalUserStats) {
+            noOfUsers = redisGlobalUserStats?.noOfUsers ?? 0;
+            noOfRegistrations = redisGlobalUserStats?.noOfRegistrations ?? 0;
+            lastRegistrations = (
+                redisGlobalUserStats?.lastRegistrations ?? []
+            ).map((x) => {
+                return {
+                    date: new Date(x.date),
+                    identifier: x.nip05.split("@")[0],
+                    domain: x.nip05.split("@")[1],
+                    pubkey: "unknown",
+                };
+            });
+
+            registrationsPerDomain = Object.keys(
+                redisGlobalUserStats.noOfRegistrationsPerDomain
+            ).map((x) => {
+                return {
+                    domain: x,
+                    registrations:
+                        redisGlobalUserStats?.noOfRegistrationsPerDomain[x] ??
+                        0,
+                };
+            });
+        }
 
         const todayString = now.startOf("day").toJSDate().toISOString();
         const yesterString = yesterday.startOf("day").toJSDate().toISOString();
@@ -65,7 +75,7 @@ export class StatisticsResolver {
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
         const redisTypeGlobalLookupStats =
-            await RedisMemoryService.client?.fetch<RedisTypeGlobalLookupStats>(
+            await RMService.x?.fetch<RedisTypeGlobalLookupStats>(
                 NonCollectionRedisTypes.RedisTypeGlobalLookupStats
             );
         if (redisTypeGlobalLookupStats) {
@@ -87,7 +97,7 @@ export class StatisticsResolver {
             .replaceAll("-", "\\-");
 
         const searchResult =
-            (await RedisMemoryService.client?.search(
+            (await RMService.x?.search(
                 "lookupStats",
                 `@date:{${escapedTodayString}*}`
             )) ?? [];
@@ -109,51 +119,6 @@ export class StatisticsResolver {
             .sortBy((x) => x.total, "desc")
             .slice(0, 10);
 
-        const queryLast10Registrations = `SELECT
-            TOP 10
-            [date] = registration.verifiedAt
-            , registration.identifier
-            , domain = domain.name
-            , pubkey = [user].pubkey
-            FROM
-            dbo.Registration registration 
-            JOIN dbo.[User] [user] ON [user].id = registration.userId 
-            JOIN dbo.SystemDomain domain ON registration.systemDOmainId = domain.id
-            WHERE 
-            registration.verifiedAt IS NOT NULL
-            AND [user].isSystemAgent = 0
-            ORDER BY registration.verifiedAt DESC`;
-        const result5 = await context.db.$queryRawUnsafe(
-            queryLast10Registrations
-        );
-        const lastRegistrations = result5 as RegistrationStatisticsOutput[];
-
-        const queryRegistrationsPerDomain = `SELECT
-                domain = domain.name
-                , registrations = ISNULL(bookedDomain.registrations, 0)
-                FROM
-                dbo.SystemDomain domain 
-                LEFT JOIN
-                (
-                SELECT
-                domain = domain.name
-                , registrations = count(registration.id)
-                FROM
-                dbo.Registration registration 
-                JOIN dbo.[User] [user] ON [user].id = registration.userId 
-                JOIN dbo.SystemDomain domain ON registration.systemDOmainId = domain.id
-                WHERE 
-                registration.verifiedAt IS NOT NULL
-                AND [user].isSystemAgent = 0
-                GROUP BY domain.name
-                ) bookedDomain on domain.name = bookedDomain.domain
-                ORDER BY registrations DESC, domain`;
-        const result6 = await context.db.$queryRawUnsafe(
-            queryRegistrationsPerDomain
-        );
-        const registrationsPerDomain =
-            result6 as RegistrationsPerDomainStatisticsOutput[];
-
         const stats: UsageStatisticsOutput = {
             noOfUsers,
             noOfRegistrations,
@@ -165,7 +130,7 @@ export class StatisticsResolver {
             registrationsPerDomain,
         };
 
-        CacheService.instance.set(USAGE_STATISTICS, stats);
+        //CacheService.instance.set(USAGE_STATISTICS, stats);
 
         return stats;
     }

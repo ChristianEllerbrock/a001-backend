@@ -16,10 +16,10 @@ type MyCollectionTypes = {
     lookupData: RedisTypeLookupData;
 };
 
-export class RedisMemoryService {
+export class RMService {
     // #region Singleton
 
-    static #i: RedisMemoryService;
+    static #i: RMService;
 
     /** Singleton instance. */
     static get i() {
@@ -27,16 +27,16 @@ export class RedisMemoryService {
             return this.#i;
         }
 
-        this.#i = new RedisMemoryService();
+        this.#i = new RMService();
         return this.#i;
     }
 
-    static get client() {
+    static get x() {
         if (this.#i) {
             return this.#i.#db;
         }
 
-        this.#i = new RedisMemoryService();
+        this.#i = new RMService();
         return this.#i.db;
     }
 

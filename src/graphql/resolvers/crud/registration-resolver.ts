@@ -38,8 +38,12 @@ import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
 import { verifyEvent } from "nostr-tools";
-import { RedisMemoryService } from "../../../services/redis-memory-service";
-import { NonCollectionRedisTypes } from "../../../types/redis/@types";
+import { RMService } from "../../../services/redis-memory-service";
+import {
+    NonCollectionRedisTypes,
+    RedisTypeGlobalLookupStats,
+    RedisTypeGlobalUserStats,
+} from "../../../types/redis/@types";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -52,6 +56,80 @@ const cleanupExpiredRegistrationsAsync = async () => {
             validUntil: { lt: now.toJSDate() },
         },
     });
+};
+
+const updateGlobalUserStatsAfterRegistrationAdd = async (
+    fullIdentifier: string,
+    verifiedDate: Date,
+    usersVerifiedRegistrations: number
+) => {
+    const domain = fullIdentifier.split("@")[1];
+
+    const redisGlobalUserStats =
+        await RMService.x?.fetch<RedisTypeGlobalUserStats>(
+            NonCollectionRedisTypes.RedisTypeGlobalUserStats
+        );
+
+    if (!redisGlobalUserStats) {
+        // This should not happen since the global stats were
+        // created when the first lookup occurred.
+        return;
+    }
+
+    if (usersVerifiedRegistrations === 1) {
+        // This registration is the first verified registration of the user.
+        redisGlobalUserStats.noOfUsers += 1;
+    }
+
+    redisGlobalUserStats.noOfRegistrations += 1;
+    redisGlobalUserStats.lastRegistrations.unshift({
+        date: verifiedDate.toISOString() ?? "na",
+        nip05: fullIdentifier,
+    });
+    redisGlobalUserStats.lastRegistrations =
+        redisGlobalUserStats.lastRegistrations.slice(0, 10);
+
+    if (
+        typeof redisGlobalUserStats.noOfRegistrationsPerDomain[domain] ===
+        "undefined"
+    ) {
+        redisGlobalUserStats.noOfRegistrationsPerDomain[domain] = 1;
+    } else {
+        redisGlobalUserStats.noOfRegistrationsPerDomain[domain] += 1;
+    }
+
+    await RMService.x?.save(
+        NonCollectionRedisTypes.RedisTypeGlobalUserStats,
+        redisGlobalUserStats
+    );
+};
+
+const updateGlobalUserStatsAfterRegistrationDelete = async function (
+    fullIdentifier: string,
+    usersVerifiedRegistrations: number
+) {
+    const domain = fullIdentifier.split("@")[1];
+    const rGlobalUserStats = await RMService.x?.fetch<RedisTypeGlobalUserStats>(
+        NonCollectionRedisTypes.RedisTypeGlobalUserStats
+    );
+
+    if (!rGlobalUserStats) {
+        return;
+    }
+
+    rGlobalUserStats.noOfRegistrations -= 1;
+    if (rGlobalUserStats.noOfRegistrationsPerDomain[domain] > 0) {
+        rGlobalUserStats.noOfRegistrationsPerDomain[domain] -= 1;
+    }
+
+    if (usersVerifiedRegistrations === 0) {
+        rGlobalUserStats.noOfUsers -= 1;
+    }
+
+    await RMService.x?.save(
+        NonCollectionRedisTypes.RedisTypeGlobalUserStats,
+        rGlobalUserStats
+    );
 };
 
 @Resolver()
@@ -131,7 +209,7 @@ export class RegistrationResolver {
             .toJSDate()
             .toISOString();
 
-        const redisLookupStats = await RedisMemoryService.client?.cFetch(
+        const redisLookupStats = await RMService.x?.cFetch(
             "lookupStats",
             fullIdentifier
         );
@@ -194,7 +272,14 @@ export class RegistrationResolver {
                 data: {
                     verifiedAt: now.toJSDate(),
                 },
-                include: { systemDomain: true },
+                include: {
+                    systemDomain: true,
+                    user: {
+                        include: {
+                            registrations: true,
+                        },
+                    },
+                },
             });
 
         await PrismaService.instance.db.registrationCode.delete({
@@ -234,11 +319,26 @@ export class RegistrationResolver {
             },
         });
 
-        // Notify user about successful registration.
+        // Update global statistics and notify user about successful registration.
         new Promise(async (resolve, reject) => {
-            const nip05 = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const fullIdentifier = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const usersRegistrations =
+                updatedDbRegistration.user.registrations.filter(
+                    (x) => x.verifiedAt != null
+                ).length;
+
+            // Update global statistics.
+            if (updatedDbRegistration.verifiedAt) {
+                await updateGlobalUserStatsAfterRegistrationAdd(
+                    fullIdentifier,
+                    updatedDbRegistration.verifiedAt,
+                    usersRegistrations
+                );
+            }
+
+            // Welcome user/registration via Nostr DM.
             const message =
-                `Thank you for registering ${nip05} as Nostr address.` +
+                `Thank you for registering ${fullIdentifier} as Nostr address.` +
                 " \n\nVisit your account section to enable Lightning Address and Email Forwarding" +
                 " or just to see some statistics about your Nostr address usage." +
                 " \n\nhttps://nip05.social";
@@ -468,106 +568,106 @@ export class RegistrationResolver {
         };
     }
 
-    @Mutation((returns) => UserTokenOutput)
-    async redeemRegistrationNip46Code(
-        @Ctx() context: GraphqlContext,
-        @Args() args: RegistrationNip46RedeemInputArgs
-    ): Promise<UserTokenOutput> {
-        const now = DateTime.now();
-        await cleanupExpiredRegistrationsAsync();
+    // @Mutation((returns) => UserTokenOutput)
+    // async redeemRegistrationNip46Code(
+    //     @Ctx() context: GraphqlContext,
+    //     @Args() args: RegistrationNip46RedeemInputArgs
+    // ): Promise<UserTokenOutput> {
+    //     const now = DateTime.now();
+    //     await cleanupExpiredRegistrationsAsync();
 
-        const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(
-            args.data.pubkey
-        );
+    //     const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(
+    //         args.data.pubkey
+    //     );
 
-        const dbRegistration = await context.db.registration.findFirst({
-            where: { id: args.registrationId },
-            include: {
-                registrationNip46Code: true,
-                user: true,
-            },
-        });
+    //     const dbRegistration = await context.db.registration.findFirst({
+    //         where: { id: args.registrationId },
+    //         include: {
+    //             registrationNip46Code: true,
+    //             user: true,
+    //         },
+    //     });
 
-        if (
-            !dbRegistration ||
-            dbRegistration.user.pubkey !== pubkeyObject.hex ||
-            !dbRegistration.registrationNip46Code
-        ) {
-            throw new Error("Cannot find registration.");
-        }
+    //     if (
+    //         !dbRegistration ||
+    //         dbRegistration.user.pubkey !== pubkeyObject.hex ||
+    //         !dbRegistration.registrationNip46Code
+    //     ) {
+    //         throw new Error("Cannot find registration.");
+    //     }
 
-        if (dbRegistration.verifiedAt) {
-            throw new Error("Registration is already validated.");
-        }
+    //     if (dbRegistration.verifiedAt) {
+    //         throw new Error("Registration is already validated.");
+    //     }
 
-        // Check 1: Has the code already expired
-        if (dbRegistration.registrationNip46Code.validUntil < now.toJSDate()) {
-            throw new Error(
-                "The registration has already expired. Please try again."
-            );
-        }
+    //     // Check 1: Has the code already expired
+    //     if (dbRegistration.registrationNip46Code.validUntil < now.toJSDate()) {
+    //         throw new Error(
+    //             "The registration has already expired. Please try again."
+    //         );
+    //     }
 
-        // Check 2: The content includes the server side generated code.
-        if (
-            !args.data.content.includes(
-                dbRegistration.registrationNip46Code.code
-            )
-        ) {
-            throw new Error("The provided content is not valid");
-        }
+    //     // Check 2: The content includes the server side generated code.
+    //     if (
+    //         !args.data.content.includes(
+    //             dbRegistration.registrationNip46Code.code
+    //         )
+    //     ) {
+    //         throw new Error("The provided content is not valid");
+    //     }
 
-        // Check 3: The provided event-signature is valid.
-        if (!verifyEvent(args.data)) {
-            throw new Error("The signature is invalid.");
-        }
+    //     // Check 3: The provided event-signature is valid.
+    //     if (!verifyEvent(args.data)) {
+    //         throw new Error("The signature is invalid.");
+    //     }
 
-        // Everything checks out. Finalize registration.
-        await PrismaService.instance.db.registration.update({
-            where: { id: dbRegistration.id },
-            data: {
-                verifiedAt: now.toJSDate(),
-            },
-        });
+    //     // Everything checks out. Finalize registration.
+    //     await PrismaService.instance.db.registration.update({
+    //         where: { id: dbRegistration.id },
+    //         data: {
+    //             verifiedAt: now.toJSDate(),
+    //         },
+    //     });
 
-        await PrismaService.instance.db.registrationNip46Code.delete({
-            where: { id: dbRegistration.registrationNip46Code.id },
-        });
+    //     await PrismaService.instance.db.registrationNip46Code.delete({
+    //         where: { id: dbRegistration.registrationNip46Code.id },
+    //     });
 
-        const userTokenValidityInMinutes =
-            await PrismaService.instance.getSystemConfigAsNumberAsync(
-                SystemConfigId.UserTokenValidityInMinutes
-            );
+    //     const userTokenValidityInMinutes =
+    //         await PrismaService.instance.getSystemConfigAsNumberAsync(
+    //             SystemConfigId.UserTokenValidityInMinutes
+    //         );
 
-        if (!userTokenValidityInMinutes) {
-            throw new Error("Invalid system config. Please contact support.");
-        }
+    //     if (!userTokenValidityInMinutes) {
+    //         throw new Error("Invalid system config. Please contact support.");
+    //     }
 
-        // Create or update user token.
-        const dbUserToken = await PrismaService.instance.db.userToken.upsert({
-            where: {
-                userId_deviceId: {
-                    userId: dbRegistration.userId,
-                    deviceId: args.deviceId,
-                },
-            },
-            update: {
-                token: uuid.v4(),
-                validUntil: now
-                    .plus({ minute: userTokenValidityInMinutes })
-                    .toJSDate(),
-            },
-            create: {
-                userId: dbRegistration.userId,
-                deviceId: args.deviceId,
-                token: uuid.v4(),
-                validUntil: now
-                    .plus({ minute: userTokenValidityInMinutes })
-                    .toJSDate(),
-            },
-        });
+    //     // Create or update user token.
+    //     const dbUserToken = await PrismaService.instance.db.userToken.upsert({
+    //         where: {
+    //             userId_deviceId: {
+    //                 userId: dbRegistration.userId,
+    //                 deviceId: args.deviceId,
+    //             },
+    //         },
+    //         update: {
+    //             token: uuid.v4(),
+    //             validUntil: now
+    //                 .plus({ minute: userTokenValidityInMinutes })
+    //                 .toJSDate(),
+    //         },
+    //         create: {
+    //             userId: dbRegistration.userId,
+    //             deviceId: args.deviceId,
+    //             token: uuid.v4(),
+    //             validUntil: now
+    //                 .plus({ minute: userTokenValidityInMinutes })
+    //                 .toJSDate(),
+    //         },
+    //     });
 
-        return dbUserToken;
-    }
+    //     return dbUserToken;
+    // }
 
     @Mutation((returns) => UserTokenOutput)
     async redeemRegistrationNip07Code(
@@ -634,7 +734,14 @@ export class RegistrationResolver {
                 data: {
                     verifiedAt: now.toJSDate(),
                 },
-                include: { systemDomain: true },
+                include: {
+                    systemDomain: true,
+                    user: {
+                        include: {
+                            registrations: true,
+                        },
+                    },
+                },
             });
 
         await PrismaService.instance.db.registrationNip07Code.delete({
@@ -674,11 +781,26 @@ export class RegistrationResolver {
             },
         });
 
-        // Notify user about successful registration.
+        // Update global statistics and notify user about successful registration.
         new Promise(async (resolve, reject) => {
-            const nip05 = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const fullIdentifier = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
+            const usersRegistrations =
+                updatedDbRegistration.user.registrations.filter(
+                    (x) => x.verifiedAt != null
+                ).length;
+
+            // Update global statistics.
+            if (updatedDbRegistration.verifiedAt) {
+                await updateGlobalUserStatsAfterRegistrationAdd(
+                    fullIdentifier,
+                    updatedDbRegistration.verifiedAt,
+                    usersRegistrations
+                );
+            }
+
+            // Welcome user/registration via Nostr DM.
             const message =
-                `Thank you for registering ${nip05} as Nostr address.` +
+                `Thank you for registering ${fullIdentifier} as Nostr address.` +
                 " \n\nVisit your account section to enable Lightning Address and Email Forwarding" +
                 " or just to see some statistics about your Nostr address usage." +
                 " \n\nhttps://nip05.social";
@@ -908,23 +1030,52 @@ ${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${code}
         @Ctx() context: GraphqlContext,
         @Args() args: RegistrationDeleteInputArgs
     ): Promise<string> {
-        const dbRegistration = await context.db.registration.findUnique({
-            where: { id: args.registrationId },
-        });
+        const result = await context.db.$transaction(
+            async (db): Promise<[string, string, number]> => {
+                const dbRegistration = await db.registration.findUnique({
+                    where: { id: args.registrationId },
+                    include: {
+                        systemDomain: true,
+                    },
+                });
 
-        if (
-            !dbRegistration ||
-            dbRegistration?.userId !== context.user?.userId
-        ) {
-            throw new Error(
-                `Could not find your registration with id '${args.registrationId}'.`
-            );
-        }
+                if (
+                    !dbRegistration ||
+                    dbRegistration?.userId !== context.user?.userId
+                ) {
+                    throw new Error(
+                        `Could not find your registration with id '${args.registrationId}'.`
+                    );
+                }
 
-        await context.db.registration.delete({
-            where: { id: dbRegistration.id },
-        });
-        return dbRegistration.id;
+                const fullIdentifier = `${dbRegistration.identifier}@${dbRegistration.systemDomain.name}`;
+                await db.registration.delete({
+                    where: { id: dbRegistration.id },
+                });
+
+                const verifiedRegistrations = (
+                    await db.registration.findMany({
+                        where: {
+                            userId: dbRegistration.userId,
+                            verifiedAt: {
+                                not: null,
+                            },
+                        },
+                    })
+                ).length;
+
+                return [
+                    dbRegistration.id,
+                    fullIdentifier,
+                    verifiedRegistrations,
+                ];
+            }
+        );
+
+        // Update global statistics.
+        updateGlobalUserStatsAfterRegistrationDelete(result[1], result[2]);
+
+        return result[0];
     }
 
     @Authorized()

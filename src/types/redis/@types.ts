@@ -22,6 +22,16 @@ export interface RedisTypeGlobalLookupStats {
     }[];
 }
 
+export interface RedisTypeGlobalUserStats {
+    noOfUsers: number;
+    noOfRegistrations: number;
+    noOfRegistrationsPerDomain: { [key: string]: number };
+    lastRegistrations: {
+        date: string;
+        nip05: string;
+    }[];
+}
+
 export interface RedisTypeLookupData {
     nip05: string;
     names: { [key: string]: string };
@@ -30,5 +40,6 @@ export interface RedisTypeLookupData {
 
 export enum NonCollectionRedisTypes {
     RedisTypeGlobalLookupStats = "globalLookupStats",
+    RedisTypeGlobalUserStats = "globalUserStats",
 }
 
