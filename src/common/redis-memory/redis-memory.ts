@@ -40,11 +40,11 @@ export class RedisMemory<
 > extends TypedEventEmitter<RedisMemoryEventType> {
     static readonly logPrefix = "[RedisMemory] -";
 
-    get client() {
-        return this.#client;
+    get redis() {
+        return this.#redis;
     }
 
-    #client: RedisClientType;
+    #redis: RedisClientType;
     #inMemoryCache: Map<
         string,
         [json: RedisJSON, lastActionAt: number, ttlInSeconds: number]
@@ -55,17 +55,17 @@ export class RedisMemory<
     constructor(public readonly config: RedisMemoryConfig) {
         super();
 
-        this.#client = createClient({
+        this.#redis = createClient({
             url: config.redisUrl,
         });
 
-        this.#client.on("error", (err) => {
+        this.#redis.on("error", (err) => {
             this.emit("error", err);
         });
     }
 
     async connect() {
-        await this.#client.connect();
+        await this.#redis.connect();
         this.emit(
             "debug",
             "info",
@@ -74,7 +74,7 @@ export class RedisMemory<
     }
 
     async disconnect() {
-        await this.#client.disconnect();
+        await this.#redis.disconnect();
         this.emit(
             "debug",
             "info",
@@ -93,7 +93,7 @@ export class RedisMemory<
             LIMIT: { from: 0, size: 10000 },
         };
 
-        const result = await this.#client.ft.search(
+        const result = await this.#redis.ft.search(
             index,
             query,
             relevantOptions
@@ -137,8 +137,8 @@ export class RedisMemory<
 
             this.#inMemoryCacheCleanup();
 
-            if (!this.#client.isOpen) {
-                await this.#client.connect();
+            if (!this.#redis.isOpen) {
+                await this.#redis.connect();
             }
 
             let relevantTtl = this.config.inMemoryTTL;
@@ -156,7 +156,7 @@ export class RedisMemory<
                     options?.directlyAddToInMemoryCache ?? false
                 }`
             );
-            const setResult = await this.#client.json.set(
+            const setResult = await this.#redis.json.set(
                 key,
                 "$",
                 json as RedisJSON
@@ -205,6 +205,18 @@ export class RedisMemory<
     }
 
     async fetch<T>(key: string): Promise<T | null | undefined> {
+        return await this.#fetch<T>(key);
+    }
+
+    async cFetch<Collection extends keyof TModel & string>(
+        collection: Collection,
+        key: string
+    ): Promise<TModel[Collection] | null | undefined> {
+        const relevantKey = `${collection}:${key}`;
+        return await this.#fetch<TModel[Collection]>(relevantKey);
+    }
+
+    async #fetch<A>(key: string): Promise<A | null | undefined> {
         this.#inMemoryCacheCleanup();
 
         const inMemoryResult = this.#inMemoryCache.get(key);
@@ -215,7 +227,7 @@ export class RedisMemory<
                 "info",
                 `${RedisMemory.logPrefix} In-Memory cache hit for ${key}`
             );
-            return inMemoryResult[0] as T;
+            return inMemoryResult[0] as A;
         }
         this.emit(
             "debug",
@@ -223,16 +235,16 @@ export class RedisMemory<
             `${RedisMemory.logPrefix} In-Memory cache miss for ${key}. Querying Redis.`
         );
 
-        if (!this.#client.isOpen) {
-            await this.#client.connect();
+        if (!this.#redis.isOpen) {
+            await this.#redis.connect();
         }
 
-        const pathType = await this.#client.json.type(key);
+        const pathType = await this.#redis.json.type(key);
         if (!pathType) {
             return undefined;
         }
 
-        const databaseResult = await this.#client.json.get(key);
+        const databaseResult = await this.#redis.json.get(key);
         const relevantTtl =
             this.#inMemoryCacheTtl.get(key) ?? this.config.inMemoryTTL;
 
@@ -247,158 +259,7 @@ export class RedisMemory<
             this.#upcomingInMemoryCacheCleanupAt = now + relevantTtl * 1000;
         }
 
-        return databaseResult as T;
-    }
-
-    async collectionFetch<Collection extends keyof TModel & string>(
-        collection: Collection,
-        key: string
-    ): Promise<TModel[Collection] | null | undefined> {
-        try {
-            this.#inMemoryCacheCleanup();
-
-            const relevantKey = `${collection}:${key}`;
-
-            const inMemoryResult = this.#inMemoryCache.get(relevantKey);
-            if (typeof inMemoryResult !== "undefined") {
-                inMemoryResult[1] = Date.now();
-                this.emit(
-                    "debug",
-                    "info",
-                    `${RedisMemory.logPrefix} In-Memory cache hit for ${relevantKey}`
-                );
-                return inMemoryResult[0] as TModel[Collection] | null;
-            }
-            this.emit(
-                "debug",
-                "info",
-                `${RedisMemory.logPrefix} In-Memory cache miss for ${relevantKey}. Querying Redis.`
-            );
-
-            if (!this.#client.isOpen) {
-                await this.#client.connect();
-            }
-
-            const pathType = await this.#client.json.type(relevantKey);
-            if (!pathType) {
-                return undefined;
-            }
-
-            const databaseResult = await this.#client.json.get(relevantKey);
-            const relevantTtl =
-                this.#inMemoryCacheTtl.get(relevantKey) ??
-                this.config.inMemoryTTL;
-
-            const now = Date.now();
-            this.#inMemoryCache.set(relevantKey, [
-                databaseResult,
-                now,
-                relevantTtl,
-            ]);
-
-            // Check if the need to update #upcomingInMemoryCacheCleanupAt
-            if (
-                typeof this.#upcomingInMemoryCacheCleanupAt === "undefined" ||
-                now + relevantTtl * 1000 < this.#upcomingInMemoryCacheCleanupAt
-            ) {
-                this.#upcomingInMemoryCacheCleanupAt = now + relevantTtl * 1000;
-            }
-
-            return databaseResult as TModel[Collection] | null;
-        } catch (error) {
-            this.emit(
-                "error",
-                `${RedisMemory.logPrefix} Error in getJson for key ${key}: ${error}`
-            );
-            this.emit(
-                "debug",
-                "error",
-                `${RedisMemory.logPrefix} Error in getJson for key ${key}: ${error}`
-            );
-            return null;
-        }
-    }
-
-    async getJson<T>(key: string): Promise<T | null | undefined>;
-    async getJson<Collection extends keyof TModel & string>(
-        collection: Collection,
-        key: string
-    ): Promise<TModel[Collection] | null | undefined>;
-    async getJson<Collection extends keyof TModel & string>(
-        arg1: Collection | string,
-        arg2?: string
-    ): Promise<any> {
-        let key = "";
-        let variant: "without collection" | "with collection" =
-            "with collection";
-        try {
-            if (typeof arg2 === "string") {
-                // Variant 1 WITH collection.
-                key = `${arg1}:${arg2}`;
-            } else {
-                key = arg1;
-                variant = "without collection";
-            }
-
-            this.#inMemoryCacheCleanup();
-
-            const inMemoryResult = this.#inMemoryCache.get(key);
-            if (typeof inMemoryResult !== "undefined") {
-                inMemoryResult[1] = Date.now();
-                this.emit(
-                    "debug",
-                    "info",
-                    `${RedisMemory.logPrefix} In-Memory cache hit for ${key}`
-                );
-                return variant === "with collection"
-                    ? (inMemoryResult[0] as TModel[Collection] | null)
-                    : (inMemoryResult[0] as any);
-            }
-            this.emit(
-                "debug",
-                "info",
-                `${RedisMemory.logPrefix} In-Memory cache miss for ${key}. Querying Redis.`
-            );
-
-            if (!this.#client.isOpen) {
-                await this.#client.connect();
-            }
-
-            const pathType = await this.#client.json.type(key);
-            if (!pathType) {
-                return undefined;
-            }
-
-            const databaseResult = await this.#client.json.get(key);
-            const relevantTtl =
-                this.#inMemoryCacheTtl.get(key) ?? this.config.inMemoryTTL;
-
-            const now = Date.now();
-            this.#inMemoryCache.set(key, [databaseResult, now, relevantTtl]);
-
-            // Check if the need to update #upcomingInMemoryCacheCleanupAt
-            if (
-                typeof this.#upcomingInMemoryCacheCleanupAt === "undefined" ||
-                now + relevantTtl * 1000 < this.#upcomingInMemoryCacheCleanupAt
-            ) {
-                this.#upcomingInMemoryCacheCleanupAt = now + relevantTtl * 1000;
-            }
-
-            return variant === "with collection"
-                ? (databaseResult as TModel[Collection] | null)
-                : (databaseResult as any);
-        } catch (error) {
-            this.emit(
-                "error",
-                `${RedisMemory.logPrefix} Error in getJson for key ${key}: ${error}`
-            );
-            this.emit(
-                "debug",
-                "error",
-                `${RedisMemory.logPrefix} Error in getJson for key ${key}: ${error}`
-            );
-            return null;
-        }
+        return databaseResult as A;
     }
 
     /** Removes all objects from the inMemory cache where there TTL has expired. */

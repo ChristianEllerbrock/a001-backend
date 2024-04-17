@@ -67,10 +67,10 @@ export class RedisMemoryService {
         try {
             await this.#db.connect();
 
-            const indexes = await this.#db.client.ft._list();
+            const indexes = await this.#db.redis.ft._list();
 
             if (!indexes.includes(RedisIndex.idxLookupStats)) {
-                await this.#db.client.ft.create(
+                await this.#db.redis.ft.create(
                     RedisIndex.idxLookupStats,
                     {
                         "$.dailyLookups[*].date": {

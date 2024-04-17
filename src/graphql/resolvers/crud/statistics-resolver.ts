@@ -11,6 +11,7 @@ import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statisti
 import { RedisMemory } from "../../../common/redis-memory/redis-memory";
 import { RedisMemoryService } from "../../../services/redis-memory-service";
 import {
+    NonCollectionRedisTypes,
     RedisIndex,
     RedisTypeGlobalLookupStats,
     RedisTypeLookupStats,
@@ -64,8 +65,8 @@ export class StatisticsResolver {
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
         const redisTypeGlobalLookupStats =
-            await RedisMemoryService.client?.getJson<RedisTypeGlobalLookupStats>(
-                "globalLookupStats"
+            await RedisMemoryService.client?.fetch<RedisTypeGlobalLookupStats>(
+                NonCollectionRedisTypes.RedisTypeGlobalLookupStats
             );
         if (redisTypeGlobalLookupStats) {
             noOfLookupsToday =

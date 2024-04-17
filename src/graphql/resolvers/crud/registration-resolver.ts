@@ -131,11 +131,10 @@ export class RegistrationResolver {
             .toJSDate()
             .toISOString();
 
-        const redisLookupStats =
-            await RedisMemoryService.client?.collectionFetch(
-                "lookupStats",
-                fullIdentifier
-            );
+        const redisLookupStats = await RedisMemoryService.client?.cFetch(
+            "lookupStats",
+            fullIdentifier
+        );
         let noOfLookups = 0;
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;

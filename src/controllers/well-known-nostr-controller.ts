@@ -20,7 +20,7 @@ const bumpGlobalStats = async function () {
     const today = now.startOf("day");
 
     let redisTypeGlobalLookupStats =
-        await RedisMemoryService.i.db?.getJson<RedisTypeGlobalLookupStats>(
+        await RedisMemoryService.client?.fetch<RedisTypeGlobalLookupStats>(
             NonCollectionRedisTypes.RedisTypeGlobalLookupStats
         );
     if (!redisTypeGlobalLookupStats) {
@@ -101,7 +101,7 @@ export async function wellKnownNostrController(
         await SystemUserCacheService.instance.initialize();
 
         // Check RedisMemory first.
-        const redisLookupData = await RedisMemoryService.i.db?.getJson(
+        const redisLookupData = await RedisMemoryService.client?.cFetch(
             "lookupData",
             fullIdentifier
         );
@@ -118,7 +118,7 @@ export async function wellKnownNostrController(
             }
 
             // This is a valid record in RedisMemory. Continue.
-            let redisLookupStats = await RedisMemoryService.i.db?.getJson(
+            let redisLookupStats = await RedisMemoryService.client?.cFetch(
                 "lookupStats",
                 fullIdentifier
             );
