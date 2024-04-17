@@ -64,7 +64,7 @@ export class StatisticsResolver {
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
         const redisTypeGlobalLookupStats =
-            await RedisMemoryService.i.db?.getJson<RedisTypeGlobalLookupStats>(
+            await RedisMemoryService.client?.getJson<RedisTypeGlobalLookupStats>(
                 "globalLookupStats"
             );
         if (redisTypeGlobalLookupStats) {
@@ -85,18 +85,14 @@ export class StatisticsResolver {
             .slice(0, 10)
             .replaceAll("-", "\\-");
 
-        const result = await RedisMemoryService.i.db?.client.ft.search(
-            RedisIndex.idxLookupStats,
-            `@date:{${escapedTodayString}*}`,
-            {
-                LIMIT: { from: 0, size: 10000 },
-            }
-        );
-        const lookups: LookupStatisticsOutput[] = [];
-        for (const lookupStatsResult of result?.documents ?? []) {
-            const lookupStats =
-                lookupStatsResult.value as unknown as RedisTypeLookupStats;
+        const searchResult =
+            (await RedisMemoryService.client?.search(
+                "lookupStats",
+                `@date:{${escapedTodayString}*}`
+            )) ?? [];
 
+        const lookups: LookupStatisticsOutput[] = [];
+        for (const lookupStats of searchResult) {
             const todayDaily = lookupStats.dailyLookups.find(
                 (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
             );
