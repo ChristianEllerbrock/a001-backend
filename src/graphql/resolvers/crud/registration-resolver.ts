@@ -38,6 +38,8 @@ import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
 import { verifyEvent } from "nostr-tools";
+import { RedisMemoryService } from "../../../services/redis-memory-service";
+import { NonCollectionRedisTypes } from "../../../types/redis/@types";
 
 const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -108,42 +110,46 @@ export class RegistrationResolver {
     ): Promise<NostrAddressStatisticsOutput> {
         const dbRegistration = await context.db.registration.findUnique({
             where: { id: registrationId },
+            include: {
+                systemDomain: true,
+            },
         });
 
         if (!dbRegistration || dbRegistration.userId !== context.user?.userId) {
             throw new Error("Could not find registration or unauthorized.");
         }
 
+        const fullIdentifier =
+            dbRegistration.identifier + "@" + dbRegistration.systemDomain.name;
+
         const now = DateTime.now();
-        const nowString = now.toJSDate().toISOString().slice(0, 10);
         const yesterday = now.plus({ days: -1 });
-        const yesterdayString = yesterday.toJSDate().toISOString().slice(0, 10);
 
-        const noOfLookups = dbRegistration.nipped;
+        const todayString = now.startOf("day").toJSDate().toISOString();
+        const yesterdayString = yesterday
+            .startOf("day")
+            .toJSDate()
+            .toISOString();
 
-        const query = `SELECT
-            noOfLookupsYesterday = ISNULL(SUM(IIF(registrationLookup.[date] = '${yesterdayString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            , noOfLookupsToday = ISNULL(SUM(IIF(registrationLookup.[date] = '${nowString}',
-                registrationLookup.total,
-                0
-            )), 0)
-            FROM
-            dbo.RegistrationLookup registrationLookup
-            JOIN dbo.Registration registration ON registrationLookup.registrationId = registration.id
-            JOIN dbo.[User] [user] ON [user].id = registration.userId 
-            WHERE 
-            registration.id = '${dbRegistration.id}'
-            AND registrationLookup.[date] in (
-                (SELECT CONVERT (Date, GETDATE()) AS [Current Date]),
-                (SELECT CONVERT (Date, DATEADD(DAY, -1, GETDATE()) ) AS [Current Date])
-            )
-            AND [user].isSystemAgent = 0`;
-        const result3 = await context.db.$queryRawUnsafe(query);
-        const noOfLookupsYesterday = (result3 as any[])[0].noOfLookupsYesterday;
-        const noOfLookupsToday = (result3 as any[])[0].noOfLookupsToday;
+        const redisLookupStats =
+            await RedisMemoryService.client?.collectionFetch(
+                "lookupStats",
+                fullIdentifier
+            );
+        let noOfLookups = 0;
+        let noOfLookupsToday = 0;
+        let noOfLookupsYesterday = 0;
+        if (redisLookupStats) {
+            noOfLookups = redisLookupStats.lookups;
+            noOfLookupsToday =
+                redisLookupStats.dailyLookups.find(
+                    (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
+                )?.lookups ?? 0;
+            noOfLookupsYesterday =
+                redisLookupStats.dailyLookups.find(
+                    (x) => x.date.slice(0, 10) === yesterdayString.slice(0, 10)
+                )?.lookups ?? 0;
+        }
 
         const stats: NostrAddressStatisticsOutput = {
             id: registrationId,

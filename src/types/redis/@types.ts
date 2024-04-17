@@ -1,3 +1,5 @@
+import { Schema, Repository } from "redis-om";
+
 export enum RedisIndex {
     idxLookupStats = "idx:lookupStats",
     ixdGlobalLookupStats = "idx:globalLookupStats",

@@ -1,4 +1,4 @@
-import { RediSearchSchema, SchemaFieldTypes } from "redis";
+import { SchemaFieldTypes } from "redis";
 import {
     RedisMemory,
     RedisMemoryConfig,
@@ -29,6 +29,15 @@ export class RedisMemoryService {
 
         this.#i = new RedisMemoryService();
         return this.#i;
+    }
+
+    static get client() {
+        if (this.#i) {
+            return this.#i.#db;
+        }
+
+        this.#i = new RedisMemoryService();
+        return this.#i.db;
     }
 
     // #endregion Singleton
