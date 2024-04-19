@@ -1,8 +1,7 @@
-import EventEmitter from "events";
-import { createClient, RedisClientType, SearchOptions } from "redis";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { createClient, RedisClientType } from "redis";
 import { RedisJSON } from "@redis/json/dist/commands";
 import { TypedEventEmitter } from "./typed-event-emitter";
-import { RedisMemoryCollectionTypes } from "./redis-memory-model";
 
 export type RedisMemoryConfig = {
     redisUrl: string;
@@ -98,6 +97,11 @@ export class RedisMemory extends TypedEventEmitter<RedisMemoryEventType> {
     //     );
     //     return result.documents.map((x) => x.value as TModel[Collection]);
     // }
+
+    async remove(key: string) {
+        await this.#redis.json.del(key);
+        this.#inMemoryCache.delete(key);
+    }
 
     async save<T>(
         key: string,

@@ -121,7 +121,21 @@ const updateGlobalUserStatsAfterRegistrationDelete = async function (
         await erGlobalUserStats.save();
     } catch (error) {
         console.error(
-            "Error updating global user stats after registration delete",
+            "Error updating globalUserStats in Redis after registration delete",
+            error
+        );
+    }
+};
+
+const deleteLookupDataAndLookupStatsAfterRegistrationDelete = async function (
+    fullIdentifier: string
+) {
+    try {
+        await RMService.i.lookupData.remove(fullIdentifier);
+        await RMService.i.lookupStats.remove(fullIdentifier);
+    } catch (error) {
+        console.error(
+            "Error deleting lookupData and lookupStats in Redis after registration delete",
             error
         );
     }
@@ -968,8 +982,11 @@ ${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${code}
             }
         );
 
-        // Update global statistics.
+        // Update globalUserStats in Redis.
         updateGlobalUserStatsAfterRegistrationDelete(result[1], result[2]);
+
+        // Delete lookupData from Redis
+        deleteLookupDataAndLookupStatsAfterRegistrationDelete(result[1]);
 
         return result[0];
     }

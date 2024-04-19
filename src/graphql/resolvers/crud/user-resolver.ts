@@ -34,11 +34,27 @@ const updateGlobalUserStatsAfterUserDelete =
             await erGlobalUserStats.save();
         } catch (error) {
             console.error(
-                "Error updating global user stats after user delete",
+                "Error updating globalUserStats in Redis after user delete",
                 error
             );
         }
     };
+
+const deleteLookupDataAndLookupStatsAfterUserDelete = async function (
+    fullIdentifiers: string[]
+) {
+    try {
+        for (const fullIdentifier of fullIdentifiers) {
+            await RMService.i.lookupData.remove(fullIdentifier);
+            await RMService.i.lookupStats.remove(fullIdentifier);
+        }
+    } catch (error) {
+        console.error(
+            "Error deleting lookupData and lookupStats in Redis after user delete",
+            error
+        );
+    }
+};
 
 @Resolver()
 export class UserResolver {
@@ -70,30 +86,40 @@ export class UserResolver {
     @Authorized()
     @Mutation((returns) => String)
     async deleteMyUser(@Ctx() context: GraphqlContext): Promise<string> {
-        const deletionsPerDomain = await context.db.$transaction(async (db) => {
-            // Get all (verified) registrations of the user in order
-            // to later update the global user stats.
-            const dbRegistrations = await db.registration.findMany({
-                where: {
-                    userId: context.user?.userId,
-                    verifiedAt: { not: null },
-                },
-                include: { systemDomain: true },
-            });
+        const result = await context.db.$transaction(
+            async (
+                db
+            ): Promise<
+                [fullIdentifiers: string[], { [key: string]: number }]
+            > => {
+                // Get all (verified) registrations of the user in order
+                // to later update the global user stats.
+                const dbRegistrations = await db.registration.findMany({
+                    where: {
+                        userId: context.user?.userId,
+                        verifiedAt: { not: null },
+                    },
+                    include: { systemDomain: true },
+                });
+                const fullIdentifiers = dbRegistrations.map((x) => {
+                    return `${x.identifier}@${x.systemDomain.name}`;
+                });
 
-            const deletionsPerDomain: { [key: string]: number } = {};
-            for (const registration of dbRegistrations) {
-                const domain = registration.systemDomain.name;
-                if (typeof deletionsPerDomain[domain] === "undefined") {
-                    deletionsPerDomain[domain] = 0;
+                const deletionsPerDomain: { [key: string]: number } = {};
+                for (const registration of dbRegistrations) {
+                    const domain = registration.systemDomain.name;
+                    if (typeof deletionsPerDomain[domain] === "undefined") {
+                        deletionsPerDomain[domain] = 0;
+                    }
+                    deletionsPerDomain[domain]++;
                 }
-                deletionsPerDomain[domain]++;
+                await db.user.delete({ where: { id: context.user?.userId } });
+                return [fullIdentifiers, deletionsPerDomain];
             }
-            await db.user.delete({ where: { id: context.user?.userId } });
-            return deletionsPerDomain;
-        });
+        );
 
-        updateGlobalUserStatsAfterUserDelete(deletionsPerDomain);
+        deleteLookupDataAndLookupStatsAfterUserDelete(result[0]);
+        updateGlobalUserStatsAfterUserDelete(result[1]);
 
         return context.user?.userId ?? "unknown";
     }

@@ -79,6 +79,15 @@ export class RedisMemoryCollectionRepository<TModel> {
         return new RedisMemoryCollectionType<TModel>(id, record, this);
     }
 
+    async remove(id: string): Promise<void> {
+        const redisMemory = this.getRedisMemory();
+        if (typeof redisMemory === "undefined") {
+            throw new Error("getRedisMemory is undefined");
+        }
+
+        await redisMemory.remove(this.#buildRedisKey(id));
+    }
+
     #buildRedisKey(id: string): string {
         return `${this.name}:${id}`;
     }
