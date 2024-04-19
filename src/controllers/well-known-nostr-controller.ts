@@ -4,12 +4,7 @@ import { DateTime } from "luxon";
 import { SystemUserCacheService } from "../services/system-user-cache-service";
 import { Nip05 } from "../nostr/type-defs";
 import { RMService } from "../services/redis-memory-service";
-import {
-    NonCollectionRedisTypes,
-    RedisTypeGlobalLookupStats,
-    RedisTypeLookupData,
-    RedisTypeLookupStats,
-} from "../types/redis/@types";
+import { RedisTypeLookupData } from "../types/redis/@types";
 
 interface Query {
     name?: string;
@@ -19,13 +14,10 @@ const bumpGlobalStats = async function () {
     const now = DateTime.now();
     const today = now.startOf("day");
 
-    let redisTypeGlobalLookupStats =
-        await RMService.x?.fetch<RedisTypeGlobalLookupStats>(
-            NonCollectionRedisTypes.RedisTypeGlobalLookupStats
-        );
-    if (!redisTypeGlobalLookupStats) {
+    const erGlobalLookupStats = await RMService.i.globalLookupStats.fetch();
+    if (!erGlobalLookupStats) {
         // This should only happen once.
-        redisTypeGlobalLookupStats = {
+        await RMService.i.globalLookupStats.save({
             lastLookupAt: new Date().toISOString(),
             lookups: 1,
             dailyLookups: [
@@ -34,31 +26,26 @@ const bumpGlobalStats = async function () {
                     lookups: 1,
                 },
             ],
-        };
-        await RMService.x?.save(
-            NonCollectionRedisTypes.RedisTypeGlobalLookupStats,
-            redisTypeGlobalLookupStats
-        );
-    } else {
-        // Update stats in Redis.
-        redisTypeGlobalLookupStats.lookups++;
-        redisTypeGlobalLookupStats.lastLookupAt = now.toJSDate().toISOString();
-        const dailyLookup = redisTypeGlobalLookupStats.dailyLookups.find(
-            (x) => x.date === today.toJSDate().toISOString()
-        );
-        if (dailyLookup) {
-            dailyLookup.lookups++;
-        } else {
-            redisTypeGlobalLookupStats.dailyLookups.push({
-                date: today.toJSDate().toISOString(),
-                lookups: 1,
-            });
-        }
-        await RMService.x?.save(
-            NonCollectionRedisTypes.RedisTypeGlobalLookupStats,
-            redisTypeGlobalLookupStats
-        );
+        });
+        return;
     }
+
+    // Update stats in Redis.
+    erGlobalLookupStats.data.lookups++;
+    erGlobalLookupStats.data.lastLookupAt = now.toJSDate().toISOString();
+    const dailyLookup = erGlobalLookupStats.data.dailyLookups.find(
+        (x) => x.date === today.toJSDate().toISOString()
+    );
+    if (dailyLookup) {
+        dailyLookup.lookups++;
+    } else {
+        erGlobalLookupStats.data.dailyLookups.push({
+            date: today.toJSDate().toISOString(),
+            lookups: 1,
+        });
+    }
+
+    await erGlobalLookupStats.save();
 };
 
 export async function wellKnownNostrController(
@@ -101,16 +88,13 @@ export async function wellKnownNostrController(
         await SystemUserCacheService.instance.initialize();
 
         // Check RedisMemory first.
-        const redisLookupData = await RMService.x?.cFetch(
-            "lookupData",
-            fullIdentifier
-        );
+        const erLookupData = await RMService.i.lookupData.fetch(fullIdentifier);
 
-        if (redisLookupData) {
+        if (erLookupData) {
             // This could still be an "empty" record, that was created
             // to avoid future database queries.
             // In that case just return an empty response.
-            if (Object.keys(redisLookupData.names).length === 0) {
+            if (Object.keys(erLookupData.data.names).length === 0) {
                 res.json({
                     names: {},
                 });
@@ -118,58 +102,58 @@ export async function wellKnownNostrController(
             }
 
             // This is a valid record in RedisMemory. Continue.
-            let redisLookupStats = await RMService.x?.cFetch(
-                "lookupStats",
+            let erLookupStats = await RMService.i.lookupStats.fetch(
                 fullIdentifier
             );
 
             // Update user stats.
-            if (!redisLookupStats) {
+            if (!erLookupStats) {
                 // No stats available. First time query.
-                await RMService.x?.cSave("lookupStats", fullIdentifier, {
-                    nip05: fullIdentifier,
-                    lastLookupAt: now.toJSDate().toISOString(),
-                    lookups: 1,
-                    dailyLookups: [
-                        {
-                            date: today.toJSDate().toISOString(),
-                            lookups: 1,
-                        },
-                    ],
-                });
+
+                erLookupStats = await RMService.i.lookupStats.save(
+                    fullIdentifier,
+                    {
+                        nip05: fullIdentifier,
+                        lastLookupAt: now.toJSDate().toISOString(),
+                        lookups: 1,
+                        dailyLookups: [
+                            {
+                                date: today.toJSDate().toISOString(),
+                                lookups: 1,
+                            },
+                        ],
+                    }
+                );
             } else {
                 // Update stats in Redis.
-                redisLookupStats.lookups++;
-                redisLookupStats.lastLookupAt = now.toJSDate().toISOString();
-                const dailyLookup = redisLookupStats.dailyLookups.find(
+                erLookupStats.data.lookups++;
+                erLookupStats.data.lastLookupAt = now.toJSDate().toISOString();
+                const dailyLookup = erLookupStats.data.dailyLookups.find(
                     (x) => x.date === today.toJSDate().toISOString()
                 );
                 if (dailyLookup) {
                     dailyLookup.lookups++;
                 } else {
-                    redisLookupStats.dailyLookups.push({
+                    erLookupStats.data.dailyLookups.push({
                         date: today.toJSDate().toISOString(),
                         lookups: 1,
                     });
                 }
-                await RMService.x?.cSave(
-                    "lookupStats",
-                    fullIdentifier,
-                    redisLookupStats
-                );
+
+                await erLookupStats.save();
             }
 
             // Update global stats.
             await bumpGlobalStats();
 
             const nip05Response: Nip05 = {
-                names: redisLookupData.names,
+                names: erLookupData.data.names,
             };
             if (
-                typeof redisLookupData.relays !== "undefined" &&
-                Object.keys(redisLookupData.relays).length > 0
+                typeof erLookupData.data.relays !== "undefined" &&
+                Object.keys(erLookupData.data.relays).length > 0
             ) {
-                nip05Response.relays = redisLookupData.relays;
+                nip05Response.relays = erLookupData.data.relays;
             }
 
             res.json(nip05Response);
@@ -184,7 +168,7 @@ export async function wellKnownNostrController(
         );
         if (dbSystemUser) {
             // Write to Redis to avoid SQL queries in the future.
-            await RMService.x?.cSave("lookupStats", fullIdentifier, {
+            await RMService.i.lookupStats.save(fullIdentifier, {
                 nip05: fullIdentifier,
                 lastLookupAt: new Date().toISOString(),
                 lookups: dbSystemUser.lookups + 1,
@@ -196,16 +180,14 @@ export async function wellKnownNostrController(
                 ],
             });
 
-            const redisTypeLookupData: RedisTypeLookupData = {
-                nip05: fullIdentifier,
-                names: {
-                    [identifier]: dbSystemUser.pubkey,
-                },
-            };
-            await RMService.x?.cSave(
-                "lookupData",
+            const erTypeLookupData = await RMService.i.lookupData.save(
                 fullIdentifier,
-                redisTypeLookupData,
+                {
+                    nip05: fullIdentifier,
+                    names: {
+                        [identifier]: dbSystemUser.pubkey,
+                    },
+                },
                 {
                     directlyAddToInMemoryCache: true,
                 }
@@ -214,7 +196,7 @@ export async function wellKnownNostrController(
             // Update global stats.
             await bumpGlobalStats();
 
-            res.json({ names: redisTypeLookupData.names });
+            res.json({ names: erTypeLookupData.data.names });
             return;
         }
 
@@ -230,8 +212,7 @@ export async function wellKnownNostrController(
                 });
             if (!dbEmailNostr) {
                 // Store empty record in Redis to avoid future database queries.
-                await RMService.x?.cSave(
-                    "lookupData",
+                await RMService.i.lookupData.save(
                     fullIdentifier,
                     {
                         nip05: fullIdentifier,
@@ -241,14 +222,15 @@ export async function wellKnownNostrController(
                         directlyAddToInMemoryCache: true,
                     }
                 );
+
                 res.json({
                     names: {},
                 });
                 return;
-            } //
+            }
 
             // Write to Redis to avoid SQL queries in the future.
-            await RMService.x?.cSave("lookupStats", fullIdentifier, {
+            await RMService.i.lookupStats.save(fullIdentifier, {
                 nip05: fullIdentifier,
                 lastLookupAt: new Date().toISOString(),
                 lookups: dbEmailNostr.lookups + 1,
@@ -260,16 +242,14 @@ export async function wellKnownNostrController(
                 ],
             });
 
-            const redisTypeLookupData: RedisTypeLookupData = {
-                nip05: fullIdentifier,
-                names: {
-                    [identifier]: dbEmailNostr.pubkey,
-                },
-            };
-            await RMService.x?.cSave(
-                "lookupData",
+            const erLookupData = await RMService.i.lookupData.save(
                 fullIdentifier,
-                redisTypeLookupData,
+                {
+                    nip05: fullIdentifier,
+                    names: {
+                        [identifier]: dbEmailNostr.pubkey,
+                    },
+                },
                 {
                     directlyAddToInMemoryCache: true,
                 }
@@ -277,7 +257,7 @@ export async function wellKnownNostrController(
 
             // Update global stats.
             await bumpGlobalStats();
-            res.json({ names: redisTypeLookupData.names });
+            res.json({ names: erLookupData.data.names });
             return;
         }
 
@@ -300,8 +280,7 @@ export async function wellKnownNostrController(
             // No user found in the database.
             // Nevertheless, store an "empty" record in Redis to avoid
             // database queries in the future.
-            await RMService.x?.cSave(
-                "lookupData",
+            await RMService.i.lookupData.save(
                 fullIdentifier,
                 {
                     nip05: fullIdentifier,
@@ -318,7 +297,7 @@ export async function wellKnownNostrController(
             return;
         }
 
-        const redisTypeLookupData: RedisTypeLookupData = {
+        const rLookupData: RedisTypeLookupData = {
             nip05: fullIdentifier,
             names: {
                 [identifier]: dbRegistration.user.pubkey,
@@ -326,20 +305,16 @@ export async function wellKnownNostrController(
         };
         const relays = dbRegistration.registrationRelays.map((x) => x.address);
         if (relays.length > 0) {
-            redisTypeLookupData.relays = {
+            rLookupData.relays = {
                 [dbRegistration.user.pubkey]: relays,
             };
         }
 
-        await RMService.x?.cSave(
-            "lookupData",
-            fullIdentifier,
-            redisTypeLookupData,
-            {
-                directlyAddToInMemoryCache: true,
-            }
-        );
-        const redisTypeLookupStats: RedisTypeLookupStats = {
+        await RMService.i.lookupData.save(fullIdentifier, rLookupData, {
+            directlyAddToInMemoryCache: true,
+        });
+
+        await RMService.i.lookupStats.save(fullIdentifier, {
             nip05: fullIdentifier,
             lastLookupAt: now.toJSDate().toISOString(),
             lookups: dbRegistration.nipped + 1,
@@ -349,21 +324,16 @@ export async function wellKnownNostrController(
                     lookups: 1,
                 },
             ],
-        };
-        await RMService.x?.cSave(
-            "lookupStats",
-            fullIdentifier,
-            redisTypeLookupStats
-        );
+        });
 
         // Update global stats.
         await bumpGlobalStats();
 
         const nip05Response: Nip05 = {
-            names: redisTypeLookupData.names,
+            names: rLookupData.names,
         };
         if (relays.length > 0) {
-            nip05Response.relays = redisTypeLookupData.relays;
+            nip05Response.relays = rLookupData.relays;
         }
 
         res.json(nip05Response);

@@ -6,15 +6,14 @@ import {
 import {
     RedisIndex,
     RedisTypeGlobalLookupStats,
+    RedisTypeGlobalUserStats,
     RedisTypeLookupData,
     RedisTypeLookupStats,
 } from "../types/redis/@types";
-
-type MyCollectionTypes = {
-    globalLookupStats: RedisTypeGlobalLookupStats;
-    lookupStats: RedisTypeLookupStats;
-    lookupData: RedisTypeLookupData;
-};
+import {
+    RedisMemoryCollectionRepository,
+    RedisMemorySingleRepository,
+} from "../common/redis-memory/redis-memory-repository";
 
 export class RMService {
     // #region Singleton
@@ -31,32 +30,49 @@ export class RMService {
         return this.#i;
     }
 
-    static get x() {
-        if (this.#i) {
-            return this.#i.#db;
-        }
-
-        this.#i = new RMService();
-        return this.#i.db;
-    }
-
     // #endregion Singleton
 
     get db() {
         return this.#db;
     }
 
-    #db: RedisMemory<MyCollectionTypes> | undefined;
+    globalUserStats = new RedisMemorySingleRepository<RedisTypeGlobalUserStats>(
+        "globalUserStats",
+        () => this.db
+    );
+    globalLookupStats =
+        new RedisMemorySingleRepository<RedisTypeGlobalLookupStats>(
+            "globalLookupStats",
+            () => this.db
+        );
+
+    // Collections
+    lookupStats = new RedisMemoryCollectionRepository<RedisTypeLookupStats>(
+        "lookupStats",
+        () => this.db
+    );
+    lookupData = new RedisMemoryCollectionRepository<RedisTypeLookupData>(
+        "lookupData",
+        () => this.db
+    );
+
+    #db: RedisMemory | undefined;
     #isInitialized = false;
+
+    getRM() {
+        return this.db;
+    }
 
     async init(config: RedisMemoryConfig) {
         if (this.#isInitialized) {
             return;
         }
 
-        this.#db = new RedisMemory<MyCollectionTypes>(config);
+        this.#db = new RedisMemory(config);
         this.#createIndexes();
         this.#isInitialized = true;
+
+        const asd = await this.globalUserStats.fetch();
     }
 
     async #createIndexes() {

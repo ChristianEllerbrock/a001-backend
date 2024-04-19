@@ -1,8 +1,5 @@
-import { bool } from "joi";
-import {
-    NonCollectionRedisTypes,
-    RedisTypeGlobalUserStats,
-} from "../types/redis/@types";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { RedisTypeGlobalUserStats } from "../types/redis/@types";
 import { RMService } from "./redis-memory-service";
 import { RegistrationsPerDomainStatisticsOutput } from "../graphql/outputs/usage-statistics-output";
 import { RegistrationStatisticsOutput } from "../graphql/outputs/statistics/registration-statistics-output";
@@ -132,6 +129,18 @@ export class CronService extends TypedEventEmitter<CronServiceEventType> {
                         queryRegistrationsPerDomain
                     )) as RegistrationsPerDomainStatisticsOutput[];
 
+                    const durationInSeconds = (
+                        (Date.now() - start) /
+                        1000
+                    ).toFixed(2);
+                    this.emit(
+                        "debug",
+                        "info",
+                        `${
+                            this.#logPrefix
+                        } getGlobalUserStats(): Fetching data finished in ${durationInSeconds} seconds`
+                    );
+
                     // Write to Redis.
                     rGlobalUserStats = {
                         noOfUsers,
@@ -148,30 +157,14 @@ export class CronService extends TypedEventEmitter<CronServiceEventType> {
                             };
                         }),
                     };
+
+                    await RMService.i.globalUserStats.save(rGlobalUserStats);
                 });
-
-                const durationInSeconds = ((Date.now() - start) / 1000).toFixed(
-                    2
-                );
-                this.emit(
-                    "debug",
-                    "info",
-                    `${
-                        this.#logPrefix
-                    } getGlobalUserStats(): Fetching data finished in ${durationInSeconds} seconds`
-                );
-
-                await RMService.x?.save(
-                    NonCollectionRedisTypes.RedisTypeGlobalUserStats,
-                    rGlobalUserStats
-                );
-
                 this.#lastGetGlobalUserStatsFromSqlDatabaseAt = Date.now();
             } else {
-                rGlobalUserStats =
-                    await RMService.x?.fetch<RedisTypeGlobalUserStats>(
-                        NonCollectionRedisTypes.RedisTypeGlobalUserStats
-                    );
+                const extrGlobalUserStats =
+                    await RMService.i.globalUserStats.fetch();
+                return extrGlobalUserStats?.data;
             }
 
             return rGlobalUserStats;

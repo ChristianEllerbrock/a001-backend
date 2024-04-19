@@ -8,10 +8,6 @@ import { DateTime } from "luxon";
 import { RegistrationStatisticsOutput } from "../../outputs/statistics/registration-statistics-output";
 import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statistics-output";
 import { RMService } from "../../../services/redis-memory-service";
-import {
-    NonCollectionRedisTypes,
-    RedisTypeGlobalLookupStats,
-} from "../../../types/redis/@types";
 import { CronService } from "../../../services/cron-service";
 
 const USAGE_STATISTICS = "usageStatistics";
@@ -72,17 +68,15 @@ export class StatisticsResolver {
 
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
-        const redisTypeGlobalLookupStats =
-            await RMService.x?.fetch<RedisTypeGlobalLookupStats>(
-                NonCollectionRedisTypes.RedisTypeGlobalLookupStats
-            );
-        if (redisTypeGlobalLookupStats) {
+        const erTypeGlobalLookupStats =
+            await RMService.i.globalLookupStats.fetch();
+        if (erTypeGlobalLookupStats) {
             noOfLookupsToday =
-                redisTypeGlobalLookupStats.dailyLookups.find(
+                erTypeGlobalLookupStats.data.dailyLookups.find(
                     (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
                 )?.lookups ?? 0;
             noOfLookupsYesterday =
-                redisTypeGlobalLookupStats.dailyLookups.find(
+                erTypeGlobalLookupStats.data.dailyLookups.find(
                     (x) => x.date.slice(0, 10) === yesterString.slice(0, 10)
                 )?.lookups ?? 0;
         }
@@ -94,20 +88,18 @@ export class StatisticsResolver {
             .slice(0, 10)
             .replaceAll("-", "\\-");
 
-        const searchResult =
-            (await RMService.x?.search(
-                "lookupStats",
-                `@date:{${escapedTodayString}*}`
-            )) ?? [];
+        const erLookupStatss = await RMService.i.lookupStats.search(
+            `@date:{${escapedTodayString}*}`
+        );
 
         const lookups: LookupStatisticsOutput[] = [];
-        for (const lookupStats of searchResult) {
-            const todayDaily = lookupStats.dailyLookups.find(
+        for (const erLookupStats of erLookupStatss) {
+            const todayDaily = erLookupStats.data.dailyLookups.find(
                 (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
             );
             lookups.push({
-                identifier: lookupStats.nip05.split("@")[0],
-                domain: lookupStats.nip05.split("@")[1],
+                identifier: erLookupStats.data.nip05.split("@")[0],
+                domain: erLookupStats.data.nip05.split("@")[1],
                 total: todayDaily?.lookups ?? 0,
                 pubkey: "unknown",
             });

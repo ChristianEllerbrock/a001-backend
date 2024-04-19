@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { DateTime } from "luxon";
 import {
     Arg,
@@ -34,18 +35,12 @@ import { RegistrationCodeResendInput } from "../../inputs/registration-code-rese
 import { CreateRegistrationNip07CodeOutput } from "../../outputs/createRegistrationNip07CodeOutput";
 import { RegistrationNip07RedeemInputArgs } from "../../inputs/registrationNip07RedeemInputArgs";
 import { CreateRegistrationNip46CodeOutput } from "../../outputs/createRegistrationNip46CodeOutput";
-import { RegistrationNip46RedeemInputArgs } from "../../inputs/registrationNip46RedeemInputArgs";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
 import { verifyEvent } from "nostr-tools";
 import { RMService } from "../../../services/redis-memory-service";
-import {
-    NonCollectionRedisTypes,
-    RedisTypeGlobalLookupStats,
-    RedisTypeGlobalUserStats,
-} from "../../../types/redis/@types";
 
-const NOSTR_STATISTICS = "nostrStatistics";
+//const NOSTR_STATISTICS = "nostrStatistics";
 
 const cleanupExpiredRegistrationsAsync = async () => {
     const now = DateTime.now();
@@ -63,73 +58,87 @@ const updateGlobalUserStatsAfterRegistrationAdd = async (
     verifiedDate: Date,
     usersVerifiedRegistrations: number
 ) => {
-    const domain = fullIdentifier.split("@")[1];
+    try {
+        const domain = fullIdentifier.split("@")[1];
 
-    const redisGlobalUserStats =
-        await RMService.x?.fetch<RedisTypeGlobalUserStats>(
-            NonCollectionRedisTypes.RedisTypeGlobalUserStats
+        const erGlobalUserStats = await RMService.i.globalUserStats.fetch();
+        if (!erGlobalUserStats) {
+            return;
+        }
+
+        if (usersVerifiedRegistrations === 1) {
+            // This registration is the first verified registration of the user.
+            erGlobalUserStats.data.noOfUsers += 1;
+        }
+
+        erGlobalUserStats.data.noOfRegistrations += 1;
+        erGlobalUserStats.data.lastRegistrations.unshift({
+            date: verifiedDate.toISOString() ?? "na",
+            nip05: fullIdentifier,
+        });
+        erGlobalUserStats.data.lastRegistrations =
+            erGlobalUserStats.data.lastRegistrations.slice(0, 10);
+
+        if (
+            typeof erGlobalUserStats.data.noOfRegistrationsPerDomain[domain] ===
+            "undefined"
+        ) {
+            erGlobalUserStats.data.noOfRegistrationsPerDomain[domain] = 1;
+        } else {
+            erGlobalUserStats.data.noOfRegistrationsPerDomain[domain] += 1;
+        }
+
+        await erGlobalUserStats.save();
+    } catch (error) {
+        console.error(
+            "Error updating global user stats after registration add",
+            error
         );
-
-    if (!redisGlobalUserStats) {
-        // This should not happen since the global stats were
-        // created when the first lookup occurred.
-        return;
     }
-
-    if (usersVerifiedRegistrations === 1) {
-        // This registration is the first verified registration of the user.
-        redisGlobalUserStats.noOfUsers += 1;
-    }
-
-    redisGlobalUserStats.noOfRegistrations += 1;
-    redisGlobalUserStats.lastRegistrations.unshift({
-        date: verifiedDate.toISOString() ?? "na",
-        nip05: fullIdentifier,
-    });
-    redisGlobalUserStats.lastRegistrations =
-        redisGlobalUserStats.lastRegistrations.slice(0, 10);
-
-    if (
-        typeof redisGlobalUserStats.noOfRegistrationsPerDomain[domain] ===
-        "undefined"
-    ) {
-        redisGlobalUserStats.noOfRegistrationsPerDomain[domain] = 1;
-    } else {
-        redisGlobalUserStats.noOfRegistrationsPerDomain[domain] += 1;
-    }
-
-    await RMService.x?.save(
-        NonCollectionRedisTypes.RedisTypeGlobalUserStats,
-        redisGlobalUserStats
-    );
 };
 
 const updateGlobalUserStatsAfterRegistrationDelete = async function (
     fullIdentifier: string,
     usersVerifiedRegistrations: number
 ) {
-    const domain = fullIdentifier.split("@")[1];
-    const rGlobalUserStats = await RMService.x?.fetch<RedisTypeGlobalUserStats>(
-        NonCollectionRedisTypes.RedisTypeGlobalUserStats
-    );
+    try {
+        const domain = fullIdentifier.split("@")[1];
 
-    if (!rGlobalUserStats) {
-        return;
+        const erGlobalUserStats = await RMService.i.globalUserStats.fetch();
+        if (!erGlobalUserStats) {
+            return;
+        }
+
+        erGlobalUserStats.data.noOfRegistrations -= 1;
+        if (erGlobalUserStats.data.noOfRegistrationsPerDomain[domain] > 0) {
+            erGlobalUserStats.data.noOfRegistrationsPerDomain[domain] -= 1;
+        }
+
+        if (usersVerifiedRegistrations === 0) {
+            erGlobalUserStats.data.noOfUsers -= 1;
+        }
+
+        await erGlobalUserStats.save();
+    } catch (error) {
+        console.error(
+            "Error updating globalUserStats in Redis after registration delete",
+            error
+        );
     }
+};
 
-    rGlobalUserStats.noOfRegistrations -= 1;
-    if (rGlobalUserStats.noOfRegistrationsPerDomain[domain] > 0) {
-        rGlobalUserStats.noOfRegistrationsPerDomain[domain] -= 1;
+const deleteLookupDataAndLookupStatsAfterRegistrationDelete = async function (
+    fullIdentifier: string
+) {
+    try {
+        await RMService.i.lookupData.remove(fullIdentifier);
+        await RMService.i.lookupStats.remove(fullIdentifier);
+    } catch (error) {
+        console.error(
+            "Error deleting lookupData and lookupStats in Redis after registration delete",
+            error
+        );
     }
-
-    if (usersVerifiedRegistrations === 0) {
-        rGlobalUserStats.noOfUsers -= 1;
-    }
-
-    await RMService.x?.save(
-        NonCollectionRedisTypes.RedisTypeGlobalUserStats,
-        rGlobalUserStats
-    );
 };
 
 @Resolver()
@@ -209,21 +218,21 @@ export class RegistrationResolver {
             .toJSDate()
             .toISOString();
 
-        const redisLookupStats = await RMService.x?.cFetch(
-            "lookupStats",
+        const erLookupStats = await RMService.i.lookupStats.fetch(
             fullIdentifier
         );
+
         let noOfLookups = 0;
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
-        if (redisLookupStats) {
-            noOfLookups = redisLookupStats.lookups;
+        if (erLookupStats) {
+            noOfLookups = erLookupStats.data.lookups;
             noOfLookupsToday =
-                redisLookupStats.dailyLookups.find(
+                erLookupStats.data.dailyLookups.find(
                     (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
                 )?.lookups ?? 0;
             noOfLookupsYesterday =
-                redisLookupStats.dailyLookups.find(
+                erLookupStats.data.dailyLookups.find(
                     (x) => x.date.slice(0, 10) === yesterdayString.slice(0, 10)
                 )?.lookups ?? 0;
         }
@@ -320,6 +329,7 @@ export class RegistrationResolver {
         });
 
         // Update global statistics and notify user about successful registration.
+        // eslint-disable-next-line no-async-promise-executor
         new Promise(async (resolve, reject) => {
             const fullIdentifier = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
             const usersRegistrations =
@@ -568,107 +578,6 @@ export class RegistrationResolver {
         };
     }
 
-    // @Mutation((returns) => UserTokenOutput)
-    // async redeemRegistrationNip46Code(
-    //     @Ctx() context: GraphqlContext,
-    //     @Args() args: RegistrationNip46RedeemInputArgs
-    // ): Promise<UserTokenOutput> {
-    //     const now = DateTime.now();
-    //     await cleanupExpiredRegistrationsAsync();
-
-    //     const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(
-    //         args.data.pubkey
-    //     );
-
-    //     const dbRegistration = await context.db.registration.findFirst({
-    //         where: { id: args.registrationId },
-    //         include: {
-    //             registrationNip46Code: true,
-    //             user: true,
-    //         },
-    //     });
-
-    //     if (
-    //         !dbRegistration ||
-    //         dbRegistration.user.pubkey !== pubkeyObject.hex ||
-    //         !dbRegistration.registrationNip46Code
-    //     ) {
-    //         throw new Error("Cannot find registration.");
-    //     }
-
-    //     if (dbRegistration.verifiedAt) {
-    //         throw new Error("Registration is already validated.");
-    //     }
-
-    //     // Check 1: Has the code already expired
-    //     if (dbRegistration.registrationNip46Code.validUntil < now.toJSDate()) {
-    //         throw new Error(
-    //             "The registration has already expired. Please try again."
-    //         );
-    //     }
-
-    //     // Check 2: The content includes the server side generated code.
-    //     if (
-    //         !args.data.content.includes(
-    //             dbRegistration.registrationNip46Code.code
-    //         )
-    //     ) {
-    //         throw new Error("The provided content is not valid");
-    //     }
-
-    //     // Check 3: The provided event-signature is valid.
-    //     if (!verifyEvent(args.data)) {
-    //         throw new Error("The signature is invalid.");
-    //     }
-
-    //     // Everything checks out. Finalize registration.
-    //     await PrismaService.instance.db.registration.update({
-    //         where: { id: dbRegistration.id },
-    //         data: {
-    //             verifiedAt: now.toJSDate(),
-    //         },
-    //     });
-
-    //     await PrismaService.instance.db.registrationNip46Code.delete({
-    //         where: { id: dbRegistration.registrationNip46Code.id },
-    //     });
-
-    //     const userTokenValidityInMinutes =
-    //         await PrismaService.instance.getSystemConfigAsNumberAsync(
-    //             SystemConfigId.UserTokenValidityInMinutes
-    //         );
-
-    //     if (!userTokenValidityInMinutes) {
-    //         throw new Error("Invalid system config. Please contact support.");
-    //     }
-
-    //     // Create or update user token.
-    //     const dbUserToken = await PrismaService.instance.db.userToken.upsert({
-    //         where: {
-    //             userId_deviceId: {
-    //                 userId: dbRegistration.userId,
-    //                 deviceId: args.deviceId,
-    //             },
-    //         },
-    //         update: {
-    //             token: uuid.v4(),
-    //             validUntil: now
-    //                 .plus({ minute: userTokenValidityInMinutes })
-    //                 .toJSDate(),
-    //         },
-    //         create: {
-    //             userId: dbRegistration.userId,
-    //             deviceId: args.deviceId,
-    //             token: uuid.v4(),
-    //             validUntil: now
-    //                 .plus({ minute: userTokenValidityInMinutes })
-    //                 .toJSDate(),
-    //         },
-    //     });
-
-    //     return dbUserToken;
-    // }
-
     @Mutation((returns) => UserTokenOutput)
     async redeemRegistrationNip07Code(
         @Ctx() context: GraphqlContext,
@@ -782,6 +691,7 @@ export class RegistrationResolver {
         });
 
         // Update global statistics and notify user about successful registration.
+        // eslint-disable-next-line no-async-promise-executor
         new Promise(async (resolve, reject) => {
             const fullIdentifier = `${updatedDbRegistration.identifier}@${updatedDbRegistration.systemDomain.name}`;
             const usersRegistrations =
@@ -1072,8 +982,11 @@ ${aUrl}/aregister/${dbRegistration.userId}/${dbRegistration.id}/${code}
             }
         );
 
-        // Update global statistics.
+        // Update globalUserStats in Redis.
         updateGlobalUserStatsAfterRegistrationDelete(result[1], result[2]);
+
+        // Delete lookupData from Redis
+        deleteLookupDataAndLookupStatsAfterRegistrationDelete(result[1]);
 
         return result[0];
     }
