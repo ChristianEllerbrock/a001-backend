@@ -11,7 +11,7 @@ export type RedisMemoryConfig = {
     inMemoryTTL: number;
 };
 
-type SetJsonOptions =
+export type RedisMemorySaveOptions =
     | {
           /*
            * The TTL (in seconds) for the json once it is loaded into the inMemory cache.
@@ -35,9 +35,7 @@ type RedisMemoryEventType = {
     debug: [level: "info" | "error", data: any];
 };
 
-export class RedisMemory<
-    TModel extends RedisMemoryCollectionTypes
-> extends TypedEventEmitter<RedisMemoryEventType> {
+export class RedisMemory extends TypedEventEmitter<RedisMemoryEventType> {
     static readonly logPrefix = "[RedisMemory] -";
 
     get redis() {
@@ -82,53 +80,35 @@ export class RedisMemory<
         );
     }
 
-    async search<Collection extends keyof TModel & string>(
-        collection: Collection,
-        query: string,
-        options: SearchOptions | undefined = undefined
-    ): Promise<Array<TModel[Collection]>> {
-        const index = `idx:${collection}`;
+    // async search<Collection extends keyof TModel & string>(
+    //     collection: Collection,
+    //     query: string,
+    //     options: SearchOptions | undefined = undefined
+    // ): Promise<Array<TModel[Collection]>> {
+    //     const index = `idx:${collection}`;
 
-        const relevantOptions = options ?? {
-            LIMIT: { from: 0, size: 10000 },
-        };
+    //     const relevantOptions = options ?? {
+    //         LIMIT: { from: 0, size: 10000 },
+    //     };
 
-        const result = await this.#redis.ft.search(
-            index,
-            query,
-            relevantOptions
-        );
-        return result.documents.map((x) => x.value as TModel[Collection]);
-    }
+    //     const result = await this.#redis.ft.search(
+    //         index,
+    //         query,
+    //         relevantOptions
+    //     );
+    //     return result.documents.map((x) => x.value as TModel[Collection]);
+    // }
 
     async save<T>(
         key: string,
         record: T,
-        options?: SetJsonOptions
+        options?: RedisMemorySaveOptions
     ): Promise<void> {
         await this.#save(key, record, options);
     }
 
-    async cSave<Collection extends keyof TModel & string>(
-        collection: Collection,
-        key: string,
-        record: TModel[Collection],
-        options?: SetJsonOptions
-    ): Promise<void> {
-        const relevantKey = `${collection}:${key}`;
-        await this.#save(relevantKey, record, options);
-    }
-
     async fetch<T>(key: string): Promise<T | null | undefined> {
         return await this.#fetch<T>(key);
-    }
-
-    async cFetch<Collection extends keyof TModel & string>(
-        collection: Collection,
-        key: string
-    ): Promise<TModel[Collection] | null | undefined> {
-        const relevantKey = `${collection}:${key}`;
-        return await this.#fetch<TModel[Collection]>(relevantKey);
     }
 
     async #fetch<A>(key: string): Promise<A | null | undefined> {
@@ -180,7 +160,7 @@ export class RedisMemory<
     async #save<A>(
         key: string,
         record: A,
-        options?: SetJsonOptions
+        options?: RedisMemorySaveOptions
     ): Promise<void> {
         this.#inMemoryCacheCleanup();
 

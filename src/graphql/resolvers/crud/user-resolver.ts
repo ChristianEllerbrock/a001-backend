@@ -1,47 +1,43 @@
-import { Args, Authorized, Ctx, Mutation, Query, Resolver } from "type-graphql";
-import { FindUserInput } from "../../inputs/find-user-input";
-import { RegistrationOutput } from "../../outputs/registration-output";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { Authorized, Ctx, Mutation, Query, Resolver } from "type-graphql";
 import { UserOutput } from "../../outputs/user-output";
 import { GraphqlContext, Role } from "../../type-defs";
 import { RMService } from "../../../services/redis-memory-service";
-import {
-    NonCollectionRedisTypes,
-    RedisTypeGlobalUserStats,
-} from "../../../types/redis/@types";
 
 const updateGlobalUserStatsAfterUserDelete =
     async function (deletionsPerDomain: { [key: string]: number }) {
-        const rGlobalUserStats =
-            await RMService.x?.fetch<RedisTypeGlobalUserStats>(
-                NonCollectionRedisTypes.RedisTypeGlobalUserStats
-            );
-
-        if (!rGlobalUserStats) {
-            return;
-        }
-
-        rGlobalUserStats.noOfUsers--;
-
-        let overallDeletions = 0;
-        Object.entries(deletionsPerDomain).forEach((keyValue) => {
-            overallDeletions += keyValue[1];
-
-            if (
-                typeof rGlobalUserStats.noOfRegistrationsPerDomain[
-                    keyValue[0]
-                ] !== "undefined"
-            ) {
-                rGlobalUserStats.noOfRegistrationsPerDomain[keyValue[0]] -=
-                    keyValue[1];
+        try {
+            const erGlobalUserStats = await RMService.i.globalUserStats.fetch();
+            if (!erGlobalUserStats) {
+                return;
             }
-        });
 
-        rGlobalUserStats.noOfRegistrations -= overallDeletions;
+            erGlobalUserStats.data.noOfUsers--;
 
-        await RMService.x?.save(
-            NonCollectionRedisTypes.RedisTypeGlobalUserStats,
-            rGlobalUserStats
-        );
+            let overallDeletions = 0;
+            Object.entries(deletionsPerDomain).forEach((keyValue) => {
+                overallDeletions += keyValue[1];
+
+                if (
+                    typeof erGlobalUserStats.data.noOfRegistrationsPerDomain[
+                        keyValue[0]
+                    ] !== "undefined"
+                ) {
+                    erGlobalUserStats.data.noOfRegistrationsPerDomain[
+                        keyValue[0]
+                    ] -= keyValue[1];
+                }
+            });
+
+            erGlobalUserStats.data.noOfRegistrations -= overallDeletions;
+
+            await erGlobalUserStats.save();
+        } catch (error) {
+            console.error(
+                "Error updating global user stats after user delete",
+                error
+            );
+        }
     };
 
 @Resolver()

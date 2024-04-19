@@ -31,7 +31,6 @@ import { Nip05SocialRelayAllowedService } from "./relay/nip05-social-relay-allow
 import { generateRelayStatsController } from "./controllers/cron/generate-relay-stats-controller";
 import { emailControllerV2 } from "./controllers/email/email-controller-v2";
 import { errorHandler } from "./middlewares/errors";
-import { RedisMemory } from "./common/redis-memory/redis-memory";
 import { RMService } from "./services/redis-memory-service";
 import { CronService } from "./services/cron-service";
 
@@ -39,7 +38,6 @@ import { CronService } from "./services/cron-service";
 dotenv.config();
 
 const GRAPHQL_ENDPOINT = "/graphql";
-const WS_ENDPOINT = "/subscriptions";
 
 const app: Express = express();
 const port = EnvService.instance.env.PORT;
@@ -55,7 +53,7 @@ app.get("/.test", testController);
 app.get("/.well-known/nostr.json", wellKnownNostrController);
 app.get("/.well-known/lnurlp/:username", wellKnownLightningController);
 app.get("/hex", hexController);
-app.get("/", (req, res, next) => {
+app.get("/", (req, res /*next*/) => {
     if (req.headers.accept === "application/nostr+json") {
         res.json({
             name: "relay.nip05.social",
@@ -144,7 +142,7 @@ async function bootstrap() {
         GRAPHQL_ENDPOINT,
         createHandler({
             schema,
-            context: (req, params) => {
+            context: (req /* params */) => {
                 return getGraphqlContext2(req);
             },
         })
@@ -224,51 +222,6 @@ async function bootstrap() {
         Nip05SocialRelay.i.initialize(wsServer, {
             url: EnvService.instance.env.RELAY_URL,
         });
-
-        // Start the Web Socket Server on the same port
-        // const wsServer = new WebSocketServer({
-        //     server,
-        //     path: WS_ENDPOINT,
-        // });
-
-        // https://github.com/enisdenjo/graphql-ws
-        // useServer(
-        //     {
-        //         schema,
-        //         // On initial WS connect: Check and verify the user JWT and only setup the subscription with a valid token
-        //         // onConnect: async (ctx: WsContext) => {
-        //         //     const params =
-        //         //         ctx.connectionParams as unknown as WebSocketConnectionParams;
-        //         //     try {
-        //         //         const decodedPayload =
-        //         //             await AccessTokenService.instance.verifyAsync(
-        //         //                 params.accessToken
-        //         //             );
-        //         //         console.log(
-        //         //             `[ws-server] - ${new Date().toISOString()} - ${
-        //         //                 decodedPayload.email
-        //         //             } has opened an authenticated web socket connection.`
-        //         //         );
-        //         //     } catch (error) {
-        //         //         (ctx.extra as WsContextExtra).socket.close(
-        //         //             4401,
-        //         //             "Unauthorized"
-        //         //         ); // This will force the client to NOT reconnect
-        //         //     }
-        //         //     return true;
-        //         // },
-        //         // Every following subscription access will uses the initial JWT (from the "onConnect") in the connectionParams
-        //         context: (ctx: WsContext) => {
-        //             return {
-        //                 name: "Peter",
-        //             };
-        //             // return getGraphqlSubContext(
-        //             //     ctx.connectionParams as unknown as WebSocketConnectionParams
-        //             // );
-        //         },
-        //     },
-        //     wsServer
-        // );
     });
 
     //Nip05NostrService.instance.start();
