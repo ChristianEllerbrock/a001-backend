@@ -5,14 +5,12 @@ import {
 } from "../../outputs/usage-statistics-output";
 import { GraphqlContext } from "../../type-defs";
 import { DateTime } from "luxon";
-import { CacheService } from "../../../services/cache-service";
 import { RegistrationStatisticsOutput } from "../../outputs/statistics/registration-statistics-output";
 import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statistics-output";
 import { RMService } from "../../../services/redis-memory-service";
 import {
     NonCollectionRedisTypes,
     RedisTypeGlobalLookupStats,
-    RedisTypeGlobalUserStats,
 } from "../../../types/redis/@types";
 import { CronService } from "../../../services/cron-service";
 
