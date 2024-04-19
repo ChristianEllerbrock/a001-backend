@@ -3,7 +3,7 @@ import { PrismaService } from "../services/prisma-service";
 import { DateTime } from "luxon";
 import { SystemUserCacheService } from "../services/system-user-cache-service";
 import { Nip05 } from "../nostr/type-defs";
-import { RedisMemoryService } from "../services/redis-memory-service";
+import { RMService } from "../services/redis-memory-service";
 import {
     NonCollectionRedisTypes,
     RedisTypeGlobalLookupStats,
@@ -20,7 +20,7 @@ const bumpGlobalStats = async function () {
     const today = now.startOf("day");
 
     let redisTypeGlobalLookupStats =
-        await RedisMemoryService.i.db?.getJson<RedisTypeGlobalLookupStats>(
+        await RMService.x?.fetch<RedisTypeGlobalLookupStats>(
             NonCollectionRedisTypes.RedisTypeGlobalLookupStats
         );
     if (!redisTypeGlobalLookupStats) {
@@ -35,7 +35,7 @@ const bumpGlobalStats = async function () {
                 },
             ],
         };
-        await RedisMemoryService.i.db?.setJson(
+        await RMService.x?.save(
             NonCollectionRedisTypes.RedisTypeGlobalLookupStats,
             redisTypeGlobalLookupStats
         );
@@ -54,7 +54,7 @@ const bumpGlobalStats = async function () {
                 lookups: 1,
             });
         }
-        await RedisMemoryService.i.db?.setJson(
+        await RMService.x?.save(
             NonCollectionRedisTypes.RedisTypeGlobalLookupStats,
             redisTypeGlobalLookupStats
         );
@@ -101,7 +101,7 @@ export async function wellKnownNostrController(
         await SystemUserCacheService.instance.initialize();
 
         // Check RedisMemory first.
-        const redisLookupData = await RedisMemoryService.i.db?.getJson(
+        const redisLookupData = await RMService.x?.cFetch(
             "lookupData",
             fullIdentifier
         );
@@ -118,7 +118,7 @@ export async function wellKnownNostrController(
             }
 
             // This is a valid record in RedisMemory. Continue.
-            let redisLookupStats = await RedisMemoryService.i.db?.getJson(
+            let redisLookupStats = await RMService.x?.cFetch(
                 "lookupStats",
                 fullIdentifier
             );
@@ -126,21 +126,17 @@ export async function wellKnownNostrController(
             // Update user stats.
             if (!redisLookupStats) {
                 // No stats available. First time query.
-                await RedisMemoryService.i.db?.setJson(
-                    "lookupStats",
-                    fullIdentifier,
-                    {
-                        nip05: fullIdentifier,
-                        lastLookupAt: now.toJSDate().toISOString(),
-                        lookups: 1,
-                        dailyLookups: [
-                            {
-                                date: today.toJSDate().toISOString(),
-                                lookups: 1,
-                            },
-                        ],
-                    }
-                );
+                await RMService.x?.cSave("lookupStats", fullIdentifier, {
+                    nip05: fullIdentifier,
+                    lastLookupAt: now.toJSDate().toISOString(),
+                    lookups: 1,
+                    dailyLookups: [
+                        {
+                            date: today.toJSDate().toISOString(),
+                            lookups: 1,
+                        },
+                    ],
+                });
             } else {
                 // Update stats in Redis.
                 redisLookupStats.lookups++;
@@ -156,7 +152,7 @@ export async function wellKnownNostrController(
                         lookups: 1,
                     });
                 }
-                await RedisMemoryService.i.db?.setJson(
+                await RMService.x?.cSave(
                     "lookupStats",
                     fullIdentifier,
                     redisLookupStats
@@ -188,21 +184,17 @@ export async function wellKnownNostrController(
         );
         if (dbSystemUser) {
             // Write to Redis to avoid SQL queries in the future.
-            await RedisMemoryService.i.db?.setJson(
-                "lookupStats",
-                fullIdentifier,
-                {
-                    nip05: fullIdentifier,
-                    lastLookupAt: new Date().toISOString(),
-                    lookups: dbSystemUser.lookups + 1,
-                    dailyLookups: [
-                        {
-                            date: today.toJSDate().toISOString(),
-                            lookups: 1,
-                        },
-                    ],
-                }
-            );
+            await RMService.x?.cSave("lookupStats", fullIdentifier, {
+                nip05: fullIdentifier,
+                lastLookupAt: new Date().toISOString(),
+                lookups: dbSystemUser.lookups + 1,
+                dailyLookups: [
+                    {
+                        date: today.toJSDate().toISOString(),
+                        lookups: 1,
+                    },
+                ],
+            });
 
             const redisTypeLookupData: RedisTypeLookupData = {
                 nip05: fullIdentifier,
@@ -210,7 +202,7 @@ export async function wellKnownNostrController(
                     [identifier]: dbSystemUser.pubkey,
                 },
             };
-            await RedisMemoryService.i.db?.setJson(
+            await RMService.x?.cSave(
                 "lookupData",
                 fullIdentifier,
                 redisTypeLookupData,
@@ -238,7 +230,7 @@ export async function wellKnownNostrController(
                 });
             if (!dbEmailNostr) {
                 // Store empty record in Redis to avoid future database queries.
-                await RedisMemoryService.i.db?.setJson(
+                await RMService.x?.cSave(
                     "lookupData",
                     fullIdentifier,
                     {
@@ -256,21 +248,17 @@ export async function wellKnownNostrController(
             } //
 
             // Write to Redis to avoid SQL queries in the future.
-            await RedisMemoryService.i.db?.setJson(
-                "lookupStats",
-                fullIdentifier,
-                {
-                    nip05: fullIdentifier,
-                    lastLookupAt: new Date().toISOString(),
-                    lookups: dbEmailNostr.lookups + 1,
-                    dailyLookups: [
-                        {
-                            date: today.toJSDate().toISOString(),
-                            lookups: 1,
-                        },
-                    ],
-                }
-            );
+            await RMService.x?.cSave("lookupStats", fullIdentifier, {
+                nip05: fullIdentifier,
+                lastLookupAt: new Date().toISOString(),
+                lookups: dbEmailNostr.lookups + 1,
+                dailyLookups: [
+                    {
+                        date: today.toJSDate().toISOString(),
+                        lookups: 1,
+                    },
+                ],
+            });
 
             const redisTypeLookupData: RedisTypeLookupData = {
                 nip05: fullIdentifier,
@@ -278,7 +266,7 @@ export async function wellKnownNostrController(
                     [identifier]: dbEmailNostr.pubkey,
                 },
             };
-            await RedisMemoryService.i.db?.setJson(
+            await RMService.x?.cSave(
                 "lookupData",
                 fullIdentifier,
                 redisTypeLookupData,
@@ -312,7 +300,7 @@ export async function wellKnownNostrController(
             // No user found in the database.
             // Nevertheless, store an "empty" record in Redis to avoid
             // database queries in the future.
-            await RedisMemoryService.i.db?.setJson(
+            await RMService.x?.cSave(
                 "lookupData",
                 fullIdentifier,
                 {
@@ -343,7 +331,7 @@ export async function wellKnownNostrController(
             };
         }
 
-        await RedisMemoryService.i.db?.setJson(
+        await RMService.x?.cSave(
             "lookupData",
             fullIdentifier,
             redisTypeLookupData,
@@ -362,7 +350,7 @@ export async function wellKnownNostrController(
                 },
             ],
         };
-        await RedisMemoryService.i.db?.setJson(
+        await RMService.x?.cSave(
             "lookupStats",
             fullIdentifier,
             redisTypeLookupStats

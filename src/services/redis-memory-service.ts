@@ -16,10 +16,10 @@ type MyCollectionTypes = {
     lookupData: RedisTypeLookupData;
 };
 
-export class RedisMemoryService {
+export class RMService {
     // #region Singleton
 
-    static #i: RedisMemoryService;
+    static #i: RMService;
 
     /** Singleton instance. */
     static get i() {
@@ -27,16 +27,16 @@ export class RedisMemoryService {
             return this.#i;
         }
 
-        this.#i = new RedisMemoryService();
+        this.#i = new RMService();
         return this.#i;
     }
 
-    static get client() {
+    static get x() {
         if (this.#i) {
             return this.#i.#db;
         }
 
-        this.#i = new RedisMemoryService();
+        this.#i = new RMService();
         return this.#i.db;
     }
 
@@ -67,10 +67,10 @@ export class RedisMemoryService {
         try {
             await this.#db.connect();
 
-            const indexes = await this.#db.client.ft._list();
+            const indexes = await this.#db.redis.ft._list();
 
             if (!indexes.includes(RedisIndex.idxLookupStats)) {
-                await this.#db.client.ft.create(
+                await this.#db.redis.ft.create(
                     RedisIndex.idxLookupStats,
                     {
                         "$.dailyLookups[*].date": {
