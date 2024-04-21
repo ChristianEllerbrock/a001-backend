@@ -1,6 +1,7 @@
 export enum RedisIndex {
     idxLookupStats = "idx:lookupStats",
     ixdGlobalLookupStats = "idx:globalLookupStats",
+    idxRelayEvent = "idx:relayEvent",
 }
 
 //////////////////////////////////////
@@ -29,6 +30,24 @@ export interface R_LookupData {
     nip05: string;
     names: { [key: string]: string };
     relays?: { [key: string]: string[] };
+}
+
+/**
+ * relayEvent:<id>
+ * id = nostr event id
+ */
+export interface R_RelayEvent {
+    id: string;
+    pubkey: string;
+    created_at: number;
+    kind: number;
+    tags: Array<string[]>;
+    content: string;
+    sig: string;
+
+    // This is a generated object filled with tag value pairs
+    // from the tags array. It is required for searching
+    _tags: { [key: string]: string };
 }
 
 //////////////////////////////////////

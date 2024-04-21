@@ -11,6 +11,15 @@ export class RedisMemoryCollectionRepository<TModel> {
         private getRedisMemory: () => RedisMemory | undefined
     ) {}
 
+    async exists(id: string): Promise<boolean> {
+        const redisMemory = this.getRedisMemory();
+        if (typeof redisMemory === "undefined") {
+            throw new Error("getRedisMemory is undefined");
+        }
+
+        return await redisMemory.exists(this.#buildRedisKey(id));
+    }
+
     async search(
         query: string,
         options: SearchOptions = { LIMIT: { from: 0, size: 10000 } }
@@ -106,6 +115,15 @@ export class RedisMemorySingleRepository<TModel> {
         private readonly key: string,
         private getRedisMemory: () => RedisMemory | undefined
     ) {}
+
+    async exists(): Promise<boolean> {
+        const redisMemory = this.getRedisMemory();
+        if (typeof redisMemory === "undefined") {
+            throw new Error("getRedisMemory is undefined");
+        }
+
+        return await redisMemory.exists(this.key);
+    }
 
     async fetch(): Promise<RedisMemorySingleType<TModel> | undefined | null> {
         const redisMemory = this.getRedisMemory();

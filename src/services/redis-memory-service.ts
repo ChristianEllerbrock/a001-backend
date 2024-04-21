@@ -9,6 +9,7 @@ import {
     R_GlobalUserStats,
     R_LookupData,
     R_LookupStats,
+    R_RelayEvent,
 } from "../types/redis/@types";
 import {
     RedisMemoryCollectionRepository,
@@ -54,6 +55,10 @@ export class RMService {
         "lookupData",
         () => this.db
     );
+    relayEvent = new RedisMemoryCollectionRepository<R_RelayEvent>(
+        "relayEvent",
+        () => this.db
+    );
 
     #db: RedisMemory | undefined;
     #isInitialized = false;
@@ -94,6 +99,138 @@ export class RMService {
                     {
                         ON: "JSON",
                         PREFIX: "lookupStats:",
+                    }
+                );
+            }
+
+            if (!indexes.includes(RedisIndex.idxRelayEvent)) {
+                await this.#db.redis.ft.create(
+                    RedisIndex.idxRelayEvent,
+                    {
+                        "$.id": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "id",
+                        },
+                        "$.pubkey": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "pubkey",
+                        },
+                        "$.created_at": {
+                            type: SchemaFieldTypes.NUMERIC,
+                            AS: "created_at",
+                        },
+                        "$.kind": {
+                            type: SchemaFieldTypes.NUMERIC,
+                            AS: "kind",
+                        },
+                        "$._tags.a": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "a",
+                        },
+                        "$._tags.b": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "b",
+                        },
+                        "$._tags.c": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "c",
+                        },
+                        "$._tags.d": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "d",
+                        },
+                        "$._tags.e": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "e",
+                        },
+                        "$._tags.f": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "f",
+                        },
+                        "$._tags.g": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "g",
+                        },
+                        "$._tags.h": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "h",
+                        },
+                        "$._tags.i": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "i",
+                        },
+                        "$._tags.j": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "j",
+                        },
+                        "$._tags.k": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "k",
+                        },
+                        "$._tags.l": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "l",
+                        },
+                        "$._tags.m": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "m",
+                        },
+                        "$._tags.n": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "n",
+                        },
+                        "$._tags.o": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "o",
+                        },
+                        "$._tags.p": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "p",
+                        },
+                        "$._tags.q": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "q",
+                        },
+                        "$._tags.r": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "r",
+                        },
+                        "$._tags.s": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "s",
+                        },
+                        "$._tags.t": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "t",
+                        },
+                        "$._tags.u": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "u",
+                        },
+                        "$._tags.v": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "v",
+                        },
+                        "$._tags.w": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "w",
+                        },
+                        "$._tags.x": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "x",
+                        },
+                        "$._tags.z": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "z",
+                        },
+                        "$._tags.y": {
+                            type: SchemaFieldTypes.TAG,
+                            AS: "y",
+                        },
+                    },
+                    {
+                        ON: "JSON",
+                        PREFIX: "relayEvent:",
                     }
                 );
             }
