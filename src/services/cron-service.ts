@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RedisTypeGlobalUserStats } from "../types/redis/@types";
+import { R_GlobalUserStats } from "../types/redis/@types";
 import { RMService } from "./redis-memory-service";
 import { RegistrationsPerDomainStatisticsOutput } from "../graphql/outputs/usage-statistics-output";
 import { RegistrationStatisticsOutput } from "../graphql/outputs/statistics/registration-statistics-output";
@@ -33,9 +33,7 @@ export class CronService extends TypedEventEmitter<CronServiceEventType> {
      * Fetches the globalUserStats object from Redis but updates it
      * with data from the SQL database if the defined TTL (1 hour) has expired.
      */
-    async getGlobalUserStats(): Promise<
-        RedisTypeGlobalUserStats | undefined | null
-    > {
+    async getGlobalUserStats(): Promise<R_GlobalUserStats | undefined | null> {
         const ttlInSeconds = 60 * 60;
 
         try {
@@ -43,7 +41,7 @@ export class CronService extends TypedEventEmitter<CronServiceEventType> {
                 (Date.now() - this.#lastGetGlobalUserStatsFromSqlDatabaseAt) /
                 1000;
 
-            let rGlobalUserStats: RedisTypeGlobalUserStats | undefined | null;
+            let rGlobalUserStats: R_GlobalUserStats | undefined | null;
             if (diffInSeconds > ttlInSeconds) {
                 const start = Date.now();
                 this.emit(

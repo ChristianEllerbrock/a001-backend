@@ -3,7 +3,15 @@ export enum RedisIndex {
     ixdGlobalLookupStats = "idx:globalLookupStats",
 }
 
-export interface RedisTypeLookupStats {
+//////////////////////////////////////
+// COLLECTIONS ///////////////////////
+//////////////////////////////////////
+
+/**
+ * lookupStats:<id>
+ * id = nip05 (e.g. chris@nip05.social)
+ */
+export interface R_LookupStats {
     nip05: string;
     lastLookupAt: string;
     lookups: number;
@@ -13,7 +21,24 @@ export interface RedisTypeLookupStats {
     }[];
 }
 
-export interface RedisTypeGlobalLookupStats {
+/**
+ * lookupData:<id>
+ * id = nip05 (e.g. chris@nip05.social)
+ */
+export interface R_LookupData {
+    nip05: string;
+    names: { [key: string]: string };
+    relays?: { [key: string]: string[] };
+}
+
+//////////////////////////////////////
+// SINGLE OBJECTS ////////////////////
+//////////////////////////////////////
+
+/**
+ * globalLookupStats
+ */
+export interface R_GlobalLookupStats {
     lastLookupAt: string;
     lookups: number;
     dailyLookups: {
@@ -22,7 +47,10 @@ export interface RedisTypeGlobalLookupStats {
     }[];
 }
 
-export interface RedisTypeGlobalUserStats {
+/**
+ * globalUserStats
+ */
+export interface R_GlobalUserStats {
     noOfUsers: number;
     noOfRegistrations: number;
     noOfRegistrationsPerDomain: { [key: string]: number };
@@ -30,16 +58,5 @@ export interface RedisTypeGlobalUserStats {
         date: string;
         nip05: string;
     }[];
-}
-
-export interface RedisTypeLookupData {
-    nip05: string;
-    names: { [key: string]: string };
-    relays?: { [key: string]: string[] };
-}
-
-export enum NonCollectionRedisTypes {
-    RedisTypeGlobalLookupStats = "globalLookupStats",
-    RedisTypeGlobalUserStats = "globalUserStats",
 }
 

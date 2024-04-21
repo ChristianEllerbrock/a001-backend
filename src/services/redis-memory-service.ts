@@ -5,10 +5,10 @@ import {
 } from "../common/redis-memory/redis-memory";
 import {
     RedisIndex,
-    RedisTypeGlobalLookupStats,
-    RedisTypeGlobalUserStats,
-    RedisTypeLookupData,
-    RedisTypeLookupStats,
+    R_GlobalLookupStats,
+    R_GlobalUserStats,
+    R_LookupData,
+    R_LookupStats,
 } from "../types/redis/@types";
 import {
     RedisMemoryCollectionRepository,
@@ -36,22 +36,21 @@ export class RMService {
         return this.#db;
     }
 
-    globalUserStats = new RedisMemorySingleRepository<RedisTypeGlobalUserStats>(
+    globalUserStats = new RedisMemorySingleRepository<R_GlobalUserStats>(
         "globalUserStats",
         () => this.db
     );
-    globalLookupStats =
-        new RedisMemorySingleRepository<RedisTypeGlobalLookupStats>(
-            "globalLookupStats",
-            () => this.db
-        );
+    globalLookupStats = new RedisMemorySingleRepository<R_GlobalLookupStats>(
+        "globalLookupStats",
+        () => this.db
+    );
 
     // Collections
-    lookupStats = new RedisMemoryCollectionRepository<RedisTypeLookupStats>(
+    lookupStats = new RedisMemoryCollectionRepository<R_LookupStats>(
         "lookupStats",
         () => this.db
     );
-    lookupData = new RedisMemoryCollectionRepository<RedisTypeLookupData>(
+    lookupData = new RedisMemoryCollectionRepository<R_LookupData>(
         "lookupData",
         () => this.db
     );
@@ -71,8 +70,6 @@ export class RMService {
         this.#db = new RedisMemory(config);
         this.#createIndexes();
         this.#isInitialized = true;
-
-        const asd = await this.globalUserStats.fetch();
     }
 
     async #createIndexes() {
