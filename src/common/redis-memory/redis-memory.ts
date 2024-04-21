@@ -79,25 +79,6 @@ export class RedisMemory extends TypedEventEmitter<RedisMemoryEventType> {
         );
     }
 
-    // async search<Collection extends keyof TModel & string>(
-    //     collection: Collection,
-    //     query: string,
-    //     options: SearchOptions | undefined = undefined
-    // ): Promise<Array<TModel[Collection]>> {
-    //     const index = `idx:${collection}`;
-
-    //     const relevantOptions = options ?? {
-    //         LIMIT: { from: 0, size: 10000 },
-    //     };
-
-    //     const result = await this.#redis.ft.search(
-    //         index,
-    //         query,
-    //         relevantOptions
-    //     );
-    //     return result.documents.map((x) => x.value as TModel[Collection]);
-    // }
-
     async remove(key: string) {
         await this.#redis.json.del(key);
         this.#inMemoryCache.delete(key);
@@ -109,6 +90,14 @@ export class RedisMemory extends TypedEventEmitter<RedisMemoryEventType> {
         options?: RedisMemorySaveOptions
     ): Promise<void> {
         await this.#save(key, record, options);
+    }
+
+    async exists(key: string): Promise<boolean> {
+        const pathType = await this.#redis.json.type(key);
+        if (!pathType) {
+            return false;
+        }
+        return true;
     }
 
     async fetch<T>(key: string): Promise<T | null | undefined> {

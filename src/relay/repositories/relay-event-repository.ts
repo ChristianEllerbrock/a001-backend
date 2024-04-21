@@ -1,5 +1,4 @@
-import { Event, Filter, Relay } from "nostr-tools";
-import { DBEvent } from "../@types/events";
+import { Event, Filter } from "nostr-tools";
 import { PrismaService } from "../../services/prisma-service";
 import { RelayEvent } from "@prisma/client";
 import {
@@ -7,6 +6,8 @@ import {
     getEventDTagValue,
     getEventMeaning,
 } from "../utils/event";
+import { RMService } from "../../services/redis-memory-service";
+import { R_RelayEvent } from "../../types/redis/@types";
 
 export class RelayEventRepository {
     // #region Singleton
@@ -44,7 +45,7 @@ export class RelayEventRepository {
     }
 
     /**
-     * Uodates existing ReplaceableEvents or ParameterizedReplaceableEvents
+     * Updates existing ReplaceableEvents or ParameterizedReplaceableEvents
      *
      * Returns "-1" if the database has a newer version. Returns "1" when
      * the event is newest and the database will be updated.
@@ -270,39 +271,48 @@ export class RelayEventRepository {
         };
     }
 
-    async #create(event: Event): Promise<RelayEvent> {
-        const dbEvent = await PrismaService.instance.db.$transaction(
-            async (tx) => {
-                const newDbEvent = await tx.relayEvent.create({
-                    data: {
-                        id: event.id,
-                        kind: event.kind,
-                        pubkey: event.pubkey,
-                        created_at: event.created_at,
-                        content: event.content,
-                        sig: event.sig,
-                        tags: JSON.stringify(event.tags),
-                    },
+    async #create(event: Event) {
+        const rRelayEvent: R_RelayEvent = {
+            ...event,
+            _tags: this.#buildTagObject(event),
+        };
+        await RMService.i.relayEvent.save(event.id, rRelayEvent);
+
+        await PrismaService.instance.db.$transaction(async (tx) => {
+            const newDbEvent = await tx.relayEvent.create({
+                data: {
+                    id: event.id,
+                    kind: event.kind,
+                    pubkey: event.pubkey,
+                    created_at: event.created_at,
+                    content: event.content,
+                    sig: event.sig,
+                    tags: JSON.stringify(event.tags),
+                },
+            });
+
+            // Create relations.
+            if (!event.tags.empty()) {
+                await tx.relayEventTag.createMany({
+                    data: event.tags.map((x) => {
+                        return {
+                            relayEventId: newDbEvent.id,
+                            name: x[0],
+                            value: x[1],
+                        };
+                    }),
                 });
-
-                // Create relations.
-                if (!event.tags.empty()) {
-                    await tx.relayEventTag.createMany({
-                        data: event.tags.map((x) => {
-                            return {
-                                relayEventId: newDbEvent.id,
-                                name: x[0],
-                                value: x[1],
-                            };
-                        }),
-                    });
-                }
-
-                return newDbEvent;
             }
-        );
+        });
+    }
 
-        return dbEvent;
+    #buildTagObject(event: Event): { [key: string]: string } {
+        const tagObject: { [key: string]: string } = {};
+        for (const tag of event.tags) {
+            tagObject[tag[0]] = tag[1];
+        }
+
+        return tagObject;
     }
 }
 

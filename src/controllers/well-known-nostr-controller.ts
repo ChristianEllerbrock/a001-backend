@@ -4,7 +4,7 @@ import { DateTime } from "luxon";
 import { SystemUserCacheService } from "../services/system-user-cache-service";
 import { Nip05 } from "../nostr/type-defs";
 import { RMService } from "../services/redis-memory-service";
-import { RedisTypeLookupData } from "../types/redis/@types";
+import { R_LookupData } from "../types/redis/@types";
 
 interface Query {
     name?: string;
@@ -297,7 +297,7 @@ export async function wellKnownNostrController(
             return;
         }
 
-        const rLookupData: RedisTypeLookupData = {
+        const rLookupData: R_LookupData = {
             nip05: fullIdentifier,
             names: {
                 [identifier]: dbRegistration.user.pubkey,
