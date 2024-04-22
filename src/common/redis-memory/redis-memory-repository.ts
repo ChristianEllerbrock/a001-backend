@@ -156,5 +156,14 @@ export class RedisMemorySingleRepository<TModel> {
         await redisMemory.save(this.key, record, options);
         return new RedisMemorySingleType<TModel>(record, this);
     }
+
+    async remove(): Promise<void> {
+        const redisMemory = this.getRedisMemory();
+        if (typeof redisMemory === "undefined") {
+            throw new Error("getRedisMemory is undefined");
+        }
+
+        await redisMemory.remove(this.key);
+    }
 }
 
