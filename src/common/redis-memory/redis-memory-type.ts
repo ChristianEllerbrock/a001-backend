@@ -14,6 +14,10 @@ export class RedisMemoryCollectionType<TModel> {
     async save(options?: RedisMemorySaveOptions) {
         return await this.repository.save(this.id, this.data, options);
     }
+
+    async remove() {
+        return await this.repository.remove(this.id);
+    }
 }
 
 export class RedisMemorySingleType<TModel> {
@@ -24,6 +28,10 @@ export class RedisMemorySingleType<TModel> {
 
     async save(options?: RedisMemorySaveOptions) {
         return await this.repository.save(this.data, options);
+    }
+
+    async remove() {
+        return await this.repository.remove();
     }
 }
 

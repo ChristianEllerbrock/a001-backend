@@ -1,6 +1,4 @@
 import { Event, Filter } from "nostr-tools";
-import { PrismaService } from "../../services/prisma-service";
-import { RelayEvent } from "@prisma/client";
 import {
     EventMeaning,
     getEventDTagValue,
@@ -8,6 +6,7 @@ import {
 } from "../utils/event";
 import { RMService } from "../../services/redis-memory-service";
 import { R_RelayEvent } from "../../types/redis/@types";
+import { RedisMemoryCollectionType } from "../../common/redis-memory/redis-memory-type";
 
 export class RelayEventRepository {
     // #region Singleton
@@ -32,10 +31,8 @@ export class RelayEventRepository {
      */
     async create(event: Event): Promise<number> {
         // Check, if the eventId already exists.
-        const dbEvent = await PrismaService.instance.db.relayEvent.findUnique({
-            where: { id: event.id },
-        });
-        if (dbEvent) {
+        const exists = await RMService.i.relayEvent.exists(event.id);
+        if (exists) {
             return -1;
         }
 
@@ -66,14 +63,17 @@ export class RelayEventRepository {
         }
 
         // Check, if the database holds any version.
-        let dbRelayEvent: RelayEvent | null | undefined;
+        let erRelayEvent:
+            | RedisMemoryCollectionType<R_RelayEvent>
+            | null
+            | undefined;
 
         if (meaning === EventMeaning.ReplaceableEvent) {
-            dbRelayEvent = await PrismaService.instance.db.relayEvent.findFirst(
-                {
-                    where: { kind: event.kind, pubkey: event.pubkey },
-                }
-            );
+            // where: { kind: event.kind, pubkey: event.pubkey },
+            const query =
+                `@kind:[${event.kind} ${event.kind}]` +
+                ` @pubkey:{${event.pubkey}}`;
+            erRelayEvent = (await RMService.i.relayEvent.search(query))[0];
         } else {
             // ParameterizedReplaceableEvents
             const dTagValue = getEventDTagValue(event);
@@ -81,21 +81,23 @@ export class RelayEventRepository {
                 throw new Error("Event does not have a 'd' tag value");
             }
 
-            dbRelayEvent = await PrismaService.instance.db.relayEvent.findFirst(
-                {
-                    where: {
-                        kind: event.kind,
-                        pubkey: event.pubkey,
-                        relayEventTags: {
-                            some: { name: "d", value: dTagValue },
-                        },
-                    },
-                }
-            );
+            // where: {
+            //     kind: event.kind,
+            //     pubkey: event.pubkey,
+            //     relayEventTags: {
+            //         some: { name: "d", value: dTagValue },
+            //     },
+            // },
+            const query =
+                `@kind:[${event.kind} ${event.kind}]` +
+                ` @pubkey:{${event.pubkey}}` +
+                ` @d:{${dTagValue}}`;
+
+            erRelayEvent = (await RMService.i.relayEvent.search(query))[0];
         }
 
-        if (!dbRelayEvent) {
-            // The database has no version at all. Insert the event into the database.
+        if (!erRelayEvent) {
+            // The Redis database has no version at all. Insert the event into the database.
             await this.#create(event);
             return 1;
         }
@@ -103,14 +105,9 @@ export class RelayEventRepository {
         // We already have stored another version in the database.
         // Determine what to do.
 
-        if (event.created_at > dbRelayEvent.created_at) {
-            // The event version if more recent.
-            await PrismaService.instance.db.$transaction(async (tx) => {
-                // Delete existing database records.
-                await tx.relayEvent.delete({ where: { id: event.id } });
-
-                await this.#create(event);
-            });
+        if (event.created_at > erRelayEvent.data.created_at) {
+            // The event version is more recent.
+            await this.#create(event);
             return 1;
         } else {
             // The database version is more recent.
@@ -119,38 +116,45 @@ export class RelayEventRepository {
     }
 
     async findByFilters(filters: Filter[]): Promise<Event[]> {
-        //return [];
+        // filters are OR
+        // filter conditions are AND
 
-        const unionSql: string[] = [];
+        const orArray: string[] = [];
         for (const filter of filters) {
-            const andSql: string[] = [];
+            const andArray: string[] = [];
 
             if (typeof filter.ids !== "undefined") {
-                andSql.push(
-                    `re.id IN (${filter.ids
-                        .map((x) => "'" + x + "'")
-                        .join(", ")})`
-                );
+                andArray.push(`@id:{${filter.ids.join(" | ")}}`);
             }
 
             if (typeof filter.authors !== "undefined") {
-                andSql.push(
-                    `re.pubkey in (${filter.authors
-                        .map((x) => "'" + x + "'")
-                        .join(", ")})`
-                );
+                andArray.push(`@pubkey:{${filter.authors.join(" | ")}}`);
             }
 
             if (typeof filter.kinds !== "undefined") {
-                andSql.push(`re.kind in (${filter.kinds.join(", ")})`);
+                if (filter.kinds.length === 1) {
+                    andArray.push(
+                        `@kind:[${filter.kinds[0]} ${filter.kinds[0]}]`
+                    );
+                } else {
+                    let kindString = "( ";
+
+                    kindString += filter.kinds
+                        .map((x) => {
+                            return `@kind:[${x} ${x}]`;
+                        })
+                        .join(" | ");
+
+                    kindString += " )";
+                    andArray.push(kindString);
+                }
             }
 
-            if (typeof filter.since !== "undefined") {
-                andSql.push(`re.created_at >= ${filter.since}`);
-            }
-
-            if (typeof filter.until !== "undefined") {
-                andSql.push(`re.created_at <= ${filter.since}`);
+            // Handle "created_at"
+            if (filter.since || filter.until) {
+                const start = filter.since ? filter.since.toString() : "-inf";
+                const end = filter.until ? filter.until.toString() : "+inf";
+                andArray.push(`@created_at:[${start} ${end}]`);
             }
 
             for (const key of Object.keys(filter)) {
@@ -164,56 +168,28 @@ export class RelayEventRepository {
                 const tagValues = filter[`#${tagName}`] ?? [];
 
                 if (!tagValues.empty()) {
-                    andSql.push(
-                        `tag.[name] = '${tagName}' AND tag.[value] IN (${tagValues
-                            .map((x) => "'" + x + "'")
-                            .join(", ")})`
-                    );
+                    andArray.push(`@${tagName}:{${tagValues.join(" | ")}}`);
                 }
             }
 
-            // Build SQL
-            const topN =
-                typeof filter.limit !== "undefined"
-                    ? `TOP(${filter.limit})`
-                    : "TOP(100) PERCENT";
-
-            const sql = `
-            SELECT ${topN} 
-            re.* 
-            FROM [dbo].[RelayEvent] re
-            LEFT JOIN 
-            (SELECT ROW_NUMBER() OVER(PARTITION BY relayEventId ORDER BY id) row#, id, relayEventId, [name], [value] FROM [dbo].[RelayEventTag]) tag ON re.id = tag.relayEventId
-            WHERE (
-                (tag.row# = 1 OR tag.row# IS NULL)              
-                ${
-                    andSql.length === 0
-                        ? ""
-                        : "AND " +
-                          andSql.map((x) => "(" + x + ")").join(" AND ")
-                }
-            ) ORDER BY re.created_at`;
-            unionSql.push(sql);
+            const andString = "( " + andArray.join(" ") + " )";
+            orArray.push(andString);
         }
 
-        const rawSql = unionSql
-            .map((sql) => `SELECT * FROM (${sql}) query`)
-            .join(" UNION ");
+        const queryString = orArray.join(" | ");
+        console.log("Query String:");
+        console.log(queryString);
 
-        //console.log(rawSql);
-
-        const events = await PrismaService.instance.db.$queryRawUnsafe<
-            RelayEvent[]
-        >(rawSql);
-        //console.log(events);
-
-        return events.map((event) => this.#toNostrEvent(event));
+        const erRelayEvents = await RMService.i.relayEvent.search(queryString);
+        return erRelayEvents.map((event) => this.#toNostrEvent(event));
     }
 
     /**
      * Deletes all references in the database of a NIP-05 delete event.
      * This method does NOT store the deletion event automatically.
-     * This must be triggered separately by a call to "create"
+     * This must be triggered separately by a call to "create".
+     *
+     * Illegal deletion requests (i.e. requests for another pubkey) will be ignored.
      */
     async delete(event: Event): Promise<void> {
         if (event.kind !== 5) {
@@ -230,44 +206,48 @@ export class RelayEventRepository {
             }
         }
 
-        await PrismaService.instance.db.$transaction(async (tx) => {
-            // Delete all e references
-            await tx.relayEvent.deleteMany({
-                where: {
-                    id: { in: eTagValues },
-                    pubkey: event.pubkey, // reference must be from "deleter"
-                },
-            });
-
-            // Delete all a references
-            for (const aTagValue of aTagValues) {
-                const [kind, pubkey, dValue] = aTagValue.split(":");
-
-                await tx.relayEvent.deleteMany({
-                    where: {
-                        kind: parseInt(kind),
-                        pubkey, // reference must be from "deleter"
-                        relayEventTags: {
-                            some: {
-                                name: "d",
-                                value: dValue,
-                            },
-                        },
-                    },
-                });
+        // Delete all e events IF THEY ARE FROM THE REQUESTER
+        for (const e of eTagValues) {
+            const erRelayEvent = await RMService.i.relayEvent.fetch(e);
+            if (erRelayEvent?.data.pubkey === event.pubkey) {
+                await erRelayEvent.remove();
             }
-        });
+        }
+
+        // Delete all a references IF THEY ARE FROM THE REQUESTER
+        for (const aTagValue of aTagValues) {
+            const [kind, pubkey, dValue] = aTagValue.split(":");
+
+            if (event.pubkey !== pubkey) {
+                continue; // Ignore illegal requests.
+            }
+
+            const query =
+                `@kind:[${kind} ${kind}]` +
+                ` @pubkey:{${pubkey}}` +
+                ` @d:{${dValue}}`;
+
+            const erRelayEvent = (
+                await RMService.i.relayEvent.search(query)
+            )[0];
+
+            if (erRelayEvent) {
+                await erRelayEvent.remove();
+            }
+        }
     }
 
-    #toNostrEvent(dbRelayEvent: RelayEvent): Event {
+    #toNostrEvent(
+        erRelayEvent: RedisMemoryCollectionType<R_RelayEvent>
+    ): Event {
         return {
-            id: dbRelayEvent.id,
-            created_at: dbRelayEvent.created_at,
-            kind: dbRelayEvent.kind,
-            pubkey: dbRelayEvent.pubkey,
-            content: dbRelayEvent.content,
-            sig: dbRelayEvent.sig,
-            tags: JSON.parse(dbRelayEvent.tags),
+            id: erRelayEvent.data.id,
+            created_at: erRelayEvent.data.created_at,
+            kind: erRelayEvent.data.kind,
+            pubkey: erRelayEvent.data.pubkey,
+            content: erRelayEvent.data.content,
+            sig: erRelayEvent.data.sig,
+            tags: erRelayEvent.data.tags,
         };
     }
 
@@ -277,33 +257,6 @@ export class RelayEventRepository {
             _tags: this.#buildTagObject(event),
         };
         await RMService.i.relayEvent.save(event.id, rRelayEvent);
-
-        await PrismaService.instance.db.$transaction(async (tx) => {
-            const newDbEvent = await tx.relayEvent.create({
-                data: {
-                    id: event.id,
-                    kind: event.kind,
-                    pubkey: event.pubkey,
-                    created_at: event.created_at,
-                    content: event.content,
-                    sig: event.sig,
-                    tags: JSON.stringify(event.tags),
-                },
-            });
-
-            // Create relations.
-            if (!event.tags.empty()) {
-                await tx.relayEventTag.createMany({
-                    data: event.tags.map((x) => {
-                        return {
-                            relayEventId: newDbEvent.id,
-                            name: x[0],
-                            value: x[1],
-                        };
-                    }),
-                });
-            }
-        });
     }
 
     #buildTagObject(event: Event): { [key: string]: string } {
