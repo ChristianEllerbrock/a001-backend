@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { debug } from "console";
 
 export const createLogger = function (namespace: string) {

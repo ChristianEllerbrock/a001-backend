@@ -7,7 +7,6 @@ import {
 import { createLogger } from "./utils/common";
 import { Nip05SocialRelayConfig } from "./config";
 import { EventEmitter } from "stream";
-import { PrismaService } from "../services/prisma-service";
 
 const WSS_CLIENT_HEALTH_PROBE_INTERVAL = 120000;
 const debug = createLogger("[Relay] - RelayWebSocketServerAdapter");

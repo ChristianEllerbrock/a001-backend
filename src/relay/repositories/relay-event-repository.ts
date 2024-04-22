@@ -7,6 +7,8 @@ import {
 import { RMService } from "../../services/redis-memory-service";
 import { R_RelayEvent } from "../../types/redis/@types";
 import { RedisMemoryCollectionType } from "../../common/redis-memory/redis-memory-type";
+import { createLogger } from "../utils/common";
+const debug = createLogger("[Relay] - RelayEventRepository");
 
 export class RelayEventRepository {
     // #region Singleton
@@ -177,10 +179,9 @@ export class RelayEventRepository {
         }
 
         const queryString = orArray.join(" | ");
-        console.log("Query String:");
-        console.log(queryString);
 
         const erRelayEvents = await RMService.i.relayEvent.search(queryString);
+        console.log(`Filter returned ${erRelayEvents.length} events.`);
         return erRelayEvents.map((event) => this.#toNostrEvent(event));
     }
 
