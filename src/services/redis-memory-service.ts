@@ -123,6 +123,10 @@ export class RMService {
                             type: SchemaFieldTypes.NUMERIC,
                             AS: "kind",
                         },
+                        "$.content": {
+                            type: SchemaFieldTypes.TEXT,
+                            AS: "content",
+                        },
                         "$._tags.a": {
                             type: SchemaFieldTypes.TAG,
                             AS: "a",
