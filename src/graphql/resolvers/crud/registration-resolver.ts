@@ -379,7 +379,8 @@ export class RegistrationResolver {
 
         const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(pubkey);
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         // Only continue, if the user was NOT reported as fraud.
         if (dbUser.fraudReportedAt != null) {
@@ -484,7 +485,8 @@ export class RegistrationResolver {
             );
         }
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         // Only continue, if the user was NOT reported as fraud.
         if (dbUser.fraudReportedAt != null) {
@@ -746,7 +748,8 @@ export class RegistrationResolver {
             );
         }
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         // Only continue, if the user was NOT reported as fraud.
         if (dbUser.fraudReportedAt != null) {

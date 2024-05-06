@@ -77,7 +77,8 @@ export class LoginResolver {
 
         await cleanupExpiredLoginsAsync();
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         const code = uuid.v4();
 
@@ -117,7 +118,8 @@ export class LoginResolver {
         const pubkeyObject = NostrHelperV2.getNostrPubkeyObject(args.pubkey);
 
         // Create user in database if necessary.
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyObject.hex);
 
         const code = uuid.v4();
 
@@ -388,7 +390,8 @@ export class LoginResolver {
 
         let pubkeyHex = NostrHelperV2.getNostrPubkeyObject(args.pubkey).hex;
 
-        const dbUser = await getOrCreateUserInDatabaseAsync(pubkeyHex);
+        const [dbUser, registrationRelays] =
+            await getOrCreateUserInDatabaseAsync(pubkeyHex);
         // Check, if the user was reported as "fraud"
         if (dbUser.fraudReportedAt != null) {
             throw new Error(ErrorMessage.fraud);

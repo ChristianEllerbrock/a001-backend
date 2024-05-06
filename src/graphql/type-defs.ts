@@ -208,22 +208,38 @@ export const customAuthChecker: AuthChecker<GraphqlContext> = async (
 };
 
 export const getOrCreateUserInDatabaseAsync = async (
-    hex: string
-): Promise<User> => {
-    let dbUser = await PrismaService.instance.db.user.findFirst({
-        where: { pubkey: hex },
-    });
-    if (!dbUser) {
-        dbUser = await PrismaService.instance.db.user.create({
-            data: {
-                pubkey: hex,
-                createdAt: new Date(),
-                isSystemUser: false,
-            },
-        });
-    }
+    pubkey: string
+): Promise<[sqlUser: User, registrationRelays: string[]]> => {
+    const result = await PrismaService.instance.db.$transaction(
+        async (db): Promise<[sqlUser: User, registrationRelays: string[]]> => {
+            let sqlUser = await db.user.findFirst({
+                where: { pubkey },
+            });
+            if (!sqlUser) {
+                sqlUser = await db.user.create({
+                    data: {
+                        pubkey: pubkey,
+                        createdAt: new Date(),
+                        isSystemUser: false,
+                    },
+                });
+            }
 
-    return dbUser;
+            const sqlRegistrations =
+                (await db.registration.findMany({
+                    where: { userId: sqlUser.id },
+                    include: { registrationRelays: true },
+                })) ?? [];
+
+            const registrationRelays = sqlRegistrations
+                .map((x) => x.registrationRelays.map((y) => y.address))
+                .flat();
+
+            return [sqlUser, registrationRelays];
+        }
+    );
+
+    return result;
 };
 
 export const updateUserToken = async (

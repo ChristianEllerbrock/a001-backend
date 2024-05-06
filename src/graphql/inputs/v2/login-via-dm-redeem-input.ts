@@ -1,7 +1,7 @@
 import { ArgsType, Field } from "type-graphql";
 
 @ArgsType()
-export class LoginCodeRedeemInput {
+export class LoginViaDmRedeemInput {
     @Field(() => String)
     userId!: string;
 
