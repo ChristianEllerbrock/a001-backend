@@ -1,11 +1,11 @@
 import { ArgsType, Field } from "type-graphql";
 
 @ArgsType()
-export class LoginViaDmInput {
+export class LoginViaExtensionInput {
     @Field(() => String)
     pubkey!: string;
 
-    @Field(() => [String])
-    relays!: string[];
+    @Field(() => String)
+    deviceId!: string;
 }
 
