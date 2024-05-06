@@ -10,9 +10,7 @@ import { UserRelationResolver } from "./resolvers/crud/user-relation-resolver";
 import { customAuthChecker } from "./type-defs";
 import { SystemResolver } from "./resolvers/crud/system-resolver";
 import { StatisticsResolver } from "./resolvers/crud/statistics-resolver";
-import { JobSubResolver } from "./subscriptions/resolvers/job-sub-resolver";
 import { NostrEventResolver } from "./resolvers/crud/nostr-event-resolver";
-import { NostrEventSubscriptionResolver } from "./subscriptions/resolvers/nostr-event-subscription-resolver";
 import { DirectoryResolver } from "./resolvers/crud/directory-resolver";
 import { SubscriptionResolver } from "./resolvers/crud/subscription-resolver";
 import { SubscriptionCalcResolver } from "./resolvers/crud/subscription-calc-resolver";
@@ -23,6 +21,7 @@ import { PublicRelayResolver } from "./resolvers/crud/public-relay-resolver";
 import { BotMetadataResolver } from "./resolvers/crud/bot-metadata-resolver";
 import { BotMetadataRelationResolver } from "./resolvers/crud/bot-metadata-relation-resolver";
 import { PromoCodeResolver } from "./resolvers/crud/promo-code-resolver";
+import { Login2Resolver } from "./resolvers/crud/login2-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -52,6 +51,7 @@ export const schemaOptions: BuildSchemaOptions = {
         BotMetadataRelationResolver,
 
         PromoCodeResolver,
+        Login2Resolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },
