@@ -2,25 +2,25 @@ import { Field, InputType, Int } from "type-graphql";
 
 @InputType()
 export class Nip07RedeemInput {
-    @Field((type) => String)
+    @Field(() => String)
     id!: string;
 
-    @Field((type) => String)
+    @Field(() => String)
     pubkey!: string;
 
-    @Field((type) => String)
+    @Field(() => String)
     content!: string;
 
-    @Field((type) => [[String]])
+    @Field(() => [[String]])
     tags!: string[][];
 
-    @Field((type) => String)
+    @Field(() => String)
     sig!: string;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     created_at!: number;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     kind!: number;
 }
 
