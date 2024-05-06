@@ -14,7 +14,7 @@ const USAGE_STATISTICS = "usageStatistics";
 
 @Resolver()
 export class StatisticsResolver {
-    @Query((returns) => UsageStatisticsOutput)
+    @Query(() => UsageStatisticsOutput)
     async usageStatistics(
         @Ctx() context: GraphqlContext
     ): Promise<UsageStatisticsOutput> {
@@ -29,7 +29,7 @@ export class StatisticsResolver {
         const now = DateTime.now();
         const yesterday = now.plus({ days: -1 });
 
-        let redisGlobalUserStats = await CronService.i.getGlobalUserStats();
+        const redisGlobalUserStats = await CronService.i.getGlobalUserStats();
 
         let noOfUsers = 0;
         let noOfRegistrations = 0;

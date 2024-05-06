@@ -11,7 +11,6 @@ import { LoginViaDMInput } from "../../inputs/v2/login-via-dm-input";
 import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-service";
 import { EnvService } from "../../../services/env-service";
 import { LoginViaDmOutput } from "../../outputs/login-via-dm-output";
-import { LoginCodeRedeemInput } from "../../inputs/login-code-redeem-input";
 import { UserTokenOutput } from "../../outputs/user-token-output";
 import { v4 } from "uuid";
 import { LoginViaDmRedeemInput } from "../../inputs/v2/login-via-dm-redeem-input";
