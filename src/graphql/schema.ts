@@ -22,6 +22,7 @@ import { BotMetadataResolver } from "./resolvers/crud/bot-metadata-resolver";
 import { BotMetadataRelationResolver } from "./resolvers/crud/bot-metadata-relation-resolver";
 import { PromoCodeResolver } from "./resolvers/crud/promo-code-resolver";
 import { Login2Resolver } from "./resolvers/crud/login2-resolver";
+import { Home2Resolver } from "./resolvers/crud/home2-resolver";
 
 export const schemaOptions: BuildSchemaOptions = {
     resolvers: [
@@ -51,7 +52,9 @@ export const schemaOptions: BuildSchemaOptions = {
         BotMetadataRelationResolver,
 
         PromoCodeResolver,
+
         Login2Resolver,
+        Home2Resolver,
     ],
     authChecker: customAuthChecker,
     validate: { forbidUnknownValues: false },
