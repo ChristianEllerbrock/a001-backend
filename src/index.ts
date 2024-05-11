@@ -33,6 +33,7 @@ import { emailControllerV2 } from "./controllers/email/email-controller-v2";
 import { errorHandler } from "./middlewares/errors";
 import { RMService } from "./services/redis-memory-service";
 import { CronService } from "./services/cron-service";
+import { Migration } from "./services/migration";
 // import { Migration } from "./services/migration";
 
 // Load any environmental variables from the local .env file
@@ -137,7 +138,7 @@ CronService.i.on("debug", (level, data) => {
 });
 
 async function bootstrap() {
-    // await Migration.i.migrateRelayEventsFromSqlToRedis();
+    //await Migration.i.migrationFixGlobalStats();
     const schema = await buildSchema(schemaOptions);
 
     app.all(
