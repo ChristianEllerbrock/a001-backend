@@ -2,16 +2,16 @@ import { Field, Int, ObjectType } from "type-graphql";
 
 @ObjectType()
 export class LookupStatisticsOutput {
-    @Field((type) => String)
+    @Field(() => String)
     identifier!: string;
 
-    @Field((type) => String)
+    @Field(() => String)
     domain!: string;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     total!: number;
 
-    @Field((type) => String)
+    @Field(() => String)
     pubkey!: string;
 }
 

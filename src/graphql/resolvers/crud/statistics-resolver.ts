@@ -10,8 +10,6 @@ import { LookupStatisticsOutput } from "../../outputs/statistics/lookup-statisti
 import { RMService } from "../../../services/redis-memory-service";
 import { CronService } from "../../../services/cron-service";
 
-const USAGE_STATISTICS = "usageStatistics";
-
 @Resolver()
 export class StatisticsResolver {
     @Query(() => UsageStatisticsOutput)
@@ -68,9 +66,11 @@ export class StatisticsResolver {
 
         let noOfLookupsToday = 0;
         let noOfLookupsYesterday = 0;
+        let noOfLookupsTotal = 0;
         const erTypeGlobalLookupStats =
             await RMService.i.globalLookupStats.fetch();
         if (erTypeGlobalLookupStats) {
+            noOfLookupsTotal = erTypeGlobalLookupStats.data.lookups;
             noOfLookupsToday =
                 erTypeGlobalLookupStats.data.dailyLookups.find(
                     (x) => x.date.slice(0, 10) === todayString.slice(0, 10)
@@ -112,6 +112,7 @@ export class StatisticsResolver {
         const stats: UsageStatisticsOutput = {
             noOfUsers,
             noOfRegistrations,
+            noOfLookupsTotal,
             noOfLookupsYesterday,
             noOfLookupsToday,
             date: now.toJSDate(),

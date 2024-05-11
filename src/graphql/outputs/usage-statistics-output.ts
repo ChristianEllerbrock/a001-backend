@@ -4,37 +4,40 @@ import { LookupStatisticsOutput } from "./statistics/lookup-statistics-output";
 
 @ObjectType()
 export class RegistrationsPerDomainStatisticsOutput {
-    @Field((type) => String)
+    @Field(() => String)
     domain!: string;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     registrations!: number;
 }
 
 @ObjectType()
 export class UsageStatisticsOutput {
-    @Field((type) => Date)
+    @Field(() => Date)
     date!: Date;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     noOfUsers!: number;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     noOfRegistrations!: number;
 
-    @Field((type) => Int)
+    @Field(() => Int)
+    noOfLookupsTotal!: number;
+
+    @Field(() => Int)
     noOfLookupsYesterday!: number;
 
-    @Field((type) => Int)
+    @Field(() => Int)
     noOfLookupsToday!: number;
 
-    @Field((type) => [LookupStatisticsOutput])
+    @Field(() => [LookupStatisticsOutput])
     topLookupsToday!: LookupStatisticsOutput[];
 
-    @Field((type) => [RegistrationStatisticsOutput])
+    @Field(() => [RegistrationStatisticsOutput])
     lastRegistrations!: RegistrationStatisticsOutput[];
 
-    @Field((type) => [RegistrationsPerDomainStatisticsOutput])
+    @Field(() => [RegistrationsPerDomainStatisticsOutput])
     registrationsPerDomain!: RegistrationsPerDomainStatisticsOutput[];
 }
 
