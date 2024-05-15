@@ -39,6 +39,7 @@ import { Nip05NostrService } from "../../../services/nip05-nostr/nip05-nostr-ser
 import { NostrPubkeyObject } from "../../../nostr/type-defs";
 import { verifyEvent } from "nostr-tools";
 import { RMService } from "../../../services/redis-memory-service";
+import { Registration } from "@prisma/client";
 
 //const NOSTR_STATISTICS = "nostrStatistics";
 
@@ -187,6 +188,20 @@ export class RegistrationResolver {
             name.trim().toLowerCase(),
             systemDomainId
         );
+    }
+
+    @Authorized()
+    @Query(() => RegistrationOutput, { nullable: true })
+    async registration(
+        @Ctx() context: GraphqlContext,
+        @Arg("id") id: string
+    ): Promise<RegistrationOutput | null> {
+        return await context.db.registration.findUnique({
+            where: {
+                id,
+                userId: context.user?.userId,
+            },
+        });
     }
 
     @Authorized()
