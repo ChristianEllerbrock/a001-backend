@@ -1,0 +1,208 @@
+openapi: 3.0.1
+info:
+  title: NIP05.social API
+  version: 1.0.0
+  description: NIP05.social API
+  termsOfService: https://example.com/terms
+  contact:
+    name: Chris
+    url: https://nip05.social
+    email: chris@iijat.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+- url: http://localhost:4000/v1
+  description: Local server
+- url: https://nip05api.azurewebsites.net/v1
+  description: Production server
+tags:
+- name: CRUD operations
+paths:
+  /registrations:
+    get:
+      description: Get all registrations.
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RegistrationDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Authorization information is missing or invalid.
+  /registration/{id}:
+    get:
+      description: Get a single registration by its id.
+      parameters:
+      - name: id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Registration id
+        example: 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Authorization information is missing or invalid.
+        '404':
+          description: A registration with the specified id was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: A registration with the id 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d was not found.
+    patch:
+      description: Update a registration by its id.
+      parameters:
+      - name: id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Registration id
+        example: 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationPatchDto'
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Authorization information is missing or invalid.
+        '404':
+          description: A registration with the specified id was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: A registration with the id 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d was not found.
+        '500':
+          description: An error occurred while updating the registration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: An error occurred while updating the registration.
+security:
+- bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+    RegistrationDto:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: false
+          example: 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+        userId:
+          type: string
+          nullable: false
+          example: b604d4ad-271d-46b4-a14b-ac15439e07a3
+        nostrAddress:
+          type: string
+          nullable: false
+          example: starlord@nip05.social
+        lightningAddress:
+          type: string
+          nullable: true
+          example: tellington12@walletofsatoshi.com
+        emailIn:
+          type: boolean
+          nullable: false
+          example: true
+        emailOut:
+          type: boolean
+          nullable: false
+          example: false
+        emailOutSubject:
+          type: string
+          nullable: false
+          example: Nostr2Email is cool!
+        relays:
+          type: array
+          nullable: false
+          items:
+            type: string
+            nullable: false
+            example: wss://relay.nip05.social
+      required:
+      - id
+      - userId
+      - nostrAddress
+      - lightningAddress
+      - emailIn
+      - emailOut
+      - emailOutSubject
+      - relays
+    RegistrationPatchDto:
+      type: object
+      properties:
+        lightningAddress:
+          type: string
+          nullable: true
+          example: tellington12@walletofsatoshi.com
+        emailIn:
+          type: boolean
+          nullable: false
+          example: true
+        emailOut:
+          type: boolean
+          nullable: false
+          example: false
+        emailOutSubject:
+          type: string
+          nullable: false
+          example: Nostr2Email is cool!
+        relays:
+          type: array
+          nullable: false
+          items:
+            type: string
+            nullable: false
+            example: wss://relay.nip05.social

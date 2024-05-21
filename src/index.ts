@@ -33,8 +33,14 @@ import { emailControllerV2 } from "./controllers/email/email-controller-v2";
 import { errorHandler } from "./middlewares/errors";
 import { RMService } from "./services/redis-memory-service";
 import { CronService } from "./services/cron-service";
-import { Migration } from "./services/migration";
-// import { Migration } from "./services/migration";
+
+import * as swaggerUi from "swagger-ui-express";
+import registrationController from "./controllers/v1/registration-controller";
+import authMiddleware from "./controllers/auth";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+// const yaml = require("../open-api/schema.yml");
+import YAML from "yamljs";
+const openApiSchema = YAML.load("./src/open-api/schema.yml");
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -43,6 +49,8 @@ const GRAPHQL_ENDPOINT = "/graphql";
 
 const app: Express = express();
 const port = EnvService.instance.env.PORT;
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiSchema));
 
 app.use(express.json());
 app.use(cors());
@@ -111,6 +119,23 @@ app.get("/tools/gen-key-pair", genKeyPairController);
 
 // Alby controllers
 app.post("/alby/payment-in", paymentInController);
+
+// V1 Controllers
+app.get(
+    "/v1/registrations",
+    authMiddleware,
+    registrationController.getRegistrations
+);
+app.get(
+    "/v1/registration/:id",
+    authMiddleware,
+    registrationController.getRegistration
+);
+app.patch(
+    "/v1/registration/:id",
+    authMiddleware,
+    registrationController.patchRegistration
+);
 
 // Error handling
 app.use(errorHandler);

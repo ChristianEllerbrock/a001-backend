@@ -19,7 +19,12 @@
     "declaration": true,
     "declarationMap": true /* Create sourcemaps for d.ts files. */,
     "skipLibCheck": true /* Skip type checking all .d.ts files. */,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@open-api": ["./src/open-api/@types.ts"]
+      // "@config": ["../open-api/@types.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
