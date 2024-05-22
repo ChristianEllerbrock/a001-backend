@@ -4,6 +4,11 @@ import { AuthenticatedRequest } from "../auth";
 import { RegistrationDto, RegistrationPatchDto } from "@open-api";
 import { Registration, RegistrationRelay, SystemDomain } from "@prisma/client";
 import { HelperRegex } from "../../helpers/helper-regex";
+import { Nip05NostrService } from "../../services/nip05-nostr/nip05-nostr-service";
+import {
+    generateMessageEmailInActivated,
+    generateMessageEmailOutActivated,
+} from "../../common/direct-messages/messages";
 
 const getRegistrations = async function (
     req: Request,
@@ -78,6 +83,7 @@ const patchRegistration = async function (
                 userId: extendedReq.user.id,
             },
             include: {
+                user: true,
                 systemDomain: true,
                 registrationRelays: true,
             },
@@ -122,6 +128,17 @@ const patchRegistration = async function (
         return;
     }
 
+    // Check, if the provided lightning address is valid.
+    if (
+        patchDto.lightningAddress &&
+        !HelperRegex.isValidLightningAddress(patchDto.lightningAddress)
+    ) {
+        res.status(400).json({
+            message: "Invalid lightning address.",
+        });
+        return;
+    }
+
     // Check, if the provided relays are valid.
     if (
         typeof patchDto.relays !== "undefined" &&
@@ -129,6 +146,15 @@ const patchRegistration = async function (
     ) {
         res.status(400).json({
             message: "One of the provided relay addresses is not valid.",
+        });
+        return;
+    }
+
+    // Check, if the user has activated EMAIL OUT but is only on the free plan.
+    if (patchDto.emailOut && sqlRegistration.user.subscriptionId === 1) {
+        res.status(400).json({
+            message:
+                "You are currently on the free BASIC plan where EMAIL OUT is not available. Subscribe to a paid plan first.",
         });
         return;
     }
@@ -198,6 +224,40 @@ const patchRegistration = async function (
             }
         }
     });
+
+    // Trigger a DM if the user has activated EMAIL IN
+    if (patchDto.emailIn) {
+        Nip05NostrService.instance
+            .getRelevantAccountRelays(sqlRegistration.user.pubkey)
+            .then(async (relays) => {
+                await Nip05NostrService.instance.sendDMFromBot(
+                    sqlRegistration.user.pubkey,
+                    relays,
+                    generateMessageEmailInActivated(
+                        sqlRegistration.identifier +
+                            "@" +
+                            sqlRegistration.systemDomain.name
+                    )
+                );
+            });
+    }
+
+    // Trigger a DM if the user has activated EMAIL OUT
+    if (patchDto.emailOut) {
+        Nip05NostrService.instance
+            .getRelevantAccountRelays(sqlRegistration.user.pubkey)
+            .then(async (relays) => {
+                await Nip05NostrService.instance.sendDMFromBot(
+                    sqlRegistration.user.pubkey,
+                    relays,
+                    generateMessageEmailOutActivated(
+                        sqlRegistration.identifier +
+                            "@" +
+                            sqlRegistration.systemDomain.name
+                    )
+                );
+            });
+    }
 
     const updatedSqlRegistration =
         await extendedReq.context.sql.registration.findFirst({

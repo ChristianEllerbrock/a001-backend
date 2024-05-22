@@ -122,10 +122,10 @@ export class Nip05NostrService {
     }
 
     /**
-     * This methods returns all relays that the user has configured for any
-     * of his registrations plus all public relays configured in the database
-     * plus all user configured NIP65 relays on any of these plus
-     * "relay.nip05.social".
+     * This methods returns all relays that the user has configured as NIP-05 relays
+     * for any of his registrations plus 'relay.nip05.social' plus a list of public relays
+     * maintained in the database plus all read-relays found
+     * in any NIP-65 relay list published on these relays.
      */
     async getRelevantAccountRelays(pubkey: string): Promise<string[]> {
         const ownRelay = EnvService.instance.env.RELAY_URL; //"wss://relay.nip05.social";
