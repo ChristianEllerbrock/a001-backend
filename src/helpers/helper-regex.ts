@@ -9,5 +9,10 @@ export class HelperRegex {
         const regExp = /^[\w-\.]+@([\w-]+\.)+[A-Z]{2,}$/i;
         return regExp.test(address);
     }
+
+    static isValidNostrAddress(address: string): boolean {
+        const regExp = /^[\w-\.]+@([\w-]+\.)+[A-Z]{2,}$/i;
+        return regExp.test(address);
+    }
 }
 

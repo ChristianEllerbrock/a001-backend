@@ -120,6 +120,40 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 message: An error occurred while updating the registration.
+  /check/is-available/{id}:
+    get:
+      description: Check if a nostr address is available.
+      parameters:
+      - name: id
+        in: path
+        schema:
+          type: string
+        required: true
+        description: Nostr address
+        example: frank@protonostr.com
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IsAvailableDto'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Please provide a valid nostr address.
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: An error occurred while checking if the nostr address is available.
 security:
 - bearerAuth: []
 components:
@@ -206,3 +240,22 @@ components:
             type: string
             nullable: false
             example: wss://relay.nip05.social
+    IsAvailableDto:
+      type: object
+      properties:
+        nostrAddress:
+          type: string
+          nullable: false
+          example: frank@protonostr.com
+        isAvailable:
+          type: boolean
+          nullable: false
+          example: true
+        reason:
+          type: string
+          nullable: true
+          example: The address is already taken.
+      required:
+      - nostrAddress
+      - isAvailable
+

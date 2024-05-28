@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Response, Request } from "express";
-import { AuthenticatedRequest } from "../auth";
+import { AuthenticatedRequest } from "../auth-middleware";
 import { RegistrationDto, RegistrationPatchDto } from "@open-api";
 import { Registration, RegistrationRelay, SystemDomain } from "@prisma/client";
 import { HelperRegex } from "../../helpers/helper-regex";

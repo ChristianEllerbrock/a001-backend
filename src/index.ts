@@ -36,10 +36,12 @@ import { CronService } from "./services/cron-service";
 
 import * as swaggerUi from "swagger-ui-express";
 import registrationController from "./controllers/v1/registration-controller";
-import authMiddleware from "./controllers/auth";
+import authMiddleware from "./controllers/auth-middleware";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 // const yaml = require("../open-api/schema.yml");
 import YAML from "yamljs";
+import checkController from "./controllers/v1/check-controller";
+import unauthMiddleware from "./controllers/v1/unauth-middleware";
 const openApiSchema = YAML.load("./src/open-api/schema.yml");
 
 // Load any environmental variables from the local .env file
@@ -121,6 +123,11 @@ app.get("/tools/gen-key-pair", genKeyPairController);
 app.post("/alby/payment-in", paymentInController);
 
 // V1 Controllers
+app.get(
+    "/v1/check/is-available/:id",
+    unauthMiddleware,
+    checkController.isAvailable
+);
 app.get(
     "/v1/registrations",
     authMiddleware,
