@@ -101,6 +101,40 @@ export interface paths {
       };
     };
   };
+  "/check/is-available/{id}": {
+    /** @description Check if a nostr address is available. */
+    get: {
+      parameters: {
+        path: {
+          /**
+           * @description Nostr address
+           * @example frank@protonostr.com
+           */
+          id: string;
+        };
+      };
+      responses: {
+        /** @description Ok */
+        200: {
+          content: {
+            "application/json": components["schemas"]["IsAvailableDto"];
+          };
+        };
+        /** @description Bad request. */
+        400: {
+          content: {
+            "application/json": components["schemas"]["Error"];
+          };
+        };
+        /** @description Internal Server Error */
+        500: {
+          content: {
+            "application/json": components["schemas"]["Error"];
+          };
+        };
+      };
+    };
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -137,6 +171,14 @@ export interface components {
       /** @example Nostr2Email is cool! */
       emailOutSubject?: string;
       relays?: string[];
+    };
+    IsAvailableDto: {
+      /** @example frank@protonostr.com */
+      nostrAddress: string;
+      /** @example true */
+      isAvailable: boolean;
+      /** @example The address is already taken. */
+      reason?: string | null;
     };
   };
   responses: never;
