@@ -26,7 +26,7 @@
     "dev": "npm run clean && npm run cp-views && concurrently \"npx tsc --watch\" \"nodemon --inspect src/index.ts\"",
     "dev2": "npm run clean && npm run cp-views && concurrently --kill-others \"npx tsc -w\" \"nodemon -q -w dist dist/index.js\"",
     "kill": "fuser 4000/tcp -k",
-    "generate-schema": "npx openapi-typescript ./src/open-api/schema.yml -o ./src/open-api/schema.d.ts"
+    "generate-schema": "npx openapi-typescript ./src/open-api/schema.yaml -o ./src/open-api/schema.d.ts"
   },
   "dependencies": {
     "@azure/arm-communication": "^4.0.0",

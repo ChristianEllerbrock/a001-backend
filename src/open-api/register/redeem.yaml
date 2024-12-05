@@ -1,0 +1,17 @@
+/register/redeem:
+  post:
+    description: Redeem a previously requested register
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/register-redeem-post-dto.yaml#/RegisterRedeemPostDto'
+    responses:
+      '200':
+        description: Ok
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/register-redeem-response-dto.yaml#/RegisterRedeemResponseDto'
+

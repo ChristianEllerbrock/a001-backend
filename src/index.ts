@@ -16,7 +16,7 @@ import { wellKnownLightningController } from "./controllers/well-known-lightning
 import { testController } from "./controllers/test-controller";
 import { WebSocketServer } from "ws";
 import { emailController } from "./controllers/email/email-controller";
-var path = require("path");
+//var path = require("path");
 import multer from "multer";
 import { adminUpdateEmailAboutController } from "./controllers/admin/update-email-about-controller";
 import { publishSystemUserController } from "./controllers/admin/publish-system-user";
@@ -41,8 +41,10 @@ import authMiddleware from "./controllers/auth-middleware";
 // const yaml = require("../open-api/schema.yml");
 import YAML from "yamljs";
 import checkController from "./controllers/v1/check-controller";
-import unauthMiddleware from "./controllers/v1/unauth-middleware";
-const openApiSchema = YAML.load("./src/open-api/schema.yml");
+import authOrUnauthMiddleware from "./controllers/auth-or-unauth-middleware";
+import registerController from "./controllers/v1/register-controller";
+import unauthMiddleware from "./controllers/unauth-middleware";
+const openApiSchema = YAML.load("./src/open-api/schema.yaml");
 
 // Load any environmental variables from the local .env file
 dotenv.config();
@@ -57,8 +59,8 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(openApiSchema));
 app.use(express.json());
 app.use(cors());
 
-app.set("views", path.join(__dirname, "views"));
-app.engine("html", require("ejs").renderFile);
+//app.set("views", path.join(__dirname, "views"));
+//app.engine("html", require("ejs").renderFile);
 
 // API Controller routes
 app.get("/.test", testController);
@@ -142,6 +144,12 @@ app.patch(
     "/v1/registration/:id",
     authMiddleware,
     registrationController.patchRegistration
+);
+
+app.post(
+    "/v1/register/request",
+    authOrUnauthMiddleware,
+    registerController.registerRequest
 );
 
 // Error handling

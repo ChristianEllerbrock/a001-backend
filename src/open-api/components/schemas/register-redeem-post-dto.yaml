@@ -1,0 +1,40 @@
+RegisterRedeemPostDto:
+  type: object
+  properties:
+    deviceId:
+      type: string
+    registrationId:
+      type: string
+    data:
+      type: object
+      properties:
+        id:
+          type: string
+        pubkey:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        sig:
+          type: string
+        created_at:
+          type: number
+        kind:
+          type: number
+      required:
+      - id
+      - pubkey
+      - content
+      - tags
+      - sig
+      - created_at
+      - kind
+  required:
+  - deviceId
+  - registrationId
+  - data

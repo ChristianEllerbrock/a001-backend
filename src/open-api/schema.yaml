@@ -30,13 +30,13 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/RegistrationDto'
+                  $ref: 'components/schemas/registration-dto.yaml#/RegistrationDto'
         '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: Authorization information is missing or invalid.
   /registration/{id}:
@@ -56,13 +56,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistrationDto'
+                $ref: 'components/schemas/registration-dto.yaml#/RegistrationDto'
         '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: Authorization information is missing or invalid.
         '404':
@@ -70,7 +70,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: A registration with the id 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d was not found.
     patch:
@@ -88,20 +88,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegistrationPatchDto'
+              $ref: 'components/schemas/registration-patch-dto.yaml#/RegistrationPatchDto'
       responses:
         '200':
           description: Ok
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistrationDto'
+                $ref: 'components/schemas/registration-dto.yaml#/RegistrationDto'
         '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: Authorization information is missing or invalid.
         '404':
@@ -109,7 +109,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: A registration with the id 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d was not found.
         '500':
@@ -117,7 +117,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: An error occurred while updating the registration.
   /check/is-available/{id}:
@@ -137,13 +137,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IsAvailableDto'
+                $ref: 'components/schemas/is-available-dto.yaml#/IsAvailableDto'
         '400':
           description: Bad request.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: Please provide a valid nostr address.
         '500':
@@ -151,9 +151,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: 'components/schemas/error.yaml#/Error'
               example:
                 message: An error occurred while checking if the nostr address is available.
+  /register/request:
+    $ref: 'register/request.yaml#/~1register~1request'
+  /register/redeem:
+    $ref: 'register/redeem.yaml#/~1register~1redeem'
 security:
 - bearerAuth: []
 components:
@@ -163,99 +167,20 @@ components:
       scheme: bearer
   schemas:
     Error:
-      type: object
-      properties:
-        message:
-          type: string
-    RegistrationDto:
-      type: object
-      properties:
-        id:
-          type: string
-          nullable: false
-          example: 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
-        userId:
-          type: string
-          nullable: false
-          example: b604d4ad-271d-46b4-a14b-ac15439e07a3
-        nostrAddress:
-          type: string
-          nullable: false
-          example: starlord@nip05.social
-        lightningAddress:
-          type: string
-          nullable: true
-          example: tellington12@walletofsatoshi.com
-        emailIn:
-          type: boolean
-          nullable: false
-          example: true
-        emailOut:
-          type: boolean
-          nullable: false
-          example: false
-        emailOutSubject:
-          type: string
-          nullable: false
-          example: Nostr2Email is cool!
-        relays:
-          type: array
-          nullable: false
-          items:
-            type: string
-            nullable: false
-            example: wss://relay.nip05.social
-      required:
-      - id
-      - userId
-      - nostrAddress
-      - lightningAddress
-      - emailIn
-      - emailOut
-      - emailOutSubject
-      - relays
-    RegistrationPatchDto:
-      type: object
-      properties:
-        lightningAddress:
-          type: string
-          nullable: true
-          example: tellington12@walletofsatoshi.com
-        emailIn:
-          type: boolean
-          nullable: false
-          example: true
-        emailOut:
-          type: boolean
-          nullable: false
-          example: false
-        emailOutSubject:
-          type: string
-          nullable: false
-          example: Nostr2Email is cool!
-        relays:
-          type: array
-          nullable: false
-          items:
-            type: string
-            nullable: false
-            example: wss://relay.nip05.social
+      $ref: 'components/schemas/error.yaml#/Error'
     IsAvailableDto:
-      type: object
-      properties:
-        nostrAddress:
-          type: string
-          nullable: false
-          example: frank@protonostr.com
-        isAvailable:
-          type: boolean
-          nullable: false
-          example: true
-        reason:
-          type: string
-          nullable: true
-          example: The address is already taken.
-      required:
-      - nostrAddress
-      - isAvailable
-
+      $ref: 'components/schemas/is-available-dto.yaml#/IsAvailableDto'
+    RegisterRequestPostDto:
+      $ref: 'components/schemas/register-request-post-dto.yaml#/RegisterRequestPostDto'
+    RegisterRequestResponseDto:
+      $ref: 'components/schemas/register-request-response-dto.yaml#/RegisterRequestResponseDto'
+    RegisterRedeemPostDto:
+      $ref: 'components/schemas/register-redeem-post-dto.yaml#/RegisterRedeemPostDto'
+    RegisterRedeemResponseDto:
+      $ref: 'components/schemas/register-redeem-response-dto.yaml#/RegisterRedeemResponseDto'
+    RegistrationDto:
+      $ref: 'components/schemas/registration-dto.yaml#/RegistrationDto'
+    RegistrationPatchDto:
+      $ref: 'components/schemas/registration-patch-dto.yaml#/RegistrationPatchDto'
+    UserTokenDto:
+      $ref: 'components/schemas/user-token-dto.yaml#/UserTokenDto'

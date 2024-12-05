@@ -1,0 +1,47 @@
+RegistrationDto:
+  type: object
+  properties:
+    id:
+      type: string
+      nullable: false
+      example: 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+    userId:
+      type: string
+      nullable: false
+      example: b604d4ad-271d-46b4-a14b-ac15439e07a3
+    nostrAddress:
+      type: string
+      nullable: false
+      example: starlord@nip05.social
+    lightningAddress:
+      type: string
+      nullable: true
+      example: tellington12@walletofsatoshi.com
+    emailIn:
+      type: boolean
+      nullable: false
+      example: true
+    emailOut:
+      type: boolean
+      nullable: false
+      example: false
+    emailOutSubject:
+      type: string
+      nullable: false
+      example: Nostr2Email is cool!
+    relays:
+      type: array
+      nullable: false
+      items:
+        type: string
+        nullable: false
+        example: wss://relay.nip05.social
+  required:
+  - id
+  - userId
+  - nostrAddress
+  - lightningAddress
+  - emailIn
+  - emailOut
+  - emailOutSubject
+  - relays

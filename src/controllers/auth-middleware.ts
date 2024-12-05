@@ -3,7 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import { PrismaService } from "../services/prisma-service";
 import { PrismaClient } from "@prisma/client";
 
-export type AuthenticatedRequest = Request & {
+export type AuthRequest = Request & {
     context: {
         sql: PrismaClient;
     };
@@ -66,8 +66,8 @@ const authMiddleware = async function (
         sql: db,
     };
 
-    (req as AuthenticatedRequest).user = user;
-    (req as AuthenticatedRequest).context = context;
+    (req as AuthRequest).user = user;
+    (req as AuthRequest).context = context;
 
     next();
 };

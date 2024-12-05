@@ -1,8 +1,8 @@
 import { Response, Request } from "express";
 import { HelperIdentifier } from "../../helpers/identifier";
-import { UnauthenticatedRequest } from "./unauth-middleware";
 import { HelperRegex } from "../../helpers/helper-regex";
 import { IsAvailableDto } from "@open-api";
+import { UnauthRequest } from "../unauth-middleware";
 
 const isAvailable = async function (
     req: Request,
@@ -15,7 +15,7 @@ const isAvailable = async function (
         return;
     }
 
-    const extendedReq = req as UnauthenticatedRequest;
+    const extendedReq = req as UnauthRequest;
     const [identifier, domain] = nostrAddress.toLowerCase().split("@");
 
     // Get the system domain id.

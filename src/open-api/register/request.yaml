@@ -1,0 +1,32 @@
+/register/request:
+  post:
+    description: Register a new nostr address.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/register-request-post-dto.yaml#/RegisterRequestPostDto'
+    responses:
+      '201':
+        description: Created
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/register-request-response-dto.yaml#/RegisterRequestResponseDto'
+      '400':
+        description: Bad request.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/error.yaml#/Error'
+            example:
+              message: Please provide a valid request.
+      '500':
+        description: Internal Server Error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/error.yaml#/Error'
+            example:
+              message: An error occurred while registering the user.

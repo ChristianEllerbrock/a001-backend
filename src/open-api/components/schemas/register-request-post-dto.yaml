@@ -1,0 +1,21 @@
+RegisterRequestPostDto:
+  type: object
+  properties:
+    nostrAddress:
+      type: string
+      nullable: false
+      example: bunny@protonostr.com
+    pubkey:
+      type: string
+      nullable: true
+      example: 090e4e48e07e331b7a9eb527532794969ab1086ddfa4d805fff88c6358e9d15d
+    viaNip07:
+      type: boolean
+      nullable: false
+      example: true
+    viaDm:
+      type: boolean
+      nullable: false
+      example: false
+  required:
+  - nostrAddress

@@ -1,0 +1,16 @@
+UserTokenDto:
+  type: object
+  properties:
+    userId:
+      type: string
+    deviceId:
+      type: string
+    token:
+      type: string
+    validUntil:
+      type: string
+  required:
+  - userId
+  - deviceId
+  - token
+  - validUntil

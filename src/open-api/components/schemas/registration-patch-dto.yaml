@@ -1,0 +1,26 @@
+RegistrationPatchDto:
+  type: object
+  properties:
+    lightningAddress:
+      type: string
+      nullable: true
+      example: tellington12@walletofsatoshi.com
+    emailIn:
+      type: boolean
+      nullable: false
+      example: true
+    emailOut:
+      type: boolean
+      nullable: false
+      example: false
+    emailOutSubject:
+      type: string
+      nullable: false
+      example: Nostr2Email is cool!
+    relays:
+      type: array
+      nullable: false
+      items:
+        type: string
+        nullable: false
+        example: wss://relay.nip05.social

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Response, Request } from "express";
-import { AuthenticatedRequest } from "../auth-middleware";
+import { AuthRequest } from "../auth-middleware";
 import { RegistrationDto, RegistrationPatchDto } from "@open-api";
 import { Registration, RegistrationRelay, SystemDomain } from "@prisma/client";
 import { HelperRegex } from "../../helpers/helper-regex";
@@ -15,7 +15,7 @@ const getRegistrations = async function (
     res: Response
     /*next: NextFunction*/
 ) {
-    const extendedReq = req as AuthenticatedRequest;
+    const extendedReq = req as AuthRequest;
     const sqlRegistrations =
         await extendedReq.context.sql.registration.findMany({
             where: {
@@ -42,7 +42,7 @@ const getRegistration = async function (
     /*next: NextFunction*/
 ) {
     const id = req.params.id;
-    const extendedReq = req as AuthenticatedRequest;
+    const extendedReq = req as AuthRequest;
 
     const sqlRegistration =
         await extendedReq.context.sql.registration.findFirst({
@@ -74,7 +74,7 @@ const patchRegistration = async function (
     /*next: NextFunction*/
 ) {
     const id = req.params.id;
-    const extendedReq = req as AuthenticatedRequest;
+    const extendedReq = req as AuthRequest;
 
     const sqlRegistration =
         await extendedReq.context.sql.registration.findFirst({

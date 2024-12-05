@@ -1,0 +1,21 @@
+RegisterRequestResponseDto:
+  type: object
+  properties:
+    variantAuthenticated:
+      nullable: true
+      $ref: './registration-dto.yaml#/RegistrationDto'
+    variantNip07:
+      type: object
+      nullable: true
+      properties:
+        registrationId:
+          type: string
+          nullable: false
+        code:
+          type: string
+          nullable: false
+      required:
+      - registrationId
+      - code
+
+

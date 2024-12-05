@@ -3,193 +3,413 @@
  * Do not make direct changes to the file.
  */
 
-
 export interface paths {
-  "/registrations": {
-    /** @description Get all registrations. */
-    get: {
-      responses: {
-        /** @description Ok */
-        200: {
-          content: {
-            "application/json": components["schemas"]["RegistrationDto"][];
-          };
+    "/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        /** @description Unauthorized */
-        401: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
+        /** @description Get all registrations. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RegistrationDto"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-  };
-  "/registration/{id}": {
-    /** @description Get a single registration by its id. */
-    get: {
-      parameters: {
-        path: {
-          /**
-           * @description Registration id
-           * @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
-           */
-          id: string;
+    "/registration/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Ok */
-        200: {
-          content: {
-            "application/json": components["schemas"]["RegistrationDto"];
-          };
+        /** @description Get a single registration by its id. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Registration id
+                     * @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RegistrationDto"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration with the specified id was not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description Unauthorized */
-        401: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Update a registration by its id. */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Registration id
+                     * @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegistrationPatchDto"];
+                };
+            };
+            responses: {
+                /** @description Ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RegistrationDto"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration with the specified id was not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description An error occurred while updating the registration. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description A registration with the specified id was not found. */
-        404: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-      };
+        trace?: never;
     };
-    /** @description Update a registration by its id. */
-    patch: {
-      parameters: {
-        path: {
-          /**
-           * @description Registration id
-           * @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d
-           */
-          id: string;
+    "/check/is-available/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      requestBody: {
-        content: {
-          "application/json": components["schemas"]["RegistrationPatchDto"];
+        /** @description Check if a nostr address is available. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Nostr address
+                     * @example frank@protonostr.com
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IsAvailableDto"];
+                    };
+                };
+                /** @description Bad request. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-      };
-      responses: {
-        /** @description Ok */
-        200: {
-          content: {
-            "application/json": components["schemas"]["RegistrationDto"];
-          };
-        };
-        /** @description Unauthorized */
-        401: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-        /** @description A registration with the specified id was not found. */
-        404: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-        /** @description An error occurred while updating the registration. */
-        500: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-      };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-  };
-  "/check/is-available/{id}": {
-    /** @description Check if a nostr address is available. */
-    get: {
-      parameters: {
-        path: {
-          /**
-           * @description Nostr address
-           * @example frank@protonostr.com
-           */
-          id: string;
+    "/register/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-      };
-      responses: {
-        /** @description Ok */
-        200: {
-          content: {
-            "application/json": components["schemas"]["IsAvailableDto"];
-          };
+        get?: never;
+        put?: never;
+        /** @description Register a new nostr address. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegisterRequestPostDto"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RegisterRequestResponseDto"];
+                    };
+                };
+                /** @description Bad request. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
         };
-        /** @description Bad request. */
-        400: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-        /** @description Internal Server Error */
-        500: {
-          content: {
-            "application/json": components["schemas"]["Error"];
-          };
-        };
-      };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-  };
+    "/register/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Redeem a previously requested register */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RegisterRedeemPostDto"];
+                };
+            };
+            responses: {
+                /** @description Ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserTokenDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-
 export type webhooks = Record<string, never>;
-
 export interface components {
-  schemas: {
-    Error: {
-      message?: string;
+    schemas: {
+        Error: {
+            message: string;
+        };
+        IsAvailableDto: {
+            /** @example frank@protonostr.com */
+            nostrAddress: string;
+            /** @example true */
+            isAvailable: boolean;
+            /** @example The address is already taken. */
+            reason?: string | null;
+        };
+        RegisterRequestPostDto: {
+            /** @example bunny@protonostr.com */
+            nostrAddress: string;
+            /** @example 090e4e48e07e331b7a9eb527532794969ab1086ddfa4d805fff88c6358e9d15d */
+            pubkey?: string | null;
+            /** @example true */
+            viaNip07?: boolean;
+            /** @example false */
+            viaDm?: boolean;
+        };
+        RegisterRequestResponseDto: {
+            variantAuthenticated?: components["schemas"]["RegistrationDto"];
+            variantNip07?: {
+                registrationId: string;
+                code: string;
+            } | null;
+        };
+        RegisterRedeemPostDto: {
+            deviceId: string;
+            registrationId: string;
+            data: {
+                id: string;
+                pubkey: string;
+                content: string;
+                tags: string[][];
+                sig: string;
+                created_at: number;
+                kind: number;
+            };
+        };
+        RegisterRedeemResponseDto: components["schemas"]["UserTokenDto"];
+        RegistrationDto: {
+            /** @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d */
+            id: string;
+            /** @example b604d4ad-271d-46b4-a14b-ac15439e07a3 */
+            userId: string;
+            /** @example starlord@nip05.social */
+            nostrAddress: string;
+            /** @example tellington12@walletofsatoshi.com */
+            lightningAddress: string | null;
+            /** @example true */
+            emailIn: boolean;
+            /** @example false */
+            emailOut: boolean;
+            /** @example Nostr2Email is cool! */
+            emailOutSubject: string;
+            relays: string[];
+        };
+        RegistrationPatchDto: {
+            /** @example tellington12@walletofsatoshi.com */
+            lightningAddress?: string | null;
+            /** @example true */
+            emailIn?: boolean;
+            /** @example false */
+            emailOut?: boolean;
+            /** @example Nostr2Email is cool! */
+            emailOutSubject?: string;
+            relays?: string[];
+        };
+        UserTokenDto: {
+            userId: string;
+            deviceId: string;
+            token: string;
+            validUntil: string;
+        };
     };
-    RegistrationDto: {
-      /** @example 5f4e4b2b-3b4d-4b5d-8f93-6c260f1f3d1d */
-      id: string;
-      /** @example b604d4ad-271d-46b4-a14b-ac15439e07a3 */
-      userId: string;
-      /** @example starlord@nip05.social */
-      nostrAddress: string;
-      /** @example tellington12@walletofsatoshi.com */
-      lightningAddress: string | null;
-      /** @example true */
-      emailIn: boolean;
-      /** @example false */
-      emailOut: boolean;
-      /** @example Nostr2Email is cool! */
-      emailOutSubject: string;
-      relays: string[];
-    };
-    RegistrationPatchDto: {
-      /** @example tellington12@walletofsatoshi.com */
-      lightningAddress?: string | null;
-      /** @example true */
-      emailIn?: boolean;
-      /** @example false */
-      emailOut?: boolean;
-      /** @example Nostr2Email is cool! */
-      emailOutSubject?: string;
-      relays?: string[];
-    };
-    IsAvailableDto: {
-      /** @example frank@protonostr.com */
-      nostrAddress: string;
-      /** @example true */
-      isAvailable: boolean;
-      /** @example The address is already taken. */
-      reason?: string | null;
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-
 export type $defs = Record<string, never>;
-
-export type external = Record<string, never>;
-
 export type operations = Record<string, never>;

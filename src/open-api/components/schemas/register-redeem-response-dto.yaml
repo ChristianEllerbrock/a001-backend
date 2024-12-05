@@ -1,0 +1,2 @@
+RegisterRedeemResponseDto:
+  $ref: './user-token-dto.yaml#/UserTokenDto'

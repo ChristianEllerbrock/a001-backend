@@ -1,0 +1,18 @@
+IsAvailableDto:
+  type: object
+  properties:
+    nostrAddress:
+      type: string
+      nullable: false
+      example: frank@protonostr.com
+    isAvailable:
+      type: boolean
+      nullable: false
+      example: true
+    reason:
+      type: string
+      nullable: true
+      example: The address is already taken.
+  required:
+  - nostrAddress
+  - isAvailable
